@@ -16,8 +16,11 @@
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageIcon>icon.png</PackageIcon>
-    <PackageTags>filter;sort;page;source-generator;efcore;linq;iqueryable;roslyn</PackageTags>
+    <PackageTags>filter;sort;page;pagination;source-generator;efcore;entity-framework;linq;iqueryable;roslyn;dynamic-linq;query-builder;aspnetcore;dotnet</PackageTags>
     <PackageReleaseNotes>https://github.com/sheva-serga/Filtering.Net/blob/v$(Version)/CHANGELOG.md</PackageReleaseNotes>
+
+    <IncludeSymbols>true</IncludeSymbols>
+    <SymbolPackageFormat>snupkg</SymbolPackageFormat>
   </PropertyGroup>
 
   <ItemGroup Condition="'$(IsPackable)' != 'false'">

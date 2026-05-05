@@ -45,8 +45,6 @@ jobs:
           -c Release --no-restore
           -p:Version=${{ steps.ver.outputs.version }}
           -p:ContinuousIntegrationBuild=true
-          -p:IncludeSymbols=true
-          -p:SymbolPackageFormat=snupkg
           -o ./artifacts
 
       - name: Pack Filtering.Net.Generator
@@ -63,8 +61,6 @@ jobs:
           -c Release --no-restore
           -p:Version=${{ steps.ver.outputs.version }}
           -p:ContinuousIntegrationBuild=true
-          -p:IncludeSymbols=true
-          -p:SymbolPackageFormat=snupkg
           -o ./artifacts
 
       - name: Upload packages

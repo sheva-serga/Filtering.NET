@@ -5,7 +5,8 @@
     <!-- Enables generator/analyzer-only API restrictions (RS1xxx rules from Roslyn). -->
     <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
     <PackageId>Filtering.Net.Generator</PackageId>
-    <Description>Roslyn source generator + analyzer for Filtering.Net.</Description>
+    <Title>Filtering.Net.Generator — Roslyn Source Generator</Title>
+    <Description>Roslyn source generator and analyzer for Filtering.Net. Generates compile-time-checked filter, sort, and pagination code from your domain types.</Description>
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
     <DevelopmentDependency>true</DevelopmentDependency>

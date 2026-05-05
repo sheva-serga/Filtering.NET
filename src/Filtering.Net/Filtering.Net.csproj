@@ -2,7 +2,8 @@
   <PropertyGroup>
     <TargetFramework>netstandard2.0</TargetFramework>
     <PackageId>Filtering.Net</PackageId>
-    <Description>Source-generated filter/sort/page configurations for IQueryable, EF Core friendly.</Description>
+    <Title>Filtering.Net — Source-Generated IQueryable Filtering</Title>
+    <Description>Type-safe filter, sort, and pagination for IQueryable and EF Core. Source-generated at compile time, with no reflection at request time.</Description>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
   <ItemGroup>
