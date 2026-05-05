@@ -105,7 +105,7 @@ See [`samples/UserManagement.WebApi/`](samples/UserManagement.WebApi/README.md) 
 - TreatWarningsAsErrors is on across the solution. The generator emits clean code against `<Nullable>enable</Nullable>` consumers.
 - Snapshot tests use `Verify.XunitV3`; if you intentionally change the emitted shape, inspect the diff (`diff -uw verified.cs received.cs`), then accept (`mv *.received.cs *.verified.cs`) and commit alongside the source change.
 - Generator emission is template-driven (Scriban). When changing what gets emitted, update the `.scriban` template under `src/Filtering.Net.Generator/Emission/Templates/` and the matching view-model record under `src/Filtering.Net.Generator/Emission/Views/`. Snapshot diffs may go red mid-refactor; compile-and-run tests (`*_Compiles`, `EmittedCodeCompilesTests`) MUST stay green at every step.
-- New diagnostics get an entry in `DiagnosticDescriptors.cs` *and* a one-paragraph markdown file under `docs/diagnostics/`.
+- New diagnostics get an entry in `DiagnosticDescriptors.cs` *and* a markdown explainer under `docs/github/docs/reference/diagnostics/` (the mkdocs-material site source).
 
 ## License
 

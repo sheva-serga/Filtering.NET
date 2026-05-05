@@ -20,7 +20,7 @@ Cross-pipeline diagnostics (`FN1003 ProfileUnused`, `FN1004 OperatorUnused`) joi
 | `Discovery/` | `EnumTypeCollector` — finds enums referenced anywhere in the filter class graph so the per-enum profile auto-emitter can emit one `[FilterProfile<TEnum>]` per. |
 | `ModelExtraction/` | `FilterClassExtractor`, `PropertyMappingExtractor`, `PropertyMapOverrideExtractor`, `ProfileExtractor`, `ProfileResolver`, `ProfileIndex(Builder)`. Pure-functional Roslyn-symbol-walkers that emit `EquatableList<T>`-based records. Models in `Models/`. |
 | `Models/` | Equatable record shapes used between extraction and emission. `FilterClassModel` is the top-level model. `EquatableList<T>` is the deduplication-friendly list type — use it everywhere a model carries a sequence. |
-| `Diagnostics/` | `DiagnosticDescriptors.cs` — every `FN0xxx` / `FN1xxx` registration with help-link URIs pointing at `docs/diagnostics/FNxxxx.md`. |
+| `Diagnostics/` | `DiagnosticDescriptors.cs` — every `FN0xxx` / `FN1xxx` registration with help-link URIs pointing at the published mkdocs site (`https://sheva-serga.github.io/Filtering.NET/reference/diagnostics/FNxxxx/`). Source pages live under `docs/github/docs/reference/diagnostics/`. |
 | `Emission/` | All output. `*Emitter.cs` files own a slice of the generated file. Each exposes `BuildView(model) → record` and `Emit(model) → string` that delegates to a single `ScribanRuntime.Render` call. |
 | `Emission/Templates/` | `.scriban` templates. Embedded as `<EmbeddedResource>`. Each template's logical name maps to the resource `Filtering.Net.Generator.Emission.Templates.{Name}.scriban`. |
 | `Emission/Views/` | Per-template view-model records (PascalCase here, snake_case inside templates via Scriban's `StandardMemberRenamer` default). |

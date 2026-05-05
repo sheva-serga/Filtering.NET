@@ -72,7 +72,7 @@ Then `[Map(nameof(User.Name), Profile = typeof(StringFilterPlus))]` and the new 
 
 ## Diagnostics
 
-25 rules total: 17 errors (`FN0001`–`FN0017`) and 8 warnings (`FN1001`–`FN1008`). Per-rule explainers live at [`docs/diagnostics/`](https://github.com/sheva-serga/Filtering.Net/tree/master/docs/diagnostics) on GitHub.
+25 rules total: 17 errors (`FN0001`–`FN0017`) and 8 warnings (`FN1001`–`FN1008`). Per-rule explainers live in the [diagnostics catalogue](https://sheva-serga.github.io/Filtering.NET/reference/diagnostics/) on the docs site.
 
 | Id | Severity | Summary |
 |----|----------|---------|

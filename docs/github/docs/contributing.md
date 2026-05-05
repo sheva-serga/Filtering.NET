@@ -26,7 +26,7 @@ dotnet test tests/Filtering.Net.Generator.Tests --filter "FullyQualifiedName~Com
 ## Adding a new diagnostic
 
 1. Add a `DiagnosticDescriptor` to `src/Filtering.Net.Generator/Diagnostics/DiagnosticDescriptors.cs` with the next `FN0xxx` / `FN1xxx` id.
-2. Create `docs/diagnostics/FNxxxx.md` — title, what triggers it, how to fix.
+2. Create `docs/github/docs/reference/diagnostics/FNxxxx.md` with frontmatter (`title`, `description`), what triggers it, how to fix, and a "See also" section. Add an entry under `nav` in `docs/github/mkdocs.yml`.
 3. Wire it into the relevant extractor / analyzer.
 4. Add a test under `tests/Filtering.Net.Generator.Tests/` that asserts the diagnostic fires (and does not fire when the offending construct is removed).
 

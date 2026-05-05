@@ -8,12 +8,11 @@ internal static class DiagnosticDescriptors
     private const string Category = "Filtering.Net";
 
     /// <summary>
-    /// Base URI for per-diagnostic explainer markdown files. Resolves to a `master`-branch
-    /// blob URL on GitHub so the link works for any consumer who hits a diagnostic.
+    /// Base URI for per-diagnostic explainer pages on the published mkdocs-material site.
     /// </summary>
-    private const string HelpLinkBase = "https://github.com/sheva-serga/Filtering.Net/blob/master/docs/diagnostics/";
+    private const string HelpLinkBase = "https://sheva-serga.github.io/Filtering.NET/reference/diagnostics/";
 
-    private static string HelpLinkFor(string diagnosticId) => HelpLinkBase + diagnosticId + ".md";
+    private static string HelpLinkFor(string diagnosticId) => HelpLinkBase + diagnosticId + "/";
 
     // ---------- Errors (FN0001 - FN0017) ----------
 
