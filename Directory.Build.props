@@ -16,5 +16,6 @@
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageTags>filter;sort;page;source-generator;efcore;linq;iqueryable;roslyn</PackageTags>
+    <PackageReleaseNotes>https://github.com/sheva-serga/Filtering.Net/blob/v$(Version)/CHANGELOG.md</PackageReleaseNotes>
   </PropertyGroup>
 </Project>
