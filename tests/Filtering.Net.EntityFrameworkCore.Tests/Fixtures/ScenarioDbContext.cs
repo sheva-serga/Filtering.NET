@@ -13,6 +13,6 @@ public sealed class ScenarioDbContext(DbContextOptions<ScenarioDbContext> option
         modelBuilder.Entity<WidgetEntity>().HasKey(widget => widget.Id);
         modelBuilder.Entity<WidgetEntity>()
             .Property(widget => widget.Status)
-            .HasConversion<string>(); // store enum as text so SQLite can sort/filter naturally
+            .HasConversion<WidgetStatusConverter>(); // explicit converter so the [ConvertWith<>] integration scenarios round-trip end to end
     }
 }
