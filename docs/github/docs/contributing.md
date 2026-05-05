@@ -53,16 +53,6 @@ dotnet test tests/Filtering.Net.Generator.Tests --filter "FullyQualifiedName~Com
 
 Compile-and-run and runtime-behaviour tests (`*_Compiles`, `EmittedCodeCompilesTests`, `EndToEndRuntimeTests`) MUST stay green at every step — only snapshot diffs may go red mid-refactor.
 
-## Worktrees
-
-`.worktrees/` is gitignored. For parallel branches that need isolation, use:
-
-```sh
-git worktree add .worktrees/<feature> -b feature/<feature>
-```
-
-The `superpowers:using-git-worktrees` workflow handles cleanup.
-
 ## See also
 
 - [Filtering.Net on GitHub](https://github.com/sheva-serga/Filtering.NET)
