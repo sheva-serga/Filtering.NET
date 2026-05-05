@@ -66,7 +66,8 @@ Bumping these is intentional — the integration tests run against both, so a fl
 
 ## See also
 
-- [Repo on GitHub](https://github.com/sheva-serga/Filtering.Net) — full design + sample ASP.NET Core 9 + PostgreSQL walkthrough.
+- [Documentation site](https://sheva-serga.github.io/Filtering.NET/) — full guides, API reference, diagnostics catalogue.
+- [Repo on GitHub](https://github.com/sheva-serga/Filtering.NET) — source, issue tracker, contribution notes.
 - [`Filtering.Net`](https://www.nuget.org/packages/Filtering.Net/) — runtime request types.
 - [`Filtering.Net.Generator`](https://www.nuget.org/packages/Filtering.Net.Generator/) — source generator + 25-rule analyzer.
 

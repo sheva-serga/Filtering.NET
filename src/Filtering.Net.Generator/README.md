@@ -110,7 +110,8 @@ The generator integrates with Roslyn directly — no MSBuild wiring required bey
 
 ## See also
 
-- [Repo on GitHub](https://github.com/sheva-serga/Filtering.Net) — full design, sample app, contribution notes.
+- [Documentation site](https://sheva-serga.github.io/Filtering.NET/) — full guides, API reference, diagnostics catalogue.
+- [Repo on GitHub](https://github.com/sheva-serga/Filtering.NET) — source, issue tracker, contribution notes.
 - [`Filtering.Net`](https://www.nuget.org/packages/Filtering.Net/) — runtime types the emitted code references.
 - [`Filtering.Net.EntityFrameworkCore`](https://www.nuget.org/packages/Filtering.Net.EntityFrameworkCore/) — async `ApplyPagedAsync` + `PageResult<T>`.
 

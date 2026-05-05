@@ -7,6 +7,10 @@
 
 Type-safe, source-generated filter / sort / page library for `IQueryable<T>` and EF Core. Define your filterable surface with attributes; the source generator emits a strongly-typed `IFilterDefinition<T>` plus a JSON-friendly request model that translates straight to SQL.
 
+## Documentation
+
+Full guides, API reference, and the diagnostics catalogue live at **<https://sheva-serga.github.io/Filtering.NET/>**.
+
 ## Why?
 
 - **Structured JSON over string DSLs.** API consumers post a typed `FilterRequest` (groups + leaves) instead of an opaque DSL fragment. No parser, no escape rules, no surprises.

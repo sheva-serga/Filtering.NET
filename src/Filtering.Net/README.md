@@ -75,10 +75,11 @@ IQueryable<User> result = users.Apply(userFilter, request);
 
 ## See also
 
-- [Repo on GitHub](https://github.com/sheva-serga/Filtering.Net) — full design, contribution notes, sample app.
+- [Documentation site](https://sheva-serga.github.io/Filtering.NET/) — full guides, API reference, diagnostics catalogue.
+- [Repo on GitHub](https://github.com/sheva-serga/Filtering.NET) — source, issue tracker, contribution notes.
 - [`Filtering.Net.Generator`](https://www.nuget.org/packages/Filtering.Net.Generator/) — source generator + 25-rule analyzer that emits the `IFilterDefinition<T>` glue.
 - [`Filtering.Net.EntityFrameworkCore`](https://www.nuget.org/packages/Filtering.Net.EntityFrameworkCore/) — async `ApplyPagedAsync` + `PageResult<T>`.
-- Sample ASP.NET Core 9 + PostgreSQL app: [`samples/UserManagement.WebApi/`](https://github.com/sheva-serga/Filtering.Net/tree/master/samples/UserManagement.WebApi) on GitHub.
+- Sample ASP.NET Core 9 + PostgreSQL app: [`samples/UserManagement.WebApi/`](https://github.com/sheva-serga/Filtering.NET/tree/main/samples/UserManagement.WebApi) on GitHub.
 
 ## License
 

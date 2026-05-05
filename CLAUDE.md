@@ -14,7 +14,6 @@ Source-generated filter / sort / page library for `IQueryable<T>` and EF Core. C
 | `tests/Filtering.Net.Generator.Tests/` | Generator extraction + emission + analyzer tests. Mix of compile-and-run, snapshot (`Verify.Xunit`), and runtime end-to-end. |
 | `tests/Filtering.Net.EntityFrameworkCore.Tests/` | EF integration tests against SQLite + Testcontainers Postgres / SQL Server. |
 | `docs/diagnostics/` | One markdown explainer per `FN0xxx` / `FN1xxx` rule. New diagnostics MUST add a file here. |
-| `docs/superpowers/specs/2026-05-02-filtering-net-design.md` | Authoritative design spec. |
 
 ## Build / test commands
 
