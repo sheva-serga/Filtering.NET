@@ -93,7 +93,7 @@ A request body looks like:
 |---------|---------|--------------|
 | `Filtering.Net` | `netstandard2.0` | Runtime types: `FilterRequest`, `FilterNode`, `IFilterDefinition<T>`, `FilterValidationException`, `[GenerateFilter<T>]`, `[Map]`, `[FilterProfile]`, …, plus the `Apply` `IQueryable` extension. |
 | `Filtering.Net.Generator` | `netstandard2.0` | Roslyn incremental source generator + 25-rule analyzer (`FN0001`–`FN0017` errors, `FN1001`–`FN1008` warnings). Templates are source-embedded Scriban; the analyzer DLL ships with no runtime NuGet dependencies. Consumed as an analyzer reference. |
-| `Filtering.Net.EntityFrameworkCore` | `net8.0`, `net9.0` | EF Core async helpers: `IQueryable<T>.ApplyPagedAsync(...)` and `PageResult<T>`. |
+| `Filtering.Net.EntityFrameworkCore` | `net8.0`, `net9.0`, `net10.0` | EF Core async helpers: `IQueryable<T>.ApplyPagedAsync(...)` and `PageResult<T>`. |
 
 ## Sample app
 

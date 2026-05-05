@@ -8,7 +8,7 @@ Source-generated filter / sort / page library for `IQueryable<T>` and EF Core. C
 |------|------|
 | `src/Filtering.Net/` | Runtime: attributes, request types (`FilterRequest`, `FilterNode`, `SortItem`), validation primitives, profile catalog, `IQueryable.Apply(...)` extension. `netstandard2.0`. |
 | `src/Filtering.Net.Generator/` | Roslyn incremental source generator + analyzer. Templates live as embedded `.scriban` resources under `Emission/Templates/`. `netstandard2.0`. |
-| `src/Filtering.Net.EntityFrameworkCore/` | EF async helpers (`ApplyPagedAsync`, `PageResult<T>`). Multi-targets `net8.0`/`net9.0`. |
+| `src/Filtering.Net.EntityFrameworkCore/` | EF async helpers (`ApplyPagedAsync`, `PageResult<T>`). Multi-targets `net8.0`/`net9.0`/`net10.0`. |
 | `samples/UserManagement.WebApi/` | ASP.NET Core 9 + EF Core 9 + PostgreSQL end-to-end demo. |
 | `tests/Filtering.Net.Tests/` | Runtime unit tests. |
 | `tests/Filtering.Net.Generator.Tests/` | Generator extraction + emission + analyzer tests. Mix of compile-and-run, snapshot (`Verify.Xunit`), and runtime end-to-end. |

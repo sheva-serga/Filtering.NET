@@ -23,9 +23,9 @@ dotnet add package Filtering.Net.EntityFrameworkCore
 |---------|---------|
 | `Filtering.Net` | `netstandard2.0` |
 | `Filtering.Net.Generator` | `netstandard2.0` (analyzer-only, no runtime DLL) |
-| `Filtering.Net.EntityFrameworkCore` | `net8.0`, `net9.0` |
+| `Filtering.Net.EntityFrameworkCore` | `net8.0`, `net9.0`, `net10.0` |
 
-The runtime stays on `netstandard2.0` so it can be loaded inside the analyzer process and on every consumer TFM. EF Core 8.0 / 9.0 floors are pinned per TFM in the EF helpers package.
+The runtime stays on `netstandard2.0` so it can be loaded inside the analyzer process and on every consumer TFM. EF Core 8.0.13 / 9.0.5 / 10.0.0 floors are pinned per TFM in the EF helpers package (the 8.0 / 9.0 patches close GHSA-qj66-m88j-hmgj on transitive `Microsoft.Extensions.Caching.Memory`).
 
 ## Verify the install
 

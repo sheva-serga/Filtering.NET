@@ -1,0 +1,81 @@
+name: nuget
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'NuGet version (e.g. 0.1.0)'
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
+
+      - name: Resolve version
+        id: ver
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            VERSION="${GITHUB_REF_NAME#v}"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Resolved version: $VERSION"
+
+      - name: Restore
+        run: dotnet restore Filtering.Net.sln
+
+      - name: Pack Filtering.Net
+        run: >
+          dotnet pack src/Filtering.Net/Filtering.Net.csproj
+          -c Release --no-restore
+          -p:Version=${{ steps.ver.outputs.version }}
+          -p:ContinuousIntegrationBuild=true
+          -p:IncludeSymbols=true
+          -p:SymbolPackageFormat=snupkg
+          -o ./artifacts
+
+      - name: Pack Filtering.Net.Generator
+        run: >
+          dotnet pack src/Filtering.Net.Generator/Filtering.Net.Generator.csproj
+          -c Release --no-restore
+          -p:Version=${{ steps.ver.outputs.version }}
+          -p:ContinuousIntegrationBuild=true
+          -o ./artifacts
+
+      - name: Pack Filtering.Net.EntityFrameworkCore
+        run: >
+          dotnet pack src/Filtering.Net.EntityFrameworkCore/Filtering.Net.EntityFrameworkCore.csproj
+          -c Release --no-restore
+          -p:Version=${{ steps.ver.outputs.version }}
+          -p:ContinuousIntegrationBuild=true
+          -p:IncludeSymbols=true
+          -p:SymbolPackageFormat=snupkg
+          -o ./artifacts
+
+      - name: Upload packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: nupkgs-${{ steps.ver.outputs.version }}
+          path: ./artifacts/*.*nupkg
+
+      - name: Push to NuGet.org
+        run: >
+          dotnet nuget push "./artifacts/*.nupkg"
+          --api-key ${{ secrets.NUGET_API_KEY }}
+          --source https://api.nuget.org/v3/index.json
+          --skip-duplicate

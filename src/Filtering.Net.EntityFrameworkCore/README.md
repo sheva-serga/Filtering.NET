@@ -2,7 +2,7 @@
 
 EF Core async helpers for [Filtering.Net](https://www.nuget.org/packages/Filtering.Net/). Adds `IQueryable<T>.ApplyPagedAsync(...)` and `PageResult<T>`.
 
-Targets `net8.0` and `net9.0`.
+Targets `net8.0`, `net9.0`, and `net10.0`.
 
 ## What it solves
 
@@ -59,8 +59,9 @@ public sealed class UsersController : ControllerBase
 
 | Target framework | EF Core version |
 |------------------|-----------------|
-| `net8.0` | 8.0.0 (LTS floor) |
-| `net9.0` | 9.0.0 (current) |
+| `net8.0` | 8.0.13 (LTS floor — patches GHSA-qj66-m88j-hmgj) |
+| `net9.0` | 9.0.5 (patches GHSA-qj66-m88j-hmgj) |
+| `net10.0` | 10.0.0 (LTS floor) |
 
 Bumping these is intentional — the integration tests run against both, so a floor bump is a contract-affecting change.
 

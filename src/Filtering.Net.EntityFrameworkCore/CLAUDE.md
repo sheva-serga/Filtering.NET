@@ -2,7 +2,7 @@
 
 Thin EF Core async layer over `Filtering.Net`. Two public surfaces and nothing else.
 
-**Targets:** `net8.0` and `net9.0` (multi-targeted to track LTS + current). Ships as `Filtering.Net.EntityFrameworkCore`.
+**Targets:** `net8.0`, `net9.0`, and `net10.0` (multi-targeted to track LTS + current). Ships as `Filtering.Net.EntityFrameworkCore`.
 
 ## Public surface
 
@@ -12,8 +12,10 @@ Thin EF Core async layer over `Filtering.Net`. Two public surfaces and nothing e
 ## EF version pinning
 
 ```xml
-<PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.0" Condition="'$(TargetFramework)' == 'net8.0'" />
-<PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.0" Condition="'$(TargetFramework)' == 'net9.0'" />
+<!-- 8.0.13 / 9.0.5 patch GHSA-qj66-m88j-hmgj on transitive Microsoft.Extensions.Caching.Memory. -->
+<PackageReference Include="Microsoft.EntityFrameworkCore" Version="8.0.13" Condition="'$(TargetFramework)' == 'net8.0'" />
+<PackageReference Include="Microsoft.EntityFrameworkCore" Version="9.0.5" Condition="'$(TargetFramework)' == 'net9.0'" />
+<PackageReference Include="Microsoft.EntityFrameworkCore" Version="10.0.0" Condition="'$(TargetFramework)' == 'net10.0'" />
 ```
 
 Floor versions match the matching .NET TFM. Bumping these requires re-running the EF integration suite under both providers in `tests/Filtering.Net.EntityFrameworkCore.Tests/`.
