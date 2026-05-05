@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <PackageId>Filtering.Net</PackageId>
+    <Description>Source-generated filter/sort/page configurations for IQueryable, EF Core friendly.</Description>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+  </PropertyGroup>
+  <ItemGroup>
+    <!-- 8.0.5 patches GHSA-8g4q-xg66-9fp4 and GHSA-hh2w-p6rv-4g7w (plan specified 8.0.0; bumped to remove vulnerability under TreatWarningsAsErrors). -->
+    <PackageReference Include="System.Text.Json" Version="8.0.5" />
+    <PackageReference Include="PolySharp" Version="1.14.1" PrivateAssets="all" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>

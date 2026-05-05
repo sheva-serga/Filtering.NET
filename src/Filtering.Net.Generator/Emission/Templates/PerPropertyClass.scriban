@@ -1,0 +1,350 @@
+/// <summary>{{ property_kind_label }}</summary>
+file static class {{ property_identifier }}
+{
+{{- if is_override_kind && !override_has_usable_body }}
+    // [PropertyMap] override for '{{ property_name }}' had no extractable For(...)/.Operator(...) chain; emitting throwing stub.
+    public static global::System.Linq.Expressions.Expression<global::System.Func<{{ entity_full_name }}, bool>> Build(global::Filtering.Net.FilterLeaf leaf{{ if build_threads_options }}, global::System.Text.Json.JsonSerializerOptions options{{ end }})
+    {
+        throw new global::Filtering.Net.FilterDispatchException("[PropertyMap] override for '{{ property_name }}' could not be parsed at codegen time.");
+    }
+
+    /// <summary>Validates a leaf whose field resolves to [PropertyMap]-overridden property '{{ property_name }}'.</summary>
+    public static void Validate(global::Filtering.Net.FilterLeaf leaf, string path, global::System.Collections.Generic.List<global::Filtering.Net.FilterValidationError> errors{{ if validate_threads_options }}, global::System.Text.Json.JsonSerializerOptions options{{ end }})
+    {
+        switch (leaf.Operator.ToUpperInvariant())
+        {
+{{- for arm in validate.override_validate_arms }}
+            case "{{ arm.operator_key_upper }}":
+{{- if arm.is_unary }}
+                if (leaf.Value.ValueKind is not global::System.Text.Json.JsonValueKind.Null and not global::System.Text.Json.JsonValueKind.Undefined)
+                {
+                    global::Filtering.Net.LeafValidation.AddNoValueError(errors, leaf, path);
+                }
+{{- else }}
+                try
+                {
+                    var typeInfo = (global::System.Text.Json.Serialization.Metadata.JsonTypeInfo<{{ arm.value_clr_type }}>)options.GetTypeInfo(typeof({{ arm.value_clr_type }}));
+                    _ = global::System.Text.Json.JsonSerializer.Deserialize(leaf.Value.GetRawText(), typeInfo);
+                }
+                catch (global::System.Exception extractionError)
+                    when (extractionError is global::System.Text.Json.JsonException
+                       || extractionError is global::System.NotSupportedException
+                       || extractionError is global::System.InvalidOperationException
+                       || extractionError is global::System.InvalidCastException)
+                {
+                    global::Filtering.Net.LeafValidation.AddTypeError(errors, leaf, path, extractionError.Message);
+                }
+{{- end }}
+                break;
+{{- end }}
+            default:
+                global::Filtering.Net.LeafValidation.AddOperatorError(errors, leaf, path, "{{ property_name }}");
+                break;
+        }
+    }
+{{- else if is_override_kind }}
+    /// <summary>Builds the typed predicate for a leaf targeting [PropertyMap]-overridden property '{{ property_name }}'.</summary>
+    public static global::System.Linq.Expressions.Expression<global::System.Func<{{ entity_full_name }}, bool>> Build(global::Filtering.Net.FilterLeaf leaf{{ if build_threads_options }}, global::System.Text.Json.JsonSerializerOptions options{{ end }})
+    {
+        var operatorKey = leaf.Operator.ToUpperInvariant();
+        switch (operatorKey)
+        {
+{{- for arm in build.override_build_arms }}
+            case "{{ arm.operator_key_upper }}":
+                {
+{{- if arm.is_unary }}
+                    return {{ arm.operator_identifier }}();
+{{- else }}
+                    try
+                    {
+                        var typeInfo = (global::System.Text.Json.Serialization.Metadata.JsonTypeInfo<{{ arm.value_clr_type }}>)options.GetTypeInfo(typeof({{ arm.value_clr_type }}));
+                        var typedLeafValue = global::System.Text.Json.JsonSerializer.Deserialize(leaf.Value.GetRawText(), typeInfo)!;
+                        return {{ arm.operator_identifier }}(typedLeafValue);
+                    }
+                    catch (global::System.Exception extractionError)
+                        when (extractionError is global::System.Text.Json.JsonException
+                           || extractionError is global::System.NotSupportedException
+                           || extractionError is global::System.InvalidOperationException
+                           || extractionError is global::System.InvalidCastException)
+                    {
+                        throw new global::Filtering.Net.FilterDispatchException(
+                            $"Apply-time value extraction failed for [PropertyMap] override '{{ arm.operator_name }}': {extractionError.Message}",
+                            extractionError);
+                    }
+{{- end }}
+                }
+{{- end }}
+            default:
+                throw new global::Filtering.Net.FilterDispatchException($"Unknown operator '{leaf.Operator}' for '{{ property_name }}' (validation should have caught this).");
+        }
+    }
+
+    /// <summary>Validates a leaf whose field resolves to [PropertyMap]-overridden property '{{ property_name }}'.</summary>
+    public static void Validate(global::Filtering.Net.FilterLeaf leaf, string path, global::System.Collections.Generic.List<global::Filtering.Net.FilterValidationError> errors{{ if validate_threads_options }}, global::System.Text.Json.JsonSerializerOptions options{{ end }})
+    {
+        switch (leaf.Operator.ToUpperInvariant())
+        {
+{{- for arm in validate.override_validate_arms }}
+            case "{{ arm.operator_key_upper }}":
+{{- if arm.is_unary }}
+                if (leaf.Value.ValueKind is not global::System.Text.Json.JsonValueKind.Null and not global::System.Text.Json.JsonValueKind.Undefined)
+                {
+                    global::Filtering.Net.LeafValidation.AddNoValueError(errors, leaf, path);
+                }
+{{- else }}
+                try
+                {
+                    var typeInfo = (global::System.Text.Json.Serialization.Metadata.JsonTypeInfo<{{ arm.value_clr_type }}>)options.GetTypeInfo(typeof({{ arm.value_clr_type }}));
+                    _ = global::System.Text.Json.JsonSerializer.Deserialize(leaf.Value.GetRawText(), typeInfo);
+                }
+                catch (global::System.Exception extractionError)
+                    when (extractionError is global::System.Text.Json.JsonException
+                       || extractionError is global::System.NotSupportedException
+                       || extractionError is global::System.InvalidOperationException
+                       || extractionError is global::System.InvalidCastException)
+                {
+                    global::Filtering.Net.LeafValidation.AddTypeError(errors, leaf, path, extractionError.Message);
+                }
+{{- end }}
+                break;
+{{- end }}
+            default:
+                global::Filtering.Net.LeafValidation.AddOperatorError(errors, leaf, path, "{{ property_name }}");
+                break;
+        }
+    }
+{{- else }}
+    /// <summary>Builds the typed predicate for a leaf targeting property '{{ property_name }}'.</summary>
+    public static global::System.Linq.Expressions.Expression<global::System.Func<{{ entity_full_name }}, bool>> Build(global::Filtering.Net.FilterLeaf leaf{{ if build_threads_options }}, global::System.Text.Json.JsonSerializerOptions options{{ end }})
+    {
+        var operatorKey = leaf.Operator.ToUpperInvariant();
+        switch (operatorKey)
+        {
+{{- if build.scalar_arm }}
+{{- for op in build.scalar_arm.operator_keys }}
+            case "{{ op }}":
+{{- end }}
+                {
+                    if (!{{ build.scalar_arm.extract_call }})
+                        throw new global::Filtering.Net.FilterDispatchException($"Apply-time value extraction failed: {typeError}");
+{{- if build.scalar_arm.has_interceptor }}
+                    var interceptContext = new global::Filtering.Net.InterceptContext("{{ property_name }}", leaf.Field, leaf.Operator);
+                    var typedLeafValue = {{ build.scalar_arm.interceptor_method_qualified }}(interceptContext, rawLeafValue);
+{{- else }}
+                    var typedLeafValue = rawLeafValue;
+{{- end }}
+{{- if build.scalar_arm.dispatch.size == 1 }}
+                    return {{ build.scalar_arm.dispatch[0].operator_identifier }}(typedLeafValue);
+{{- else }}
+                    return operatorKey switch
+                    {
+{{- for d in build.scalar_arm.dispatch }}
+                        "{{ d.operator_key_upper }}" => {{ d.operator_identifier }}(typedLeafValue),
+{{- end }}
+                        _ => throw new global::Filtering.Net.FilterDispatchException($"Unreachable operator '{operatorKey}' for property '{{ property_name }}'.")
+                    };
+{{- end }}
+                }
+{{- end }}
+{{- if build.array_arm }}
+{{- for op in build.array_arm.operator_keys }}
+            case "{{ op }}":
+{{- end }}
+                {
+                    if (!{{ build.array_arm.extract_call }})
+                        throw new global::Filtering.Net.FilterDispatchException($"Apply-time array extraction failed: {arrayError}");
+{{- if build.array_arm.dispatch.size == 1 }}
+                    return {{ build.array_arm.dispatch[0].operator_identifier }}{{ build.array_arm.arg_expression }};
+{{- else }}
+                    return operatorKey switch
+                    {
+{{- for d in build.array_arm.dispatch }}
+                        "{{ d.operator_key_upper }}" => {{ d.operator_identifier }}{{ build.array_arm.arg_expression }},
+{{- end }}
+                        _ => throw new global::Filtering.Net.FilterDispatchException($"Unreachable operator '{operatorKey}' for property '{{ property_name }}'.")
+                    };
+{{- end }}
+                }
+{{- end }}
+{{- if build.none_operators.size > 0 }}
+{{- for op in build.none_operators }}
+            case "{{ op | string.upcase }}":
+{{- end }}
+{{- if build.none_operators.size == 1 }}
+                return {{ build.none_operators[0] | to_operator_id }}();
+{{- else }}
+                return operatorKey switch
+                {
+{{- for op in build.none_operators }}
+                    "{{ op | string.upcase }}" => {{ op | to_operator_id }}(),
+{{- end }}
+                    _ => throw new global::Filtering.Net.FilterDispatchException($"Unreachable operator '{operatorKey}' for property '<none>'.")
+                };
+{{- end }}
+{{- end }}
+{{- for arm in build.custom_build_arms }}
+            case "{{ arm.operator_key_upper }}":
+                {
+{{- if arm.is_unary }}
+                    return {{ arm.operator_identifier }}();
+{{- else }}
+                    try
+                    {
+                        var typeInfo = (global::System.Text.Json.Serialization.Metadata.JsonTypeInfo<{{ arm.value_clr_type }}>)options.GetTypeInfo(typeof({{ arm.value_clr_type }}));
+                        var typedLeafValue = global::System.Text.Json.JsonSerializer.Deserialize(leaf.Value.GetRawText(), typeInfo)!;
+                        return {{ arm.operator_identifier }}(typedLeafValue);
+                    }
+                    catch (global::System.Exception extractionError)
+                        when (extractionError is global::System.Text.Json.JsonException
+                           || extractionError is global::System.NotSupportedException
+                           || extractionError is global::System.InvalidOperationException
+                           || extractionError is global::System.InvalidCastException)
+                    {
+                        throw new global::Filtering.Net.FilterDispatchException(
+                            $"Apply-time value extraction failed for custom operator '{{ arm.operator_name }}': {extractionError.Message}",
+                            extractionError);
+                    }
+{{- end }}
+                }
+{{- end }}
+            default:
+                throw new global::Filtering.Net.FilterDispatchException($"Unknown operator '{leaf.Operator}' for '{{ property_name }}' (validation should have caught this).");
+        }
+    }
+
+{{- if validate.simple_forwarder }}
+
+    private static readonly string[] _allowedScalarOps = {{ validate.simple_forwarder.scalar_ops_array_literal }};
+    private static readonly string[] _allowedArrayOps = {{ validate.simple_forwarder.array_ops_array_literal }};
+    private static readonly string[] _allowedNoneOps = {{ validate.simple_forwarder.none_ops_array_literal }};
+
+    /// <summary>Validates a leaf whose field resolves to property '{{ property_name }}'.</summary>
+    public static void Validate(global::Filtering.Net.FilterLeaf leaf, string path, global::System.Collections.Generic.List<global::Filtering.Net.FilterValidationError> errors) =>
+        global::Filtering.Net.LeafValidation.ValidateMappedLeaf<{{ validate.simple_forwarder.scalar_value_clr_type }}>(
+            leaf,
+            path,
+            errors,
+            "{{ property_name }}",
+            _allowedScalarOps,
+            _allowedArrayOps,
+            _allowedNoneOps,
+{{- if validate.simple_forwarder.scalar_extractor_method_group }}
+            {{ validate.simple_forwarder.scalar_extractor_method_group }},
+{{- else }}
+            null,
+{{- end }}
+{{- if validate.simple_forwarder.array_extractor_method_group }}
+            {{ validate.simple_forwarder.array_extractor_method_group }});
+{{- else }}
+            null);
+{{- end }}
+{{- else }}
+
+    /// <summary>Validates a leaf whose field resolves to property '{{ property_name }}'.</summary>
+    public static void Validate(global::Filtering.Net.FilterLeaf leaf, string path, global::System.Collections.Generic.List<global::Filtering.Net.FilterValidationError> errors{{ if validate_threads_options }}, global::System.Text.Json.JsonSerializerOptions options{{ end }})
+    {
+        switch (leaf.Operator.ToUpperInvariant())
+        {
+{{- if validate.scalar_arm }}
+{{- for op in validate.scalar_arm.operator_keys }}
+            case "{{ op }}":
+{{- end }}
+                {
+{{- if !validate.scalar_arm.has_interceptor }}
+                    if (!{{ validate.scalar_arm.extract_call }})
+                    {
+                        global::Filtering.Net.LeafValidation.AddTypeError(errors, leaf, path, typeError);
+                    }
+{{- else }}
+                    if (!{{ validate.scalar_arm.extract_call }})
+                    {
+                        global::Filtering.Net.LeafValidation.AddTypeError(errors, leaf, path, typeError);
+                    }
+                    else
+                    {
+                        try
+                        {
+                            var interceptContext = new global::Filtering.Net.InterceptContext("{{ validate.scalar_arm.property_name }}", leaf.Field, leaf.Operator);
+                            _ = {{ validate.scalar_arm.interceptor_method_qualified }}(interceptContext, typedValue);
+                        }
+                        catch (global::Filtering.Net.FilterValidationException interceptorException)
+                        {
+                            var interceptorMessage = interceptorException.Result.Errors.Count > 0
+                                ? interceptorException.Result.Errors[0].Message
+                                : interceptorException.Message;
+                            global::Filtering.Net.LeafValidation.AddInterceptorError(errors, leaf, path, interceptorMessage);
+                        }
+                    }
+{{- end }}
+                }
+                break;
+{{- end }}
+{{- if validate.array_arm }}
+{{- for op in validate.array_arm.operator_keys }}
+            case "{{ op }}":
+{{- end }}
+                if (!{{ validate.array_arm.extract_call }})
+                {
+                    global::Filtering.Net.LeafValidation.AddTypeError(errors, leaf, path, arrayError);
+                }
+                break;
+{{- end }}
+{{- if validate.none_operators.size > 0 }}
+{{- for op in validate.none_operators }}
+            case "{{ op | string.upcase }}":
+{{- end }}
+                if (leaf.Value.ValueKind is not global::System.Text.Json.JsonValueKind.Null and not global::System.Text.Json.JsonValueKind.Undefined)
+                    global::Filtering.Net.LeafValidation.AddNoValueError(errors, leaf, path);
+                break;
+{{- end }}
+{{- for arm in validate.custom_validate_arms }}
+            case "{{ arm.operator_key_upper }}":
+                {
+{{- if arm.is_unary }}
+                    if (leaf.Value.ValueKind is not global::System.Text.Json.JsonValueKind.Null and not global::System.Text.Json.JsonValueKind.Undefined)
+                        global::Filtering.Net.LeafValidation.AddNoValueError(errors, leaf, path);
+{{- else }}
+                    try
+                    {
+                        var typeInfo = (global::System.Text.Json.Serialization.Metadata.JsonTypeInfo<{{ arm.value_clr_type }}>)options.GetTypeInfo(typeof({{ arm.value_clr_type }}));
+                        _ = global::System.Text.Json.JsonSerializer.Deserialize(leaf.Value.GetRawText(), typeInfo);
+                    }
+                    catch (global::System.Exception extractionError)
+                        when (extractionError is global::System.Text.Json.JsonException
+                           || extractionError is global::System.NotSupportedException
+                           || extractionError is global::System.InvalidOperationException
+                           || extractionError is global::System.InvalidCastException)
+                    {
+                        global::Filtering.Net.LeafValidation.AddTypeError(errors, leaf, path, extractionError.Message);
+                    }
+{{- end }}
+                }
+                break;
+{{- end }}
+            default:
+                global::Filtering.Net.LeafValidation.AddOperatorError(errors, leaf, path, "{{ property_name }}");
+                break;
+        }
+    }
+{{- end }}
+{{- end }}
+{{- if typed_leaf_methods.size > 0 }}
+
+{{- for method in typed_leaf_methods }}
+    {{ method }}
+{{- end }}
+{{- end }}
+{{- if sort }}
+
+    /// <summary>Applies the sort step for property '{{ property_name }}'.</summary>
+    public static global::System.Linq.IOrderedQueryable<{{ entity_full_name }}> ApplySort(global::System.Linq.IQueryable<{{ entity_full_name }}> query, global::System.Linq.IOrderedQueryable<{{ entity_full_name }}>? orderedQuery, global::Filtering.Net.SortDir direction, bool isFirstSort) =>
+        (direction, isFirstSort) switch
+        {
+            (global::Filtering.Net.SortDir.Asc, true) => query.OrderBy(entity => {{ sort.accessor }}),
+            (global::Filtering.Net.SortDir.Desc, true) => query.OrderByDescending(entity => {{ sort.accessor }}),
+            (global::Filtering.Net.SortDir.Asc, false) => orderedQuery!.ThenBy(entity => {{ sort.accessor }}),
+            (global::Filtering.Net.SortDir.Desc, false) => orderedQuery!.ThenByDescending(entity => {{ sort.accessor }}),
+            _ => throw new global::Filtering.Net.FilterDispatchException($"Unreachable sort direction '{direction}' for property '{{ property_name }}' (validation should have caught this).")
+        };
+{{- end }}
+}

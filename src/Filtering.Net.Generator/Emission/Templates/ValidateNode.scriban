@@ -1,0 +1,66 @@
+/// <inheritdoc />
+public global::Filtering.Net.FilterValidationResult Validate(global::Filtering.Net.FilterNode? where)
+{
+    if (where is null) return global::Filtering.Net.FilterValidationResult.Success;
+    var validationErrors = new global::System.Collections.Generic.List<global::Filtering.Net.FilterValidationError>();
+    ValidateNode(where, "where", validationErrors{{ if threads_serializer_options }}, _serializerOptions{{ end }});
+    return validationErrors.Count == 0
+        ? global::Filtering.Net.FilterValidationResult.Success
+        : new global::Filtering.Net.FilterValidationResult(validationErrors);
+}
+
+/// <summary>Recursively validates a filter expression tree, appending errors as it descends.</summary>
+private static void ValidateNode(global::Filtering.Net.FilterNode node, string path, global::System.Collections.Generic.List<global::Filtering.Net.FilterValidationError> errors{{ if threads_serializer_options }}, global::System.Text.Json.JsonSerializerOptions options{{ end }})
+{
+    if (node is global::Filtering.Net.FilterGroup group)
+    {
+        if (group.Children.Count == 0)
+        {
+            errors.Add(new global::Filtering.Net.FilterValidationError(path, global::Filtering.Net.FilterValidationCode.GroupEmpty, "Group has no children."));
+            return;
+        }
+        var combinatorSegment = group.Op switch
+        {
+            global::Filtering.Net.LogicalOp.And => "and",
+            global::Filtering.Net.LogicalOp.Or => "or",
+            global::Filtering.Net.LogicalOp.Not => "not",
+            _ => "unknown"
+        };
+        for (var childIndex = 0; childIndex < group.Children.Count; childIndex++)
+        {
+            var childPath = $"{path}.{combinatorSegment}[{childIndex}]";
+            ValidateNode(group.Children[childIndex], childPath, errors{{ if threads_serializer_options }}, options{{ end }});
+        }
+        return;
+    }
+    if (node is global::Filtering.Net.FilterLeaf leaf)
+    {
+        ValidateLeaf(leaf, path, errors{{ if threads_serializer_options }}, options{{ end }});
+        return;
+    }
+    errors.Add(new global::Filtering.Net.FilterValidationError(path, global::Filtering.Net.FilterValidationCode.InvalidValueType, "Unknown FilterNode subtype."));
+}
+
+/// <summary>Field-name dispatcher for leaf validation. Routes to a per-property nested-class validator after uppercasing the field.</summary>
+private static void ValidateLeaf(global::Filtering.Net.FilterLeaf leaf, string path, global::System.Collections.Generic.List<global::Filtering.Net.FilterValidationError> errors{{ if threads_serializer_options }}, global::System.Text.Json.JsonSerializerOptions options{{ end }})
+{
+    var fieldKey = leaf.Field.ToUpperInvariant();
+    switch (fieldKey)
+    {
+{{- for arm in leaf_arms }}
+        case "{{ arm.primary_field_key }}":
+{{- if arm.alias_field_key }}
+        case "{{ arm.alias_field_key }}":
+{{- end }}
+            {{ arm.property_identifier }}.Validate(leaf, path, errors{{ if arm.arm_threads_options }}, options{{ end }});
+            break;
+{{- end }}
+        default:
+            errors.Add(new global::Filtering.Net.FilterValidationError(
+                path,
+                global::Filtering.Net.FilterValidationCode.UnknownField,
+                $"Field '{leaf.Field}' is not configured for filtering.",
+                Field: leaf.Field));
+            break;
+    }
+}

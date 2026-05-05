@@ -1,0 +1,51 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <IsRoslynComponent>true</IsRoslynComponent>
+    <!-- Enables generator/analyzer-only API restrictions (RS1xxx rules from Roslyn). -->
+    <EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>
+    <PackageId>Filtering.Net.Generator</PackageId>
+    <Description>Roslyn source generator + analyzer for Filtering.Net.</Description>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
+    <DevelopmentDependency>true</DevelopmentDependency>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <!-- Activates Scriban source-embedding so the analyzer DLL has no runtime NuGet dep. -->
+    <PackageScribanIncludeSource>true</PackageScribanIncludeSource>
+    <!-- RS1032: messageFormat trailing period guidance is opinionated; we keep terminal periods
+         consistently across all our diagnostics for readability.
+         RS2008: analyzer release tracking is opt-in; we don't ship via NuGet analyzer tracking yet.
+         CS1591: missing XML doc on public types — internal types in this generator project are
+         legitimately undocumented; we suppress because most types here are internal-implementation
+         details that the public API surface (FilterGenerator) doesn't expose.
+         CS1573 / CS1574: incomplete XML doc on internal extraction-model records — suppressed for
+         the same reason; these are private-by-intent shapes consumed only by the generator.
+         NU1902 / NU1903 / NU1904 (moderate / high / critical security advisories on transitive
+         packages): Scriban 6.5.0 has published GHSA advisories, but we source-embed Scriban via
+         PackageScribanIncludeSource — no Scriban DLL ships at runtime, so the attack surface is
+         build-time only inside our own generator process. Revisit and drop these suppressions
+         once Scriban publishes a fixed release we can upgrade to. -->
+    <NoWarn>$(NoWarn);RS1032;RS2008;CS1591;CS1573;CS1574;NU1902;NU1903;NU1904</NoWarn>
+    <!-- PolySharp polyfills internal attributes for netstandard2.0; once we expose internals
+         to the test assembly via [InternalsVisibleTo], the test project (net9.0) sees both the
+         polyfill and the BCL definition and CS0433 fires. Exclude the ones the generator
+         doesn't actually need to keep the symbol set minimal. -->
+    <PolySharpExcludeGeneratedTypes>System.Runtime.CompilerServices.ModuleInitializerAttribute</PolySharpExcludeGeneratedTypes>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Microsoft.CodeAnalysis.CSharp" Version="4.8.0" PrivateAssets="all" />
+    <PackageReference Include="PolySharp" Version="1.15.0" PrivateAssets="all" />
+    <PackageReference Include="Scriban" Version="6.5.0" PrivateAssets="all" IncludeAssets="Build" />
+    <PackageReference Include="Microsoft.CSharp" Version="4.7.0" PrivateAssets="all" />
+    <PackageReference Include="System.Threading.Tasks.Extensions" Version="4.6.3" PrivateAssets="all" />
+  </ItemGroup>
+  <ItemGroup>
+    <EmbeddedResource Include="Emission\Templates\**\*.scriban" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="$(OutputPath)\$(AssemblyName).dll" Pack="true" PackagePath="analyzers/dotnet/cs" Visible="false" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+</Project>

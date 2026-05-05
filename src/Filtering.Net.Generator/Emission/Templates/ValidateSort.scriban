@@ -1,0 +1,32 @@
+/// <inheritdoc />
+public global::Filtering.Net.FilterValidationResult Validate(global::System.Collections.Generic.IReadOnlyList<global::Filtering.Net.SortItem>? sortItems)
+{
+    if (sortItems is null || sortItems.Count == 0) return global::Filtering.Net.FilterValidationResult.Success;
+    var validationErrors = new global::System.Collections.Generic.List<global::Filtering.Net.FilterValidationError>();
+    for (var sortIndex = 0; sortIndex < sortItems.Count; sortIndex++)
+    {
+        var sortItem = sortItems[sortIndex];
+        var path = $"sort[{sortIndex}].field";
+        var fieldKey = sortItem.Field.ToUpperInvariant();
+        switch (fieldKey)
+        {
+{{- for field in sortable_fields }}
+            case "{{ field.primary_field_key }}":
+{{- if field.alias_field_key }}
+            case "{{ field.alias_field_key }}":
+{{- end }}
+                break;
+{{- end }}
+            default:
+                validationErrors.Add(new global::Filtering.Net.FilterValidationError(
+                    path,
+                    global::Filtering.Net.FilterValidationCode.NotSortable,
+                    $"Field '{sortItem.Field}' is not configured as sortable.",
+                    Field: sortItem.Field));
+                break;
+        }
+    }
+    return validationErrors.Count == 0
+        ? global::Filtering.Net.FilterValidationResult.Success
+        : new global::Filtering.Net.FilterValidationResult(validationErrors);
+}

@@ -1,0 +1,32 @@
+﻿{
+  Diagnostics: [
+    {
+      Location: : (10,35)-(10,50),
+      Message: [FilterOperator] body references DateTime.UtcNow/Now directly inside the lambda. Consider using the method-shape override that pre-computes the cutoff for app-clock semantics.,
+      Severity: Warning,
+      WarningLevel: 1,
+      Descriptor: {
+        Id: FN1001,
+        Title: DateTime.UtcNow/Now used directly inside [FilterOperator] lambda,
+        MessageFormat: [FilterOperator] body references DateTime.UtcNow/Now directly inside the lambda. Consider using the method-shape override that pre-computes the cutoff for app-clock semantics.,
+        Category: Filtering.Net,
+        DefaultSeverity: Warning,
+        IsEnabledByDefault: true
+      }
+    },
+    {
+      Location: : (10,35)-(10,65),
+      Message: Method 'DateTime.UtcNow.AddDays' in operator body is not in the EF Core translatable allow-list. May produce client-side evaluation or runtime errors.,
+      Severity: Warning,
+      WarningLevel: 1,
+      Descriptor: {
+        Id: FN1007,
+        Title: Operator body uses untranslatable method,
+        MessageFormat: Method '{0}' in operator body is not in the EF Core translatable allow-list. May produce client-side evaluation or runtime errors.,
+        Category: Filtering.Net,
+        DefaultSeverity: Warning,
+        IsEnabledByDefault: true
+      }
+    }
+  ]
+}

@@ -1,0 +1,61 @@
+/// <inheritdoc />
+public global::System.Linq.IQueryable<{{ entity_full_name }}> ApplyFilter(global::System.Linq.IQueryable<{{ entity_full_name }}> query, global::Filtering.Net.FilterNode? where)
+{
+    if (where is null) return query;
+{{- if threads_serializer_options }}
+    var predicate = BuildPredicate(where, _serializerOptions);
+{{- else }}
+    var predicate = BuildPredicate(where);
+{{- end }}
+    return query.Where(predicate);
+}
+
+/// <summary>Recursive subtype dispatcher: groups → CombineGroup, leaves → BuildLeaf.</summary>
+private static global::System.Linq.Expressions.Expression<global::System.Func<{{ entity_full_name }}, bool>> BuildPredicate(global::Filtering.Net.FilterNode node{{ if threads_serializer_options }}, global::System.Text.Json.JsonSerializerOptions options{{ end }})
+{
+    if (node is global::Filtering.Net.FilterGroup group) return CombineGroup(group{{ if threads_serializer_options }}, options{{ end }});
+    if (node is global::Filtering.Net.FilterLeaf leaf) return BuildLeaf(leaf{{ if threads_serializer_options }}, options{{ end }});
+    throw new global::Filtering.Net.FilterDispatchException("Unknown FilterNode subtype.");
+}
+
+/// <summary>Reduces a FilterGroup's children into a single predicate via PredicateBuilder.</summary>
+private static global::System.Linq.Expressions.Expression<global::System.Func<{{ entity_full_name }}, bool>> CombineGroup(global::Filtering.Net.FilterGroup group{{ if threads_serializer_options }}, global::System.Text.Json.JsonSerializerOptions options{{ end }})
+{
+    if (group.Children.Count == 0) throw new global::Filtering.Net.FilterDispatchException("Group has no children (validation should have caught this).");
+    if (group.Op == global::Filtering.Net.LogicalOp.Not)
+    {
+        if (group.Children.Count != 1) throw new global::Filtering.Net.FilterDispatchException("Not group requires exactly one child.");
+        var negatedChild = BuildPredicate(group.Children[0]{{ if threads_serializer_options }}, options{{ end }});
+        return global::Filtering.Net.PredicateBuilder.Not(negatedChild);
+    }
+    var combinedPredicate = BuildPredicate(group.Children[0]{{ if threads_serializer_options }}, options{{ end }});
+    for (var childIndex = 1; childIndex < group.Children.Count; childIndex++)
+    {
+        var nextPredicate = BuildPredicate(group.Children[childIndex]{{ if threads_serializer_options }}, options{{ end }});
+        combinedPredicate = group.Op switch
+        {
+            global::Filtering.Net.LogicalOp.And => global::Filtering.Net.PredicateBuilder.AndAlso(combinedPredicate, nextPredicate),
+            global::Filtering.Net.LogicalOp.Or => global::Filtering.Net.PredicateBuilder.OrElse(combinedPredicate, nextPredicate),
+            _ => throw new global::Filtering.Net.FilterDispatchException($"Unknown LogicalOp '{group.Op}'.")
+        };
+    }
+    return combinedPredicate;
+}
+
+/// <summary>Field-key dispatcher for leaves; routes to a per-property nested-class Build method.</summary>
+private static global::System.Linq.Expressions.Expression<global::System.Func<{{ entity_full_name }}, bool>> BuildLeaf(global::Filtering.Net.FilterLeaf leaf{{ if threads_serializer_options }}, global::System.Text.Json.JsonSerializerOptions options{{ end }})
+{
+    var fieldKey = leaf.Field.ToUpperInvariant();
+    switch (fieldKey)
+    {
+{{- for arm in dispatch_arms }}
+        case "{{ arm.primary_field_key }}":
+{{- if arm.alias_field_key }}
+        case "{{ arm.alias_field_key }}":
+{{- end }}
+            return {{ arm.property_identifier }}.Build(leaf{{ if arm.arm_threads_options }}, options{{ end }});
+{{- end }}
+        default:
+            throw new global::Filtering.Net.FilterDispatchException($"Unknown field '{leaf.Field}' (validation should have caught this).");
+    }
+}

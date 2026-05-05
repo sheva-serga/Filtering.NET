@@ -1,0 +1,39 @@
+/// <inheritdoc />
+public global::System.Linq.IQueryable<{{ entity_full_name }}> ApplySorting(global::System.Linq.IQueryable<{{ entity_full_name }}> query, global::System.Collections.Generic.IReadOnlyList<global::Filtering.Net.SortItem>? sortItems, int? page = null, int? pageSize = null)
+{
+    global::System.Linq.IQueryable<{{ entity_full_name }}> resultQuery = query;
+{{- if has_sortable_fields }}
+    if (sortItems is { Count: > 0 })
+    {
+        global::System.Linq.IOrderedQueryable<{{ entity_full_name }}>? orderedQuery = null;
+        foreach (var sortItem in sortItems)
+        {
+            var fieldKey = sortItem.Field.ToUpperInvariant();
+            var isFirstSort = orderedQuery is null;
+            orderedQuery = fieldKey switch
+            {
+{{- for group in sort_dispatch_groups }}
+{{- for fieldKey in group.field_keys }}
+                "{{ fieldKey }}" => {{ group.property_identifier }}.ApplySort(query, orderedQuery, sortItem.Dir, isFirstSort),
+{{- end }}
+{{- end }}
+                _ => throw new global::Filtering.Net.FilterDispatchException($"Unknown sort field '{sortItem.Field}' (validation should have caught this).")
+            };
+        }
+        resultQuery = orderedQuery!;
+    }
+{{- else }}
+    if (sortItems is { Count: > 0 })
+    {
+        var firstSort = sortItems[0];
+        throw new global::Filtering.Net.FilterDispatchException($"No sortable fields are configured (got '{firstSort.Field}').");
+    }
+{{- end }}
+    if (page is not null || pageSize is not null)
+    {
+        var pageNumber = global::System.Math.Max(1, page ?? 1);
+        var resolvedPageSize = global::System.Math.Min(global::System.Math.Max(1, pageSize ?? _defaultPageSize), _maxPageSize);
+        resultQuery = resultQuery.Skip((pageNumber - 1) * resolvedPageSize).Take(resolvedPageSize);
+    }
+    return resultQuery;
+}
