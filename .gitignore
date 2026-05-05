@@ -90,5 +90,8 @@ $RECYCLE.BIN/
 ## Publish-Filtering.ps1 output
 artifacts/
 
+## MkDocs build output
+docs/github/site/
+
 ## Internal planning docs (kept locally, not published)
 docs/superpowers/
