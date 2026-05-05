@@ -15,7 +15,12 @@
     <RepositoryUrl>https://github.com/sheva-serga/Filtering.Net</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageIcon>icon.png</PackageIcon>
     <PackageTags>filter;sort;page;source-generator;efcore;linq;iqueryable;roslyn</PackageTags>
     <PackageReleaseNotes>https://github.com/sheva-serga/Filtering.Net/blob/v$(Version)/CHANGELOG.md</PackageReleaseNotes>
   </PropertyGroup>
+
+  <ItemGroup Condition="'$(IsPackable)' != 'false'">
+    <None Include="$(MSBuildThisFileDirectory)assets\icon.png" Pack="true" PackagePath="\" Visible="false" />
+  </ItemGroup>
 </Project>
