@@ -8,6 +8,7 @@
     <Title>Filtering.Net.Generator — Roslyn Source Generator</Title>
     <Description>Roslyn source generator and analyzer for Filtering.Net. Generates compile-time-checked filter, sort, and pagination code from your domain types.</Description>
     <IncludeBuildOutput>false</IncludeBuildOutput>
+    <IncludeSymbols>false</IncludeSymbols>
     <SuppressDependenciesWhenPacking>true</SuppressDependenciesWhenPacking>
     <DevelopmentDependency>true</DevelopmentDependency>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
