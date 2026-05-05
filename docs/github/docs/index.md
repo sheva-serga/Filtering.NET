@@ -5,6 +5,10 @@ description: Type-safe, source-generated filter / sort / page library for IQuery
 
 # Filtering.Net
 
+[![Filtering.Net](https://img.shields.io/nuget/v/Filtering.Net?label=Filtering.Net&logo=nuget)](https://www.nuget.org/packages/Filtering.Net)
+[![Filtering.Net.Generator](https://img.shields.io/nuget/v/Filtering.Net.Generator?label=Filtering.Net.Generator&logo=nuget)](https://www.nuget.org/packages/Filtering.Net.Generator)
+[![Filtering.Net.EntityFrameworkCore](https://img.shields.io/nuget/v/Filtering.Net.EntityFrameworkCore?label=Filtering.Net.EntityFrameworkCore&logo=nuget)](https://www.nuget.org/packages/Filtering.Net.EntityFrameworkCore)
+
 Type-safe, source-generated filter / sort / page library for `IQueryable<T>` and EF Core. Define your filterable surface with attributes; the source generator emits a strongly-typed `IFilterDefinition<T>` plus a JSON-friendly request model that translates straight to SQL.
 
 ## Why?
