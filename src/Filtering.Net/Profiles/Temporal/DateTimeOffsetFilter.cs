@@ -36,9 +36,6 @@ public static class DateTimeOffsetFilter
     public static Expression<Func<DateTimeOffset?, bool>> IsNull => column => column == null;
 
     /// <summary>Extracts a <see cref="DateTimeOffset"/> from an ISO 8601 JSON String.</summary>
-    /// <param name="element">The JSON value to read.</param>
-    /// <param name="value">The extracted DateTimeOffset, or <c>default</c> on failure.</param>
-    /// <param name="error">A human-readable explanation of the failure.</param>
     public static bool TryGetValue(JsonElement element, out DateTimeOffset value, out string error)
     {
         if (element.ValueKind != JsonValueKind.String)

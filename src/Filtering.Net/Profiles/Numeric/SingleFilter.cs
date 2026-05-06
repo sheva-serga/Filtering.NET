@@ -33,9 +33,6 @@ public static class SingleFilter
     [FilterOperator("isNull")] public static Expression<Func<float?, bool>> IsNull => column => column == null;
 
     /// <summary>Extracts a <see cref="float"/> from a JSON Number or invariant-culture JSON String via <see cref="NumericExtractor"/>.</summary>
-    /// <param name="element">The JSON value to read.</param>
-    /// <param name="value">The extracted float, or <c>0</c> on failure.</param>
-    /// <param name="error">A human-readable explanation of the failure.</param>
     public static bool TryGetValue(JsonElement element, out float value, out string error) =>
         NumericExtractor.TryGetValue(
             element,
@@ -44,10 +41,7 @@ public static class SingleFilter
             "float",
             out value, out error);
 
-    /// <summary>Extracts a <see cref="float"/>[] from a JSON Array; each element parsed via <see cref="TryGetValue"/>.</summary>
-    /// <param name="element">The JSON array to read.</param>
-    /// <param name="values">The extracted floats, or an empty array on failure.</param>
-    /// <param name="error">A human-readable explanation of the failure.</param>
+    /// <summary>Extracts a <see cref="float"/>[] from a JSON Array via <see cref="TryGetValue"/>.</summary>
     public static bool TryGetArray(JsonElement element, out float[] values, out string error) =>
         NumericExtractor.TryGetArray(element, TryGetValue, out values, out error);
 }

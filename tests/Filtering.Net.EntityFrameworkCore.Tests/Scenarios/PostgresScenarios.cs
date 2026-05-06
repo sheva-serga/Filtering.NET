@@ -91,28 +91,6 @@ public class PostgresScenarios(PostgresFixture postgresFixture)
         renderedSql.Should().Contain("\"Name\"");
     }
 
-    [Fact]
-    public async Task ApplyPagedAsync_StatusEqViaConverterRequest_WorksAgainstPostgres()
-    {
-        // Arrange
-        var cancellationToken = TestContext.Current.CancellationToken;
-        if (!_postgresFixture.IsAvailable) Assert.Skip("Docker is not available on this host.");
-        await using var dbContext = await _postgresFixture.CreateContextAsync();
-        await ResetSchemaAsync(dbContext, cancellationToken);
-        await WidgetSeed.SeedAsync(dbContext);
-        var widgetFilter = new WidgetFilterWithExplicitStatusConverter();
-        var request = new FilterRequest
-        {
-            Where = FilterRequestBuilder.Leaf("Status", "eq", "Active"),
-        };
-
-        // Act
-        var pageResult = await dbContext.Widgets.AsQueryable().ApplyPagedAsync(widgetFilter, request, cancellationToken);
-
-        // Assert
-        pageResult.Items.Select(widget => widget.Id).Should().BeEquivalentTo([1, 4]);
-    }
-
     private static async Task ResetSchemaAsync(ScenarioDbContext dbContext, CancellationToken cancellationToken)
     {
         // Postgres won't let us drop a database we're connected to — clearing the table is

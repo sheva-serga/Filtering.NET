@@ -2,28 +2,22 @@ using Microsoft.CodeAnalysis;
 
 namespace Filtering.Net.Generator;
 
-/// <summary>
-/// Resolves dotted property paths (e.g., <c>"Department.Name"</c>) on an entity type to the
-/// final <see cref="IPropertySymbol"/>.
-/// </summary>
+// Resolves dotted property paths (e.g., "Department.Name") on an entity type to the final IPropertySymbol.
 internal static class PropertyTypeResolver
 {
-    /// <summary>Result of a path resolution: the leaf property and a flag telling whether any intermediate segment is a nullable reference-type navigation.</summary>
     public readonly struct ResolutionResult(IPropertySymbol? leafProperty, bool crossesNullableNavigation)
     {
         public IPropertySymbol? LeafProperty { get; } = leafProperty;
 
-        /// <summary>True when one of the intermediate segments was a nullable reference-typed navigation property (e.g., <c>Department?.Name</c>).</summary>
+        // True when an intermediate segment is a nullable reference-type navigation (FN1006).
         public bool CrossesNullableNavigation { get; } = crossesNullableNavigation;
     }
 
-    /// <summary>Convenience overload — returns just the leaf property; preserves the original API used elsewhere.</summary>
     public static IPropertySymbol? Resolve(INamedTypeSymbol entityType, string path)
     {
         return ResolveWithNullableInfo(entityType, path).LeafProperty;
     }
 
-    /// <summary>Walks a dotted path on <paramref name="entityType"/>, returning the leaf property and whether any intermediate hop crossed a nullable navigation.</summary>
     public static ResolutionResult ResolveWithNullableInfo(INamedTypeSymbol entityType, string path)
     {
         if (string.IsNullOrEmpty(path))
@@ -60,7 +54,6 @@ internal static class PropertyTypeResolver
 
     private static IPropertySymbol? FindProperty(INamedTypeSymbol containingType, string name)
     {
-        // Walk the inheritance chain so inherited properties are visible too.
         for (var currentType = (INamedTypeSymbol?)containingType; currentType is not null; currentType = currentType.BaseType)
         {
             foreach (var member in currentType.GetMembers(name))
@@ -82,7 +75,6 @@ internal static class PropertyTypeResolver
         return type;
     }
 
-    /// <summary>True for reference types annotated as nullable (e.g., <c>Department?</c>). Excludes nullable value types — <c>int?</c> etc. don't carry navigation semantics.</summary>
     private static bool IsNullableReferenceType(ITypeSymbol type)
     {
         return type.IsReferenceType && type.NullableAnnotation == NullableAnnotation.Annotated;

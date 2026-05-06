@@ -4,25 +4,11 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Filtering.Net.Generator;
 
-/// <summary>
-/// Emitter for custom <c>[FilterOperator]</c> lambda bodies. Rewrites the column parameter
-/// to the property accessor and the value parameter to the leaf method's value variable,
-/// then emits the rewritten body as the typed leaf method's expression body.
-/// </summary>
-/// <remarks>
-/// Known limitation (v1, accepted by design): the rewriter is parameter-name-based and does
-/// not track lexical scope. A nested lambda inside a custom operator that re-declares a
-/// parameter with the same name as the outer column or value parameter would be incorrectly
-/// substituted. In practice <c>[FilterOperator]</c> bodies are short LINQ-style expressions
-/// where this doesn't occur, but the limitation is documented here so a future iteration
-/// can lift it by walking <c>SimpleLambdaExpressionSyntax</c>/<c>ParenthesizedLambdaExpressionSyntax</c>
-/// and pushing/popping a shadow set during traversal.
-/// </remarks>
+// Known limitation: the rewriter is parameter-name-based and doesn't track lexical scope.
+// Nested lambdas that re-declare the outer column/value name would be incorrectly substituted.
+// [FilterOperator] bodies are short LINQ expressions in practice, so this is accepted.
 internal static class CustomOperatorEmitter
 {
-    /// <summary>Rewrites the lambda body source so the column parameter becomes the property
-    /// accessor expression and the value parameter becomes the supplied value-variable name.
-    /// Returns the rewritten C# source ready to drop into a <c>=&gt; entity =&gt; …</c> tail.</summary>
     public static string RewriteLambdaBody(
         string lambdaBodySource,
         string columnParameterName,
@@ -47,13 +33,6 @@ internal static class CustomOperatorEmitter
         return rewrittenStatement.ToFullString();
     }
 
-    /// <summary>
-    /// Rewriter that replaces bare <see cref="IdentifierNameSyntax"/> occurrences of the
-    /// column / value parameter names with their target replacement source. Member-access
-    /// right-hand sides are left alone (e.g., <c>foo.column</c> where <c>column</c> is a
-    /// property name remains untouched) by overriding <see cref="VisitMemberAccessExpression"/>
-    /// to recurse only into the receiver.
-    /// </summary>
     private sealed class IdentifierRewriter(
         string columnName,
         string columnReplacement,
@@ -85,8 +64,7 @@ internal static class CustomOperatorEmitter
 
         public override SyntaxNode? VisitMemberAccessExpression(MemberAccessExpressionSyntax node)
         {
-            // Rewrite the receiver but leave the member name alone (so a property named
-            // "column" on some receiver doesn't get rewritten).
+            // Rewrite receiver only — leaves member names (e.g., a property named "column") untouched.
             var rewrittenReceiver = (ExpressionSyntax)Visit(node.Expression);
             if (ReferenceEquals(rewrittenReceiver, node.Expression))
             {

@@ -4,7 +4,7 @@ using UserManagement.WebApi.Models;
 namespace UserManagement.WebApi.Filters;
 
 // Feature catalogue: each grouping below demonstrates one Filtering.Net capability.
-// String maps pass Profile = typeof(...) explicitly because StringFilterPlus makes string ambiguous (FN0015).
+// String maps pass Profile = typeof(...) explicitly because StringFilterPlus makes string ambiguous (FN0014).
 [GenerateFilter<User>]
 public partial class UserFilter
 {

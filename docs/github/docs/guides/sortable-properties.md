@@ -47,5 +47,3 @@ A consumer requesting `{ "sort": [{ "field": "createdAt" }, { "field": "id", "di
 ## See also
 
 - [Mapping properties](mapping-properties.md)
-- [FN0002 — duplicate sortable mapping](../reference/diagnostics/FN0002.md)
-- [FN1002 — property likely should be sortable](../reference/diagnostics/FN1002.md)

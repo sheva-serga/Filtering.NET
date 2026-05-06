@@ -1,10 +1,6 @@
 namespace Filtering.Net.Generator;
 
-/// <summary>
-/// Buckets a property's allowed operators by their value shape (Scalar / Array / None / Custom)
-/// so the leaf-validator emitter can produce a single grouped <c>switch</c> arm per shape
-/// instead of one arm per operator. See Refactor 3 in the v1 cleanup pass.
-/// </summary>
+// Buckets allowed operators by value shape so the emitter produces one switch arm per shape.
 internal sealed class OperatorShapeGrouping
 {
     private OperatorShapeGrouping(
@@ -19,28 +15,12 @@ internal sealed class OperatorShapeGrouping
         CustomOperators = customOperators;
     }
 
-    /// <summary>Operators that take a single scalar value (eq, ne, gt, gte, lt, lte,
-    /// contains, startsWith, endsWith). Share one grouped switch arm.</summary>
     public IReadOnlyList<string> ScalarOperators { get; }
-
-    /// <summary>Operators that take a JSON array value (currently just <c>in</c>).
-    /// Share one grouped switch arm.</summary>
     public IReadOnlyList<string> ArrayOperators { get; }
-
-    /// <summary>Operators that take no value at all (currently just <c>isNull</c>).
-    /// Share one grouped switch arm.</summary>
     public IReadOnlyList<string> NoneOperators { get; }
-
-    /// <summary>Custom-profile operators that need their own switch arm. Each one carries
-    /// its own value type (from its lambda's <c>TArg</c>) so they can't share a TryGet call
-    /// with each other or with the built-in operators.</summary>
+    // Each custom operator has its own value type and can't share a TryGet call with others.
     public IReadOnlyList<CustomOperatorModel> CustomOperators { get; }
 
-    /// <summary>Bucketises <paramref name="property"/>'s <c>AllowedOperators</c> by shape.
-    /// Built-in operators land in the matching scalar/array/none bucket. Operators declared
-    /// on a custom (non-built-in) profile go in the per-operator <see cref="CustomOperators"/>
-    /// bucket — keyed by their pre-extracted lambda metadata so the emitter can read the
-    /// value type and parameter name.</summary>
     public static OperatorShapeGrouping Build(PropertyMappingModel property)
     {
         var scalarOperators = new List<string>();
@@ -52,10 +32,8 @@ internal sealed class OperatorShapeGrouping
 
         foreach (var operatorName in property.AllowedOperators)
         {
-            // On a custom profile, prefer the per-operator metadata if we successfully
-            // extracted it (lambda body, value type, parameter names). Built-in operator
-            // names that the custom profile inherits via [FilterProfile(BasedOn=…)] don't
-            // get custom metadata — they fall through to the built-in shape catalog.
+            // Built-in operator names inherited via BasedOn don't get custom metadata;
+            // they fall through to the built-in shape catalog below.
             if (!isBuiltInProfile)
             {
                 CustomOperatorModel? customMetadata = null;

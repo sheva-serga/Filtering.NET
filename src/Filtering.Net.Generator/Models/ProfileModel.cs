@@ -1,10 +1,6 @@
 namespace Filtering.Net.Generator;
 
-/// <summary>
-/// Cacheable model describing a discovered <c>[FilterProfile]</c>-marked class. Carries enough
-/// information for cross-class checks (FN1003 ProfileUnused, FN1004 OperatorUnused) without
-/// holding any non-equatable Roslyn types.
-/// </summary>
+// Carries enough for cross-pipeline checks (FN1003, FN1004) with no non-equatable Roslyn types.
 internal sealed record ProfileModel(
     string ProfileFullName,
     EquatableList<string> OperatorNames,

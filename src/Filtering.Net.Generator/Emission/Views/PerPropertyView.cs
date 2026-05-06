@@ -1,11 +1,5 @@
 namespace Filtering.Net.Generator;
 
-/// <param name="BuildThreadsOptions">True when this property's <c>Build</c> method should accept a
-/// <c>JsonSerializerOptions options</c> parameter — i.e., the property has at least one
-/// typed-value operator that will need the resolver chain for deserialization.</param>
-/// <param name="ValidateThreadsOptions">True when this property's <c>Validate</c> method should accept a
-/// <c>JsonSerializerOptions options</c> parameter — i.e., the property has at least one
-/// typed-value operator whose validate arm must resolve the type via the resolver chain.</param>
 internal sealed record PerPropertyView(
     string PropertyIdentifier,
     string PropertyName,
@@ -20,9 +14,7 @@ internal sealed record PerPropertyView(
     IReadOnlyList<string> TypedLeafMethods,
     PerPropertySortView? Sort);
 
-/// <summary>Populated only when the property is sortable. <see cref="Accessor"/> is the entity-rooted column expression
-/// (e.g. <c>entity.Name</c>) used inside the four <c>OrderBy / OrderByDescending / ThenBy / ThenByDescending</c> arms
-/// emitted into the per-property class's <c>ApplySort</c> method.</summary>
+// Accessor is the entity-rooted column expression (e.g. entity.Name) used in OrderBy / ThenBy arms.
 internal sealed record PerPropertySortView(string Accessor);
 
 internal sealed record PerPropertyBuildView(

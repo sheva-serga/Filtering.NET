@@ -33,10 +33,7 @@ public static class TimeOnlyFilter
     [FilterOperator("isNull")]
     public static Expression<Func<TimeOnly?, bool>> IsNull => column => column == null;
 
-    /// <summary>Extracts a <see cref="TimeOnly"/> from an ISO 8601 time string (HH:mm:ss).</summary>
-    /// <param name="element">The JSON value to read.</param>
-    /// <param name="value">The extracted TimeOnly, or <c>default</c> on failure.</param>
-    /// <param name="error">A human-readable explanation of the failure.</param>
+    /// <summary>Extracts a <see cref="TimeOnly"/> from an ISO 8601 time JSON String (HH:mm:ss).</summary>
     public static bool TryGetValue(JsonElement element, out TimeOnly value, out string error)
     {
         if (element.ValueKind != JsonValueKind.String)

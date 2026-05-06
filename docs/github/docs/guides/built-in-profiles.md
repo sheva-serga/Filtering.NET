@@ -37,12 +37,10 @@ Nullable reference and value-typed columns share the underlying type's profile �
 
 ## Pitfalls
 
-- Declaring any custom `[FilterProfile<T>]` for a CLR type that already has a built-in makes resolution ambiguous and fires `FN0015`. From that point forward, every `[Map]` for properties of that type must specify `Profile = typeof(...)` explicitly. The sample app's `StringFilterPlus` is exactly this case — adding it forces every `[Map]` on a `string` column to name a profile.
-- Mapping a property whose CLR type has no built-in match (a custom struct, a third-party value type) without `Profile = typeof(...)` raises `FN0009`. Either declare a custom profile for the type or specify one on the map.
+- Declaring any custom `[FilterProfile<T>]` for a CLR type that already has a built-in makes resolution ambiguous and fires `FN0014`. From that point forward, every `[Map]` for properties of that type must specify `Profile = typeof(...)` explicitly. The sample app's `StringFilterPlus` is exactly this case — adding it forces every `[Map]` on a `string` column to name a profile.
+- Mapping a property whose CLR type has no built-in match (a custom struct, a third-party value type) without `Profile = typeof(...)` raises `FN0008`. Either declare a custom profile for the type or specify one on the map.
 
 ## See also
 
 - [Defining custom profiles](custom-profiles.md)
 - [Profiles and operators](../concepts/profiles-and-operators.md)
-- [FN0015 — multiple profiles match property type](../reference/diagnostics/FN0015.md)
-- [FN0009 — no inferable profile for property type](../reference/diagnostics/FN0009.md)

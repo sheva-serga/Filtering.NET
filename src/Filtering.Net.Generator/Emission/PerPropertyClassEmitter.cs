@@ -1,10 +1,5 @@
 namespace Filtering.Net.Generator;
 
-/// <summary>
-/// Emits a <c>private static class {Property}</c> nested inside the partial filter class for
-/// one filterable property. The nested class contains <c>Build</c> (apply-side predicate
-/// builder), <c>Validate</c> (leaf validator), and per-operator typed leaf methods.
-/// </summary>
 internal static class PerPropertyClassEmitter
 {
     public static string Emit(FilterClassModel model, PropertyMappingModel property) =>
@@ -17,7 +12,7 @@ internal static class PerPropertyClassEmitter
     {
         var entityFullName = "global::" + model.FullEntityTypeName;
         var propertyIdentifier = EmissionNames.PropertyIdentifier(property.PropertyName);
-        var valueShapeSourceType = property.ConverterModelClrType ?? property.PropertyClrType;
+        var valueShapeSourceType = property.PropertyClrType;
         var valueShape = PropertyValueShapeResolver.Resolve(valueShapeSourceType, property.ExtractorProfileFullName);
         var interceptor = model.Interceptors.FirstOrDefault(i => i.PropertyName == property.PropertyName);
         var grouping = OperatorShapeGrouping.Build(property);

@@ -1,6 +1,6 @@
 # Filtering.Net.Generator
 
-Roslyn incremental source generator + 25-rule analyzer for [Filtering.Net](https://www.nuget.org/packages/Filtering.Net/). Emits typed `IFilterDefinition<T>` implementations and a DI extension at compile time. Catches translatable-method mistakes before EF Core sees them.
+Roslyn incremental source generator + 24-rule analyzer for [Filtering.Net](https://www.nuget.org/packages/Filtering.Net/). Emits typed `IFilterDefinition<T>` implementations and a DI extension at compile time. Catches translatable-method mistakes before EF Core sees them.
 
 This package is **analyzer-only** — it has no runtime DLL. Install it alongside `Filtering.Net`.
 
@@ -72,7 +72,7 @@ Then `[Map(nameof(User.Name), Profile = typeof(StringFilterPlus))]` and the new 
 
 ## Diagnostics
 
-25 rules total: 17 errors (`FN0001`–`FN0017`) and 8 warnings (`FN1001`–`FN1008`). Per-rule explainers live in the [diagnostics catalogue](https://sheva-serga.github.io/Filtering.NET/reference/diagnostics/) on the docs site.
+24 rules total: 16 errors (`FN0001`–`FN0016`) and 8 warnings (`FN1001`–`FN1008`). The full catalogue with one-line summaries lives at the [diagnostics catalogue](https://sheva-serga.github.io/Filtering.NET/diagnostics/) on the docs site.
 
 | Id | Severity | Summary |
 |----|----------|---------|
@@ -82,17 +82,16 @@ Then `[Map(nameof(User.Name), Profile = typeof(StringFilterPlus))]` and the new 
 | FN0004 | Error | Property referenced by `[Map]` or `[PropertyMap]` does not exist on the entity type. |
 | FN0005 | Error | Profile cannot be applied to the property — the profile's column type is incompatible with the property's CLR type. |
 | FN0006 | Error | Operator referenced in `For(...).Operator(...)` is not declared by the resolved profile. |
-| FN0007 | Error | Type referenced by `[ConvertWith]` does not inherit from `ValueConverter<TModel, TProvider>`. |
-| FN0008 | Error | `[Map]` method is not declared `partial` — the generator can only emit implementations for partial methods. |
-| FN0009 | Error | Property's CLR type has no built-in primitive profile; specify `Profile = typeof(...)` explicitly. |
-| FN0010 | Error | Property has multiple `[InterceptValue]` declarations. |
-| FN0011 | Error | `[FilterOperator]` member is not `public static`. |
-| FN0012 | Error | Alias collides with another property or alias on the entity (case-insensitive). |
-| FN0013 | Error | `[FilterProfile(BasedOn = typeof(...))]` references a type that is not marked with `[FilterProfile]`. |
-| FN0014 | Error | Property has `[InterceptValue]` but no matching `[Map]` declaration. |
-| FN0015 | Error | Property's CLR type is matched by multiple profiles — use `Profile = typeof(...)` on the `[Map]` to pick one. |
-| FN0016 | Error | Standalone profile has no `BasedOn` and is missing required extractor method(s). |
-| FN0017 | Error | Same operator name declared more than once on a single profile. |
+| FN0007 | Error | `[Map]` method is not declared `partial` — the generator can only emit implementations for partial methods. |
+| FN0008 | Error | Property's CLR type has no built-in primitive profile; specify `Profile = typeof(...)` explicitly. |
+| FN0009 | Error | Property has multiple `[InterceptValue]` declarations. |
+| FN0010 | Error | `[FilterOperator]` member is not `public static`. |
+| FN0011 | Error | Alias collides with another property or alias on the entity (case-insensitive). |
+| FN0012 | Error | `[FilterProfile(BasedOn = typeof(...))]` references a type that is not marked with `[FilterProfile]`. |
+| FN0013 | Error | Property has `[InterceptValue]` but no matching `[Map]` declaration. |
+| FN0014 | Error | Property's CLR type is matched by multiple profiles — use `Profile = typeof(...)` on the `[Map]` to pick one. |
+| FN0015 | Error | Standalone profile has no `BasedOn` and is missing required extractor method(s). |
+| FN0016 | Error | Same operator name declared more than once on a single profile. |
 | FN1001 | Warning | `[FilterOperator]` body references `DateTime.UtcNow`/`Now` directly inside the lambda. |
 | FN1002 | Warning | Property is mapped but not marked `Sortable = true` — likely omission for a sortable type. |
 | FN1003 | Warning | Profile is declared but never referenced by any `[Map(..., Profile = ...)]`. |
@@ -100,9 +99,9 @@ Then `[Map(nameof(User.Name), Profile = typeof(StringFilterPlus))]` and the new 
 | FN1005 | Warning | Property allows zero operators — `Only`/`Except` excluded everything; filter leaves on this field will always fail validation. |
 | FN1006 | Warning | Mapped path crosses a nullable navigation property. |
 | FN1007 | Warning | `[FilterOperator]` body calls a method not in the EF Core translatable allow-list — may produce client-side evaluation or runtime errors. |
-| FN1008 | Warning | Path B filter value type is not registered in any visible `JsonSerializerContext` (opt-in via `[assembly: FilterValueDiagnostics(WarnUnregistered = true)]`). |
+| FN1008 | Warning | Filter value type is not registered in any visible `JsonSerializerContext` (opt-in via `[assembly: FilterValueDiagnostics(WarnUnregistered = true)]`). |
 
-Click any rule on GitHub for the full explainer with examples + how to fix.
+Every rule's `helpLinkUri` points back at the catalogue table on the docs site.
 
 ## Editor / build integration
 

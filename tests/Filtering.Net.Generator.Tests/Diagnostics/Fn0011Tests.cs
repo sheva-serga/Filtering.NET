@@ -1,77 +1,72 @@
 namespace Filtering.Net.Generator.Tests.Diagnostics;
 
-/// <summary>Tests for FN0011 (NonStaticOperator): [FilterOperator] member must be public static.</summary>
 public class Fn0011Tests
 {
     [Fact]
-    public void FilterOperatorOnInstanceMember_FiresFN0011()
+    public void AliasMatchesAnotherPropertyName_FiresFN0011()
     {
         // Arrange
         var source = """
-            using System;
-            using System.Linq.Expressions;
             using Filtering.Net;
             namespace TestNs;
-            [FilterProfile<string>]
-            public class CustomProfile
+            public class User { public string Name { get; set; } = ""; public string Nickname { get; set; } = ""; }
+            [GenerateFilter<User>]
+            public partial class UserFilter
             {
-                [FilterOperator("eq")]
-                public Expression<Func<string, string, bool>> Eq => (column, value) => column == value;
+                [Map(nameof(User.Name))]
+                private static partial void MapName();
+                [Map(nameof(User.Nickname), Alias = "name")]
+                private static partial void MapNickname();
             }
             """;
 
         // Act
-        // (no separate act step — AssertDiagnostic is the verification)
-
         // Assert
         DiagnosticTestHelpers.AssertDiagnostic(source, "FN0011");
     }
 
     [Fact]
-    public void FilterOperatorOnPrivateStaticMember_FiresFN0011()
+    public void TwoAliasesIdentical_FiresFN0011()
     {
         // Arrange
-        // public is also required, not just static.
         var source = """
-            using System;
-            using System.Linq.Expressions;
             using Filtering.Net;
             namespace TestNs;
-            [FilterProfile<string>]
-            public static class CustomProfile
+            public class User { public string Name { get; set; } = ""; public string Nickname { get; set; } = ""; }
+            [GenerateFilter<User>]
+            public partial class UserFilter
             {
-                [FilterOperator("eq")]
-                private static Expression<Func<string, string, bool>> Eq => (column, value) => column == value;
+                [Map(nameof(User.Name), Alias = "title")]
+                private static partial void MapName();
+                [Map(nameof(User.Nickname), Alias = "TITLE")]
+                private static partial void MapNickname();
             }
             """;
 
         // Act
-        // (no separate act step — AssertDiagnostic is the verification)
-
         // Assert
         DiagnosticTestHelpers.AssertDiagnostic(source, "FN0011");
     }
 
     [Fact]
-    public void FilterOperatorOnPublicStaticMember_DoesNotFireFN0011()
+    public void DistinctAliases_DoesNotFireFN0011()
     {
         // Arrange
         var source = """
-            using System;
-            using System.Linq.Expressions;
             using Filtering.Net;
             namespace TestNs;
-            [FilterProfile<string>]
-            public static class CustomProfile
+            public class User { public string Name { get; set; } = ""; public string Nickname { get; set; } = ""; }
+            [GenerateFilter<User>]
+            public partial class UserFilter
             {
-                [FilterOperator("eq")]
-                public static Expression<Func<string, string, bool>> Eq => (column, value) => column == value;
+                [Map(nameof(User.Name), Alias = "fullName")]
+                private static partial void MapName();
+                [Map(nameof(User.Nickname), Alias = "shortName")]
+                private static partial void MapNickname();
             }
             """;
 
         // Act
-        // (no separate act step — AssertNoDiagnostic is the verification)
-
         // Assert
         DiagnosticTestHelpers.AssertNoDiagnostic(source, "FN0011");
     }

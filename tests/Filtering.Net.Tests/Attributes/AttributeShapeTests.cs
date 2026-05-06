@@ -115,16 +115,6 @@ public class AttributeShapeTests
     }
 
     [Fact]
-    public void ConvertWithAttribute_Constructed_StoresConverterType()
-    {
-        // Arrange
-        var attribute = new ConvertWithAttribute<int>();
-
-        // Act + Assert
-        attribute.ConverterType.Should().Be<int>();
-    }
-
-    [Fact]
     public void FilterDefaultsAttribute_InitializedWithLimits_StoresLimits()
     {
         // Arrange

@@ -49,15 +49,14 @@ Navigation paths use dotted strings: `[Map("Department.Name", Alias = "departmen
 
 ## Pitfalls
 
-- The `[Map]`-decorated method must be declared `partial`, otherwise `FN0008` fires.
+- The `[Map]`-decorated method must be declared `partial`, otherwise `FN0007` fires.
 - A property may be carried by either `[Map]` or `[PropertyMap]`, never both — `FN0003` flags the conflict.
 - Two `[Map]` methods that point at the same property name (or the same alias) collide with `FN0001`.
 - The string passed to `[Map(...)]` must resolve to a real property on the entity, otherwise `FN0004` fires.
-- Aliases must be unique across the whole filter class (case-insensitive), or `FN0012` fires.
+- Aliases must be unique across the whole filter class (case-insensitive), or `FN0011` fires.
 
 ## See also
 
 - [Sortable properties](sortable-properties.md)
 - [Restricting operators](restricting-operators.md)
 - [Built-in profiles per primitive type](built-in-profiles.md)
-- [FN0008 — `[Map]` method must be partial](../reference/diagnostics/FN0008.md)

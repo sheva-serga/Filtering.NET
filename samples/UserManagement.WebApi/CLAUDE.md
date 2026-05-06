@@ -7,7 +7,7 @@ A minimal ASP.NET Core 9 + EF Core 9 + PostgreSQL Web API that exercises `Filter
 ## What it demonstrates
 
 - **`[GenerateFilter<User>]` partial** — `Filters/UserFilter.cs`. Each `[Map]` group inside is a feature demo (primitives, custom-profile, operator restriction, interceptor, enum, navigation alias).
-- **Custom profile with typed-value operator** — `Filters/StringFilterPlus.cs`. `[FilterProfile<string>(BasedOn = typeof(StringFilter))]` + two custom operators: `[FilterOperator("fuzzy")]` (substring) and `[FilterOperator("ilike")]` (calls `EF.Functions.ILike` directly — the canonical example of a `[FilterOperator]` lambda invoking a provider-specific EF function). Adding any `string`-typed custom profile makes `string` an ambiguous match for built-in resolution, so every string-typed `[Map]` in `UserFilter` specifies `Profile = typeof(...)` explicitly (this is the FN0015 contract).
+- **Custom profile with typed-value operator** — `Filters/StringFilterPlus.cs`. `[FilterProfile<string>(BasedOn = typeof(StringFilter))]` + two custom operators: `[FilterOperator("fuzzy")]` (substring) and `[FilterOperator("ilike")]` (calls `EF.Functions.ILike` directly — the canonical example of a `[FilterOperator]` lambda invoking a provider-specific EF function). Adding any `string`-typed custom profile makes `string` an ambiguous match for built-in resolution, so every string-typed `[Map]` in `UserFilter` specifies `Profile = typeof(...)` explicitly (this is the FN0014 contract).
 - **`[InterceptValue]`** — `NormalizeEmail` lowercases the email value before predicate building. Interceptors must be `internal` or `public` (the generator's per-property class is `file`-scoped, separate compilation unit).
 - **Auto-emitted enum profile** — `User.Status` is a `UserStatus` enum; the generator scans the property graph and emits `Filtering.Net.Generated.UserStatusFilter` automatically.
 - **Navigation path + alias** — `[Map("Department.Name", Alias = "departmentName")]` exposes the related column under a friendly key.
@@ -54,4 +54,4 @@ The connection string in `appsettings.json` matches the docker-compose defaults.
 - Auth, logging, OpenAPI generation — orthogonal to filtering and would only obscure the example.
 - Migrations — `EnsureCreatedAsync` is enough for a sample. Real apps would use `dotnet ef migrations`.
 - Multi-tenant filtering — handled at the `IQueryable<User>` source (e.g., `dbContext.Users.Where(u => u.TenantId == tenantId)`) before passing to `ApplyPagedAsync`. Outside this sample's scope.
-- `[PropertyMap]` full DSL override and `[ConvertWith]` value-converter integration — both supported by the library but require enough setup that they belong in dedicated samples.
+- `[PropertyMap]` full DSL override — supported by the library but requires enough setup that it belongs in a dedicated sample.

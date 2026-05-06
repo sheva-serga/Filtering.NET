@@ -4,19 +4,11 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Filtering.Net.Generator;
 
-/// <summary>
-/// Shared lambda-body qualifier used by both <see cref="ProfileResolver"/> (for custom
-/// <c>[FilterOperator]</c> bodies) and <see cref="PropertyMapOverrideExtractor"/> (for
-/// <c>[PropertyMap]</c> override bodies). Walks the supplied syntax tree and replaces
-/// type identifiers with their fully-qualified <c>global::Namespace.Type</c> form via
-/// the semantic model so the rewritten body resolves inside the generated file
-/// regardless of which usings the consumer brings.
-/// </summary>
+// Rewrites type identifiers to their global::-qualified form so the body resolves in the
+// generated file regardless of which using directives the consumer brings.
 internal static class ProfileLambdaQualifier
 {
-    /// <summary>Qualify all type identifiers in the supplied lambda body. Returns the raw
-    /// source when no compilation / semantic model is available, or when the syntax tree
-    /// isn't owned by the supplied compilation (defensive — happens in some test paths).</summary>
+    // Returns raw source when no model is available (e.g., some test paths).
     public static string QualifyLambdaBody(CSharpSyntaxNode lambdaBody, Compilation? compilation)
     {
         if (compilation is null) return lambdaBody.ToString();
@@ -34,12 +26,7 @@ internal static class ProfileLambdaQualifier
         return rewritten.ToFullString();
     }
 
-    /// <summary>
-    /// Renders a CLR type as it should appear in emitted code. C# language keyword types
-    /// (<c>string</c>, <c>int</c>, …) skip the <c>global::</c> prefix because the compiler
-    /// rejects <c>global::string</c>; everything else gets prefixed for unambiguous binding.
-    /// Arrays / nullables recurse through their element / underlying type.
-    /// </summary>
+    // C# keyword types skip global:: because the compiler rejects global::string.
     public static string FormatType(ITypeSymbol typeSymbol)
     {
         if (typeSymbol is IArrayTypeSymbol arrayType)
@@ -80,8 +67,6 @@ internal static class ProfileLambdaQualifier
             or SpecialType.System_Object;
     }
 
-    /// <summary>Rewriter that prepends <c>global::</c> + namespace to type identifiers so
-    /// the rewritten body resolves without any usings in the generated file.</summary>
     private sealed class TypeIdentifierQualifier(SemanticModel semanticModel) : CSharpSyntaxRewriter
     {
         private readonly SemanticModel _semanticModel = semanticModel;
@@ -96,7 +81,7 @@ internal static class ProfileLambdaQualifier
 
         public override SyntaxNode? VisitIdentifierName(IdentifierNameSyntax node)
         {
-            // Skip names that are part of a qualified expression — we'd double-qualify.
+            // Skip right-hand sides of qualified names to avoid double-qualifying.
             if (node.Parent is QualifiedNameSyntax qualified && qualified.Right == node) return node;
             if (node.Parent is MemberAccessExpressionSyntax memberAccess && memberAccess.Name == node) return node;
             if (node.Parent is AliasQualifiedNameSyntax) return node;

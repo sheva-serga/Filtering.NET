@@ -1,12 +1,7 @@
 namespace Filtering.Net.Generator;
 
-/// <summary>Model describing a discovered filter class (a partial class marked with <c>[GenerateFilter&lt;TEntity&gt;]</c>).</summary>
-/// <param name="HasAnyTypedValueProperty">True when at least one property in <see cref="Properties"/>
-/// has <see cref="PropertyMappingModel.HasTypedValueOperator"/> set, or at least one override in
-/// <see cref="Overrides"/> has <see cref="PropertyOverrideModel.HasTypedValueOperator"/> set. The
-/// emitter uses this flag to conditionally thread <c>JsonSerializerOptions</c> through the Apply
-/// and Validate chains — classes with no typed-value properties need no JSON deserialisation at
-/// all and can ignore the options parameter entirely.</param>
+// HasAnyTypedValueProperty: emitter uses this to decide whether to thread JsonSerializerOptions
+// through Apply/Validate — classes with no typed-value properties can skip JSON deserialisation.
 internal sealed record FilterClassModel(
     string Namespace,
     string ClassName,

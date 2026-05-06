@@ -15,11 +15,7 @@ public static class BoolFilter
     [FilterOperator("isNull")]
     public static Expression<Func<bool?, bool>> IsNull => column => column == null;
 
-    /// <summary>Extracts a <see cref="bool"/> from a JSON True or False value. Returns
-    /// <see langword="false"/> with a populated <paramref name="error"/> for any other kind.</summary>
-    /// <param name="element">The JSON value to read.</param>
-    /// <param name="value">The extracted bool, or <see langword="false"/> on failure.</param>
-    /// <param name="error">A human-readable explanation of the type mismatch on failure.</param>
+    /// <summary>Extracts a <see cref="bool"/> from a JSON True/False value; returns false with a populated <paramref name="error"/> for any other kind.</summary>
     public static bool TryGetValue(JsonElement element, out bool value, out string error)
     {
         if (element.ValueKind == JsonValueKind.True)

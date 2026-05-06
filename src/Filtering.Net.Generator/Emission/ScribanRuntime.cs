@@ -5,21 +5,13 @@ using Scriban.Runtime;
 
 namespace Filtering.Net.Generator;
 
-/// <summary>
-/// Loads, parses, and renders the embedded Scriban templates that drive Filtering.Net.Generator's
-/// emission layer. Templates live under <c>Emission/Templates/</c> as <c>&lt;EmbeddedResource&gt;</c>
-/// items; logical names like <c>"FilterClass"</c> resolve to embedded resource
-/// <c>Filtering.Net.Generator.Emission.Templates.FilterClass.scriban</c>. Parsed templates are
-/// cached for the lifetime of the assembly load.
-/// </summary>
+// Templates are cached for the lifetime of the assembly load.
 internal static class ScribanRuntime
 {
     private const string ResourceNamespace = "Filtering.Net.Generator.Emission.Templates.";
     private static readonly ConcurrentDictionary<string, Template> Cache = new();
 
-    /// <summary>Renders the named template against <paramref name="view"/>. The view is imported
-    /// into a Scriban <see cref="ScriptObject"/> using the default <see cref="StandardMemberRenamer"/>,
-    /// so PascalCase C# property names appear in the template as snake_case.</summary>
+    // PascalCase C# property names appear in templates as snake_case via StandardMemberRenamer.
     public static string Render(string templateName, object view)
     {
         var template = Cache.GetOrAdd(templateName, LoadAndParse);

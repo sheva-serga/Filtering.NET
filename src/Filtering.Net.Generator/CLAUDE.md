@@ -9,7 +9,7 @@ Roslyn incremental source generator + analyzer. Walks `[GenerateFilter<TEntity>]
 `FilterGenerator.cs` registers two `ForAttributeWithMetadataName` pipelines:
 
 1. **`[GenerateFilter<TEntity>]` branch** — extracts a `FilterClassModel`, reports per-class diagnostics, emits one source file per class via `SourceEmitter.EmitForClass`. A collected view drives the assembly-wide `AddFiltering()` extension and the per-enum auto-emitted profiles (`EnumProfileEmitter`).
-2. **`[FilterProfile<T>]` branch** — extracts profile-level models and reports per-profile diagnostics (`FN0006`, `FN0009`, `FN0014`, `FN1001`, `FN1002`, …).
+2. **`[FilterProfile<T>]` branch** — extracts profile-level models and reports per-profile diagnostics (`FN0006`, `FN0008`, `FN0013`, `FN1001`, `FN1002`, …).
 
 Cross-pipeline diagnostics (`FN1003 ProfileUnused`, `FN1004 OperatorUnused`) join both `.Collect()` outputs.
 
@@ -20,7 +20,7 @@ Cross-pipeline diagnostics (`FN1003 ProfileUnused`, `FN1004 OperatorUnused`) joi
 | `Discovery/` | `EnumTypeCollector` — finds enums referenced anywhere in the filter class graph so the per-enum profile auto-emitter can emit one `[FilterProfile<TEnum>]` per. |
 | `ModelExtraction/` | `FilterClassExtractor`, `PropertyMappingExtractor`, `PropertyMapOverrideExtractor`, `ProfileExtractor`, `ProfileResolver`, `ProfileIndex(Builder)`. Pure-functional Roslyn-symbol-walkers that emit `EquatableList<T>`-based records. Models in `Models/`. |
 | `Models/` | Equatable record shapes used between extraction and emission. `FilterClassModel` is the top-level model. `EquatableList<T>` is the deduplication-friendly list type — use it everywhere a model carries a sequence. |
-| `Diagnostics/` | `DiagnosticDescriptors.cs` — every `FN0xxx` / `FN1xxx` registration with help-link URIs pointing at the published mkdocs site (`https://sheva-serga.github.io/Filtering.NET/reference/diagnostics/FNxxxx/`). Source pages live under `docs/github/docs/reference/diagnostics/`. |
+| `Diagnostics/` | `DiagnosticDescriptors.cs` — every `FN0xxx` / `FN1xxx` registration. Every rule's `helpLinkUri` points at the single catalogue page (`https://sheva-serga.github.io/Filtering.NET/diagnostics/`), source at `docs/github/docs/diagnostics/index.md`. |
 | `Emission/` | All output. `*Emitter.cs` files own a slice of the generated file. Each exposes `BuildView(model) → record` and `Emit(model) → string` that delegates to a single `ScribanRuntime.Render` call. |
 | `Emission/Templates/` | `.scriban` templates. Embedded as `<EmbeddedResource>`. Each template's logical name maps to the resource `Filtering.Net.Generator.Emission.Templates.{Name}.scriban`. |
 | `Emission/Views/` | Per-template view-model records (PascalCase here, snake_case inside templates via Scriban's `StandardMemberRenamer` default). |

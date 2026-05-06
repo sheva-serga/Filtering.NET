@@ -2,9 +2,6 @@ using Microsoft.CodeAnalysis;
 
 namespace Filtering.Net.Generator;
 
-/// <summary>Walks every named type in a <see cref="Compilation"/> looking for
-/// <c>[FilterProfile&lt;T&gt;]</c> attributes; returns a <see cref="ProfileIndex"/>
-/// keyed by the closed CLR type's display string.</summary>
 internal static class ProfileIndexBuilder
 {
     private const string FilterProfileAttributeOpenName = "Filtering.Net.FilterProfileAttribute<T>";

@@ -1,10 +1,5 @@
 namespace Filtering.Net.Generator;
 
-/// <summary>
-/// Emitter for ApplySorting. Per sortable property, emits the four-way switch over
-/// (field, direction, isFirstSort) → OrderBy / OrderByDescending / ThenBy / ThenByDescending.
-/// Skip/Take pagination is appended after the sort chain when page or pageSize is non-null.
-/// </summary>
 internal static class ApplySortingEmitter
 {
     public static string Emit(FilterClassModel model) =>

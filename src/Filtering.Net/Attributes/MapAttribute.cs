@@ -1,7 +1,6 @@
 namespace Filtering.Net;
 
 /// <summary>Marks a partial method as the configuration for one filterable property on the target entity.</summary>
-/// <remarks>Initializes a new <see cref="MapAttribute"/>.</remarks>
 /// <param name="propertyName">Name (or dotted nav path) of the property to map.</param>
 [AttributeUsage(AttributeTargets.Method, AllowMultiple = false, Inherited = false)]
 public sealed class MapAttribute(string propertyName) : Attribute

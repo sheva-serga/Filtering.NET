@@ -2,25 +2,19 @@ using System.Text.Json;
 
 namespace Filtering.Net;
 
-/// <summary>Generic JSON-to-numeric parsing used by every per-CLR-type numeric profile
-/// (<c>Int32Filter</c>, <c>Int64Filter</c>, …). The single generic body removes
-/// what used to be seven near-identical <c>TryGetInt32</c> / <c>TryGetInt64</c> / … methods on
-/// the deleted <c>NumberFilter</c>.</summary>
+/// <summary>Generic JSON-to-numeric extraction shared by every per-CLR-type numeric profile.</summary>
 public static class NumericExtractor
 {
     /// <summary>Per-CLR-type JSON Number reader (e.g. <c>JsonElement.TryGetInt32</c>).</summary>
     public delegate bool TryGetFromJson<T>(JsonElement element, out T value);
 
-    /// <summary>Per-CLR-type invariant-culture string parser (e.g. <c>int.TryParse</c> wrapped to
-    /// fix the <see cref="System.Globalization.NumberStyles"/> and culture).</summary>
+    /// <summary>Per-CLR-type invariant-culture string parser (e.g. <c>int.TryParse</c> with invariant culture).</summary>
     public delegate bool TryParseInvariant<T>(string raw, out T value);
 
-    /// <summary>Per-CLR-type scalar extractor signature shared by every per-type profile;
-    /// <see cref="TryGetArray{T}"/> walks an Array using one of these.</summary>
+    /// <summary>Per-CLR-type scalar extractor signature; <see cref="TryGetArray{T}"/> walks an array using one of these.</summary>
     public delegate bool ScalarTryGet<T>(JsonElement element, out T value, out string error);
 
-    /// <summary>Extracts a numeric value <typeparamref name="T"/> from a JSON Number or
-    /// invariant-culture JSON String. Mirrors the legacy <c>NumberFilter.TryGetInt32</c> shape.</summary>
+    /// <summary>Extracts <typeparamref name="T"/> from a JSON Number or invariant-culture JSON String.</summary>
     public static bool TryGetValue<T>(
         JsonElement element,
         TryGetFromJson<T> tryGetFromJson,
@@ -58,8 +52,7 @@ public static class NumericExtractor
         return false;
     }
 
-    /// <summary>Walks a JSON Array element-by-element via <paramref name="tryGetScalar"/>,
-    /// short-circuiting on the first failure with a "[i]: …"-prefixed error.</summary>
+    /// <summary>Walks a JSON Array via <paramref name="tryGetScalar"/>, short-circuiting on the first element failure.</summary>
     public static bool TryGetArray<T>(
         JsonElement element,
         ScalarTryGet<T> tryGetScalar,

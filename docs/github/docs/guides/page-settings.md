@@ -49,5 +49,3 @@ A request with `"pageSize": 50` runs as-is. A request with no `pageSize` resolve
 ## See also
 
 - [Async paged queries with `ApplyPagedAsync`](async-paged-queries.md)
-- [PageSettings attribute reference](../reference/attributes/page-settings.md)
-- [PageResult&lt;T&gt; reference](../reference/types/page-result.md)

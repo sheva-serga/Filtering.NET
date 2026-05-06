@@ -71,5 +71,3 @@ The `FilterValidationResult` serializes to JSON cleanly, so passing it straight 
 ## See also
 
 - [Validation philosophy](../concepts/validation-philosophy.md)
-- [FilterValidationResult reference](../reference/types/filter-validation-result.md)
-- [FilterValidationError reference](../reference/types/filter-validation-error.md)

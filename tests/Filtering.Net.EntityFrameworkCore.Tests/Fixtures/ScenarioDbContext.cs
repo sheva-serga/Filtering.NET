@@ -2,8 +2,6 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Filtering.Net.EntityFrameworkCore.Tests.Fixtures;
 
-/// <summary>EF Core context for the scenario tests. Holds a single
-/// <see cref="WidgetEntity"/> table.</summary>
 public sealed class ScenarioDbContext(DbContextOptions<ScenarioDbContext> options) : DbContext(options)
 {
     public DbSet<WidgetEntity> Widgets => Set<WidgetEntity>();
@@ -13,6 +11,6 @@ public sealed class ScenarioDbContext(DbContextOptions<ScenarioDbContext> option
         modelBuilder.Entity<WidgetEntity>().HasKey(widget => widget.Id);
         modelBuilder.Entity<WidgetEntity>()
             .Property(widget => widget.Status)
-            .HasConversion<WidgetStatusConverter>(); // explicit converter so the [ConvertWith<>] integration scenarios round-trip end to end
+            .HasConversion<WidgetStatusConverter>();
     }
 }

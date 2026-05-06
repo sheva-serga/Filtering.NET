@@ -1,12 +1,9 @@
 namespace Filtering.Net;
 
-/// <summary>Marks a static class as the filter profile for CLR type <typeparamref name="T"/>.
-/// The source generator builds a profile index keyed by <typeparamref name="T"/> and resolves
-/// each filterable property's profile by looking up its CLR type.</summary>
+/// <summary>Marks a static class as the built-in or custom filter profile for CLR type <typeparamref name="T"/>.</summary>
 [AttributeUsage(AttributeTargets.Class, AllowMultiple = false, Inherited = false)]
 public sealed class FilterProfileAttribute<T> : Attribute
 {
-    /// <summary>Optional base profile whose operators are inherited. If null, this profile
-    /// defines all of its operators from scratch.</summary>
+    /// <summary>Optional base profile to inherit operators from; null means this profile defines all operators itself.</summary>
     public Type? BasedOn { get; init; }
 }

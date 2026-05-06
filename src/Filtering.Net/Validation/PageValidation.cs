@@ -1,16 +1,9 @@
 namespace Filtering.Net;
 
-/// <summary>
-/// Helper used by the source generator's emitted page validator. Centralises bounds-checking
-/// for <c>page</c> / <c>pageSize</c> arguments so every generated filter class can forward to
-/// a single implementation rather than embedding the same switch.
-/// </summary>
+/// <summary>Centralised page/pageSize bounds-checking called by emitted filter validators.</summary>
 public static class PageValidation
 {
-    /// <summary>Validates <paramref name="page"/> and <paramref name="pageSize"/> against
-    /// <paramref name="maxPageSize"/>. Returns <see cref="FilterValidationResult.Success"/>
-    /// when both arguments are null or pass bounds checks; otherwise returns a result
-    /// containing one error per failing bound.</summary>
+    /// <summary>Returns <see cref="FilterValidationResult.Success"/> when both arguments are null or within bounds; otherwise one error per failing bound.</summary>
     public static FilterValidationResult Validate(int? page, int? pageSize, int maxPageSize)
     {
         if (page is null && pageSize is null) return FilterValidationResult.Success;

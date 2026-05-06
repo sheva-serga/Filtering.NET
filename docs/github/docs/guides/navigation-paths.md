@@ -44,12 +44,10 @@ EF Core translates the predicate into a SQL join through the `Department` naviga
 ## Pitfalls
 
 - Paths through a nullable navigation produce `FN1006` (potential null-propagation surprise). The generated predicate uses C# `?.` semantics, but providers translate that with their own null-handling — review the generated SQL or supply a custom mapping with explicit null guards if the default behaviour is wrong for your domain.
-- Aliases must be unique across the filter class — a duplicate fires `FN0012` (case-insensitive comparison).
+- Aliases must be unique across the filter class — a duplicate fires `FN0011` (case-insensitive comparison).
 - The path must resolve against the entity model. A typo (`"Departement.Name"`) fires `FN0004`.
 - The leaf type at the end of the path (`Department.Name` is a `string`) is what the profile must accept. The same profile-resolution rules apply to navigation paths as to top-level properties.
 
 ## See also
 
 - [Mapping properties](mapping-properties.md)
-- [FN1006 — path crosses nullable navigation property](../reference/diagnostics/FN1006.md)
-- [FN0012 — alias collides with existing property or alias](../reference/diagnostics/FN0012.md)

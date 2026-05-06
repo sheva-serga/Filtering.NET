@@ -1,53 +1,70 @@
 namespace Filtering.Net.Generator.Tests.Diagnostics;
 
-/// <summary>Tests for FN0014 (InterceptorWithoutMap): [InterceptValue] for a property without a matching [Map].</summary>
 public class Fn0014Tests
 {
     [Fact]
-    public void InterceptValueWithoutMap_FiresFN0014()
+    public void TwoProfilesForSameIntType_FiresFN0014()
     {
-        // Arrange
+        // Arrange — Filtering.Net already ships [FilterProfile<int>] (Int32Filter); the
+        // hand-written profile below makes int an ambiguous match on a [Map] without an
+        // explicit Profile = typeof(...).
         var source = """
+            using System;
+            using System.Linq.Expressions;
             using Filtering.Net;
             namespace TestNs;
-            public class User { public string Name { get; set; } = ""; }
+            [FilterProfile<int>]
+            public static class MyIntFilter
+            {
+                [FilterOperator("eq")]
+                public static Expression<Func<int, int, bool>> Eq => (column, value) => column == value;
+            }
+            public class User { public int Id { get; set; } }
             [GenerateFilter<User>]
             public partial class UserFilter
             {
-                [InterceptValue(nameof(User.Name))]
-                private static string TrimName(string value) => value.Trim();
+                [Map(nameof(User.Id))]
+                private static partial void MapId();
             }
             """;
 
         // Act
-        // (no separate act step — AssertDiagnostic is the verification)
-
         // Assert
         DiagnosticTestHelpers.AssertDiagnostic(source, "FN0014");
     }
 
     [Fact]
-    public void InterceptValueWithMatchingMap_DoesNotFireFN0014()
+    public void HandWrittenEnumProfileCollidesWithAutoEmitted_FiresFN0014()
     {
         // Arrange
         var source = """
+            using System;
+            using System.Linq.Expressions;
             using Filtering.Net;
+
             namespace TestNs;
-            public class User { public string Name { get; set; } = ""; }
+
+            public enum UserStatus { Active, Closed }
+
+            [FilterProfile<UserStatus>]
+            public static class MyUserStatusFilter
+            {
+                [FilterOperator("eq")]
+                public static Expression<Func<UserStatus, UserStatus, bool>> Eq => (column, value) => column == value;
+            }
+
+            public class User { public UserStatus Status { get; set; } }
+
             [GenerateFilter<User>]
             public partial class UserFilter
             {
-                [Map(nameof(User.Name))]
-                private static partial void MapName();
-                [InterceptValue(nameof(User.Name))]
-                private static string TrimName(string value) => value.Trim();
+                [Map(nameof(User.Status))]
+                private static partial void MapStatus();
             }
             """;
 
         // Act
-        // (no separate act step — AssertNoDiagnostic is the verification)
-
         // Assert
-        DiagnosticTestHelpers.AssertNoDiagnostic(source, "FN0014");
+        DiagnosticTestHelpers.AssertDiagnostic(source, "FN0014");
     }
 }

@@ -1,15 +1,7 @@
 namespace Filtering.Net.Generator;
 
-/// <summary>
-/// Emitter for ApplyFilter. Walks the FilterNode tree, builds typed per-(property, operator)
-/// leaf predicates, and composes them with PredicateBuilder.
-/// </summary>
-/// <remarks>
-/// As of the per-property nested-class refactor, the per-property <c>Build</c> methods and
-/// per-operator typed leaf methods are emitted by <see cref="PerPropertyClassEmitter"/> rather
-/// than directly by this emitter. This emitter only owns the public API surface and the
-/// field-name dispatcher (<c>BuildLeaf</c>) that forwards into <c>{Property}.Build(leaf)</c> (or <c>Build(leaf, options)</c> when the property has typed-value operators).
-/// </remarks>
+// Per-property Build methods and typed leaf methods live in PerPropertyClassEmitter.
+// This emitter owns only the field-name dispatcher that forwards into {Property}.Build(leaf).
 internal static class ApplyFilterEmitter
 {
     public static string Emit(FilterClassModel model) =>

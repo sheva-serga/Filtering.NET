@@ -67,5 +67,3 @@ public sealed class UsersController(AppDbContext dbContext, IFilterDefinition<Us
 ## See also
 
 - [Handling validation errors](handling-validation-errors.md)
-- [PageResult&lt;T&gt; reference](../reference/types/page-result.md)
-- [ApplyPagedAsync reference](../reference/types/apply-paged-async.md)

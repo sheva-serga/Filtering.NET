@@ -8,7 +8,7 @@ The runtime contract that source-generated filter classes implement against. No 
 
 | Folder | Contents |
 |--------|----------|
-| `Attributes/` | `[GenerateFilter<T>]`, `[Map]`, `[PropertyMap]`, `[FilterProfile<T>]`, `[FilterOperator]`, `[FilterValidator]`, `[InterceptValue]`, `[ConvertWith<TConverter>]`, `[FilterDefaults]`, `[PageSettings]`. The generator reads these; consumers stick them on partials. |
+| `Attributes/` | `[GenerateFilter<T>]`, `[Map]`, `[PropertyMap]`, `[FilterProfile<T>]`, `[FilterOperator]`, `[FilterValidator]`, `[InterceptValue]`, `[FilterDefaults]`, `[PageSettings]`. The generator reads these; consumers stick them on partials. |
 | `Requests/` | `FilterRequest`, `FilterNode` + subtypes (`FilterGroup`, `FilterLeaf`), `SortItem`, `SortDir`, `LogicalOp`, plus the polymorphic `FilterNodeJsonConverter`. |
 | `Validation/` | `FilterValidationResult`, `FilterValidationError`, `FilterValidationCode`, plus runtime helpers: `LeafValidation` (per-leaf error shaping) and `PageValidation` (page/pageSize bounds). Generated code calls these helpers — the call surface is part of the runtime API contract. |
 | `Profiles/` | Built-in profiles: `StringFilter`, `BoolFilter`, `GuidFilter`, `DateTimeFilter`, `Numeric/*`, `Temporal/*`, `Enum/*`. Each exposes `TryGet*` extractors that the generator calls when resolving a property's profile. |

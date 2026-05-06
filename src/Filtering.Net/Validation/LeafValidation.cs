@@ -1,19 +1,9 @@
 namespace Filtering.Net;
 
-/// <summary>
-/// Helpers used by the source generator's emitted leaf validators to add a
-/// <see cref="FilterValidationError"/> to the running list. Centralises the error-shape
-/// boilerplate (Path / Code / Message / Field / OperatorName) so the emitter's
-/// shape-grouped switch can stay short — see Refactor 3 in the v1 cleanup pass.
-/// </summary>
+/// <summary>Helpers used by emitted leaf validators to append structured <see cref="FilterValidationError"/> entries.</summary>
 public static class LeafValidation
 {
-    /// <summary>Records a value-shape mismatch error on the given <paramref name="leaf"/>.
-    /// Used when a <c>TryGet*</c> helper rejects the JSON value as the wrong type.</summary>
-    /// <param name="errors">The running error list to append to.</param>
-    /// <param name="leaf">The leaf whose value failed extraction.</param>
-    /// <param name="path">The JSON-pointer-like location of the leaf.</param>
-    /// <param name="typeError">The error message returned by the <c>TryGet*</c> helper.</param>
+    /// <summary>Appends a value-type mismatch error when a <c>TryGet*</c> extractor rejects the JSON value.</summary>
     public static void AddTypeError(List<FilterValidationError> errors, FilterLeaf leaf, string path, string typeError) =>
         errors.Add(new FilterValidationError(
             $"{path}.value",
@@ -22,12 +12,7 @@ public static class LeafValidation
             Field: leaf.Field,
             OperatorName: leaf.Operator));
 
-    /// <summary>Records an "operator not allowed on this field" error.
-    /// The default arm of a per-property leaf-validator switch.</summary>
-    /// <param name="errors">The running error list to append to.</param>
-    /// <param name="leaf">The leaf whose operator is unsupported.</param>
-    /// <param name="path">The JSON-pointer-like location of the leaf.</param>
-    /// <param name="fieldName">The configured property name being validated against.</param>
+    /// <summary>Appends an "operator not allowed" error; used as the default arm of a per-property switch.</summary>
     public static void AddOperatorError(List<FilterValidationError> errors, FilterLeaf leaf, string path, string fieldName) =>
         errors.Add(new FilterValidationError(
             $"{path}.op",
@@ -36,11 +21,7 @@ public static class LeafValidation
             Field: leaf.Field,
             OperatorName: leaf.Operator));
 
-    /// <summary>Records an "operator takes no value" error for unary operators
-    /// (<c>isNull</c> and any custom unary operators) when the caller passed a non-null value.</summary>
-    /// <param name="errors">The running error list to append to.</param>
-    /// <param name="leaf">The leaf whose operator was given a value despite being unary.</param>
-    /// <param name="path">The JSON-pointer-like location of the leaf.</param>
+    /// <summary>Appends an error when a unary operator (e.g. <c>isNull</c>) receives a non-null value.</summary>
     public static void AddNoValueError(List<FilterValidationError> errors, FilterLeaf leaf, string path) =>
         errors.Add(new FilterValidationError(
             $"{path}.value",
@@ -49,12 +30,7 @@ public static class LeafValidation
             Field: leaf.Field,
             OperatorName: leaf.Operator));
 
-    /// <summary>Records an interceptor-rejection error. Used when an
-    /// <c>[InterceptValue]</c> dry-run threw a <see cref="FilterValidationException"/>.</summary>
-    /// <param name="errors">The running error list to append to.</param>
-    /// <param name="leaf">The leaf whose value the interceptor rejected.</param>
-    /// <param name="path">The JSON-pointer-like location of the leaf.</param>
-    /// <param name="message">The interceptor's rejection message.</param>
+    /// <summary>Appends an interceptor-rejection error when an <c>[InterceptValue]</c> method throws.</summary>
     public static void AddInterceptorError(List<FilterValidationError> errors, FilterLeaf leaf, string path, string message) =>
         errors.Add(new FilterValidationError(
             $"{path}.value",
@@ -63,32 +39,13 @@ public static class LeafValidation
             Field: leaf.Field,
             OperatorName: leaf.Operator));
 
-    /// <summary>Method-group target for a profile's <c>TryGetValue</c> extractor — the
-    /// scalar half of the <see cref="ValidateMappedLeaf{TValue}"/> dispatcher.</summary>
+    /// <summary>Method-group delegate for a profile's scalar <c>TryGetValue</c> extractor.</summary>
     public delegate bool TryParseScalar<TValue>(System.Text.Json.JsonElement element, out TValue value, out string error);
 
-    /// <summary>Method-group target for a profile's <c>TryGetArray</c> extractor — the
-    /// array half of the <see cref="ValidateMappedLeaf{TValue}"/> dispatcher.</summary>
+    /// <summary>Method-group delegate for a profile's array <c>TryGetArray</c> extractor.</summary>
     public delegate bool TryParseArray<TValue>(System.Text.Json.JsonElement element, out TValue[] values, out string error);
 
-    /// <summary>Validates a leaf for a vanilla mapped property (no interceptor, no custom
-    /// operators, no <c>[PropertyMap]</c> override). The generator emits a one-line
-    /// forwarder per such property; this helper performs the operator-shape dispatch and
-    /// translates extractor failures into <see cref="FilterValidationError"/>s. Properties
-    /// with bespoke validation logic (interceptors, custom operators, overrides) keep their
-    /// inlined switch.</summary>
-    /// <param name="leaf">The leaf being validated.</param>
-    /// <param name="path">JSON-pointer-like location of the leaf.</param>
-    /// <param name="errors">Running error list to append to.</param>
-    /// <param name="propertyName">Configured property name — surfaced in the
-    /// "operator not allowed" default arm.</param>
-    /// <param name="allowedScalarOps">Uppercase names of allowed scalar-shape operators.</param>
-    /// <param name="allowedArrayOps">Uppercase names of allowed array-shape operators.</param>
-    /// <param name="allowedNoneOps">Uppercase names of allowed unary (no-value) operators.</param>
-    /// <param name="scalarExtractor">Profile's <c>TryGetValue</c> method group — may be
-    /// null when no scalar operators are configured.</param>
-    /// <param name="arrayExtractor">Profile's <c>TryGetArray</c> method group — may be
-    /// null when no array operators are configured.</param>
+    /// <summary>Validates a plain mapped leaf (no interceptor, no custom operators, no <c>[PropertyMap]</c> override); emitted code forwards here to avoid inlining the operator-shape switch per property.</summary>
     public static void ValidateMappedLeaf<TValue>(
         FilterLeaf leaf,
         string path,

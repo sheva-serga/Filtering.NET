@@ -70,7 +70,7 @@ Bumping these is intentional — the integration tests run against both, so a fl
 - [Documentation site](https://sheva-serga.github.io/Filtering.NET/) — full guides, API reference, diagnostics catalogue.
 - [Repo on GitHub](https://github.com/sheva-serga/Filtering.NET) — source, issue tracker, contribution notes.
 - [`Filtering.Net`](https://www.nuget.org/packages/Filtering.Net/) — runtime request types.
-- [`Filtering.Net.Generator`](https://www.nuget.org/packages/Filtering.Net.Generator/) — source generator + 25-rule analyzer.
+- [`Filtering.Net.Generator`](https://www.nuget.org/packages/Filtering.Net.Generator/) — source generator + 24-rule analyzer.
 
 ## License
 

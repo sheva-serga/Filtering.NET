@@ -30,8 +30,8 @@ When `[Map]` does not specify `Profile = typeof(...)`, the generator runs `Profi
 
 - Exact match → pick the built-in (`string` → `StringFilter`, `int` → `Int32Filter`, etc.).
 - Enum type → pick the auto-emitted `<EnumName>Filter`.
-- Multiple matches → emit `FN0015` and require the consumer to pick one explicitly.
-- No match → emit `FN0009` and require `Profile = typeof(...)`.
+- Multiple matches → emit `FN0014` and require the consumer to pick one explicitly.
+- No match → emit `FN0008` and require `Profile = typeof(...)`.
 
 Setting `Profile = typeof(MyProfile)` overrides the resolver entirely and bypasses both ambiguity and unmatched-type diagnostics. The chosen profile's `TColumn` must be assignment-compatible with the property's CLR type, or `FN0005` fires.
 
@@ -58,5 +58,4 @@ The analyzer also runs the body through its EF translatability allow-list and wa
 ## See also
 
 - [Custom profiles guide](../guides/custom-profiles.md)
-- [FN0015 — ambiguous profile](../reference/diagnostics/FN0015.md)
 - [How it works](how-it-works.md)

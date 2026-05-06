@@ -70,5 +70,4 @@ catch (FilterValidationException invalid)
 ## See also
 
 - [Handling validation errors](../guides/handling-validation-errors.md)
-- [FilterValidationResult reference](../reference/types/filter-validation-result.md)
 - [The FilterRequest JSON shape](filter-request-shape.md)

@@ -4,22 +4,11 @@ using Microsoft.CodeAnalysis;
 
 namespace Filtering.Net.Generator;
 
-/// <summary>
-/// Walks every <c>JsonSerializerContext</c> subclass visible in the compilation
-/// and returns the union of types registered via <c>[JsonSerializable(typeof(T))]</c>.
-/// Used by the FN1008 analyzer pass to determine which typed-value types are already
-/// covered for AOT-safe deserialization.
-/// </summary>
 internal static class JsonSerializableTypeCollector
 {
     private const string JsonSerializableAttributeFullName = "System.Text.Json.Serialization.JsonSerializableAttribute";
     private const string JsonSerializerContextFullName = "System.Text.Json.Serialization.JsonSerializerContext";
 
-    /// <summary>
-    /// Returns the set of types registered with <c>[JsonSerializable(typeof(T))]</c>
-    /// on any <c>JsonSerializerContext</c> subclass visible in the compilation.
-    /// Returns an empty set when <c>System.Text.Json</c> is not referenced.
-    /// </summary>
     public static HashSet<INamedTypeSymbol> CollectRegisteredTypes(Compilation compilation)
     {
         var registeredTypes = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);

@@ -15,8 +15,8 @@ There is **no** runtime expression-tree construction. The runtime never calls `E
 
 The generator (`FilterGenerator.cs`) registers two `ForAttributeWithMetadataName` pipelines that run independently and emit to different targets:
 
-1. **`[GenerateFilter<TEntity>]` branch.** Extracts a `FilterClassModel` per declared partial, reports per-class diagnostics (`FN0001`–`FN0017` errors, `FN1001`–`FN1002`, `FN1005`–`FN1007` warnings), and emits one source file per class. A collected view of all classes drives the assembly-wide `services.AddFiltering()` extension and the per-enum auto-emitted profiles.
-2. **`[FilterProfile<T>]` branch.** Extracts profile-level models from custom profile classes and reports per-profile diagnostics like `FN0006` (operator missing), `FN0009` (no built-in match), `FN0014` (orphan interceptor), `FN1001` (`DateTime.UtcNow` in lambda), and `FN1002` (sortable omission).
+1. **`[GenerateFilter<TEntity>]` branch.** Extracts a `FilterClassModel` per declared partial, reports per-class diagnostics (`FN0001`–`FN0016` errors, `FN1001`–`FN1002`, `FN1005`–`FN1007` warnings), and emits one source file per class. A collected view of all classes drives the assembly-wide `services.AddFiltering()` extension and the per-enum auto-emitted profiles.
+2. **`[FilterProfile<T>]` branch.** Extracts profile-level models from custom profile classes and reports per-profile diagnostics like `FN0006` (operator missing), `FN0008` (no built-in match), `FN0013` (orphan interceptor), `FN1001` (`DateTime.UtcNow` in lambda), and `FN1002` (sortable omission).
 
 Cross-pipeline diagnostics — `FN1003 ProfileUnused` and `FN1004 OperatorUnused` — join both `.Collect()` outputs so the generator can report a profile that no `[Map]` references, or an operator declared on a profile that no consumer uses.
 

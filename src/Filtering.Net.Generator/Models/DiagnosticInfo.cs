@@ -2,12 +2,8 @@ using Microsoft.CodeAnalysis;
 
 namespace Filtering.Net.Generator;
 
-/// <summary>
-/// Cacheable description of a diagnostic produced during model extraction. Uses primitive/value
-/// data so that it does not break equality of the surrounding model when flowing through the
-/// incremental pipeline. The corresponding <see cref="Diagnostic"/> is materialized only at
-/// emission time via <see cref="ToDiagnostic"/>.
-/// </summary>
+// Primitive-only diagnostic snapshot so it doesn't break incremental-pipeline equality.
+// The actual Diagnostic is materialised at emission time via ToDiagnostic().
 internal sealed record DiagnosticInfo(
     string Id,
     string Title,

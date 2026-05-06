@@ -2,7 +2,7 @@ using System.Collections;
 
 namespace Filtering.Net.Generator;
 
-/// <summary>List wrapper with structural equality. Used in generator pipeline models so they cache correctly across incremental runs.</summary>
+// Structural equality so incremental-pipeline models cache correctly across runs.
 internal sealed class EquatableList<T> : IReadOnlyList<T>, IEquatable<EquatableList<T>>
 {
     private readonly List<T> _items;

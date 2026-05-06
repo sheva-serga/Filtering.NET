@@ -67,7 +67,7 @@ IQueryable<User> result = users.Apply(userFilter, request);
 - **`FilterValidationResult` / `FilterValidationError`** — structured error shape with JSON-pointer-style paths and codes.
 - **`FilterValidationException`** — thrown by `Apply` when validation fails; carries the `Result` for HTTP 400 conversion.
 - **Built-in profiles** — `StringFilter`, `BoolFilter`, `GuidFilter`, `DateTimeFilter`, plus `Numeric/*` and `Temporal/*` per primitive. The generator picks one automatically based on the property's CLR type; override with `[Map(..., Profile = typeof(MyProfile))]`.
-- **Attributes** — `[GenerateFilter<T>]`, `[Map]`, `[PropertyMap]`, `[FilterProfile<T>]`, `[FilterOperator]`, `[FilterValidator]`, `[InterceptValue]`, `[ConvertWith<TConverter>]`, `[FilterDefaults]`, `[PageSettings]`.
+- **Attributes** — `[GenerateFilter<T>]`, `[Map]`, `[PropertyMap]`, `[FilterProfile<T>]`, `[FilterOperator]`, `[FilterValidator]`, `[InterceptValue]`, `[FilterDefaults]`, `[PageSettings]`.
 
 ## Synchronous vs async
 
@@ -77,7 +77,7 @@ IQueryable<User> result = users.Apply(userFilter, request);
 
 - [Documentation site](https://sheva-serga.github.io/Filtering.NET/) — full guides, API reference, diagnostics catalogue.
 - [Repo on GitHub](https://github.com/sheva-serga/Filtering.NET) — source, issue tracker, contribution notes.
-- [`Filtering.Net.Generator`](https://www.nuget.org/packages/Filtering.Net.Generator/) — source generator + 25-rule analyzer that emits the `IFilterDefinition<T>` glue.
+- [`Filtering.Net.Generator`](https://www.nuget.org/packages/Filtering.Net.Generator/) — source generator + 24-rule analyzer that emits the `IFilterDefinition<T>` glue.
 - [`Filtering.Net.EntityFrameworkCore`](https://www.nuget.org/packages/Filtering.Net.EntityFrameworkCore/) — async `ApplyPagedAsync` + `PageResult<T>`.
 - Sample ASP.NET Core 9 + PostgreSQL app: [`samples/UserManagement.WebApi/`](https://github.com/sheva-serga/Filtering.NET/tree/main/samples/UserManagement.WebApi) on GitHub.
 

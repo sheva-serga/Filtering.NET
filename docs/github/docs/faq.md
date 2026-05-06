@@ -5,9 +5,9 @@ description: Common gotchas and questions.
 
 # FAQ
 
-## Why is FN0015 firing on my string properties?
+## Why is FN0014 firing on my string properties?
 
-Declaring any custom `string` profile (e.g., a `[FilterProfile<string>(BasedOn = typeof(StringFilter))]`) makes profile resolution for `string` properties ambiguous: both the built-in `StringFilter` and your custom profile match. The generator refuses to guess. Fix it by specifying `Profile = typeof(...)` on every `string`-typed `[Map]`. The sample app's `UserFilter` does exactly this on `MapName`, `MapEmail`, and `MapDepartmentName`. See [FN0015](reference/diagnostics/FN0015.md) and [Built-in profiles](guides/built-in-profiles.md).
+Declaring any custom `string` profile (e.g., a `[FilterProfile<string>(BasedOn = typeof(StringFilter))]`) makes profile resolution for `string` properties ambiguous: both the built-in `StringFilter` and your custom profile match. The generator refuses to guess. Fix it by specifying `Profile = typeof(...)` on every `string`-typed `[Map]`. The sample app's `UserFilter` does exactly this on `MapName`, `MapEmail`, and `MapDepartmentName`. See FN0014 in the [diagnostics catalogue](diagnostics/index.md) and [Built-in profiles](guides/built-in-profiles.md).
 
 ## How do I filter through a navigation property?
 
@@ -63,4 +63,4 @@ No. `[GenerateFilter<T>]` is per-entity. What you can share is profiles — decl
 
 - [Built-in profiles](guides/built-in-profiles.md)
 - [Handling validation errors](guides/handling-validation-errors.md)
-- [Diagnostics catalogue](reference/diagnostics/index.md)
+- [Diagnostics catalogue](diagnostics/index.md)

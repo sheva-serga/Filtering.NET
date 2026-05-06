@@ -1,9 +1,5 @@
 namespace Filtering.Net.Generator;
 
-/// <summary>
-/// Emits <c>Validate(IReadOnlyList&lt;SortItem&gt;?)</c>. Iterates the request's sort items and
-/// emits a per-sortable-field switch; unknown fields surface as <see cref="FilterValidationCode.NotSortable"/>.
-/// </summary>
 internal static class ValidateSortEmitter
 {
     public static string Emit(FilterClassModel model) =>

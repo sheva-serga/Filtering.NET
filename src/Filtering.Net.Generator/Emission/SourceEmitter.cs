@@ -2,10 +2,6 @@ using System.Text;
 
 namespace Filtering.Net.Generator;
 
-/// <summary>
-/// Top-level emitter that turns a <see cref="FilterClassModel"/> into a single C# source file
-/// containing the partial-class implementation of <c>IFilterDefinition&lt;TEntity&gt;</c>.
-/// </summary>
 internal static class SourceEmitter
 {
     public static string EmitForClass(FilterClassModel model) =>

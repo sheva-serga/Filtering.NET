@@ -33,10 +33,7 @@ public static class DateOnlyFilter
     [FilterOperator("isNull")]
     public static Expression<Func<DateOnly?, bool>> IsNull => column => column == null;
 
-    /// <summary>Extracts a <see cref="DateOnly"/> from an ISO 8601 date string (yyyy-MM-dd).</summary>
-    /// <param name="element">The JSON value to read.</param>
-    /// <param name="value">The extracted DateOnly, or <c>default</c> on failure.</param>
-    /// <param name="error">A human-readable explanation of the failure.</param>
+    /// <summary>Extracts a <see cref="DateOnly"/> from an ISO 8601 date JSON String (yyyy-MM-dd).</summary>
     public static bool TryGetValue(JsonElement element, out DateOnly value, out string error)
     {
         if (element.ValueKind != JsonValueKind.String)

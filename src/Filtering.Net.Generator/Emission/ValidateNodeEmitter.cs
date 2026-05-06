@@ -1,10 +1,7 @@
 namespace Filtering.Net.Generator;
 
-/// <summary>
-/// Emits <c>Validate(FilterNode?)</c> and its supporting <c>ValidateNode</c>/<c>ValidateLeaf</c>
-/// dispatchers. The per-property leaf validators live on the per-property nested classes
-/// emitted by <see cref="PerPropertyClassEmitter"/>; this emitter just routes into them.
-/// </summary>
+// Per-property leaf validators live on nested classes emitted by PerPropertyClassEmitter;
+// this emitter owns the field-name dispatcher that routes into them.
 internal static class ValidateNodeEmitter
 {
     public static string Emit(FilterClassModel model) =>

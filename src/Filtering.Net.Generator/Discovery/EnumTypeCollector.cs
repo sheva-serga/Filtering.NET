@@ -2,10 +2,6 @@ using Microsoft.CodeAnalysis;
 
 namespace Filtering.Net.Generator;
 
-/// <summary>Scans every type in the compilation that carries
-/// <c>[GenerateFilter&lt;TEntity&gt;]</c>; returns the set of distinct enum CLR types
-/// referenced by any of their filterable properties. Drives auto-emission of per-enum
-/// profile classes by <c>EnumProfileEmitter</c>.</summary>
 internal static class EnumTypeCollector
 {
     private const string GenerateFilterAttributeOpenName = "Filtering.Net.GenerateFilterAttribute<TEntity>";

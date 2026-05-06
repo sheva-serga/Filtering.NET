@@ -63,4 +63,3 @@ app.Run();
 ## See also
 
 - [DI integration with AddFiltering](di-integration.md)
-- [FN1008 — filter value type is not registered in any visible JsonSerializerContext](../reference/diagnostics/FN1008.md)

@@ -35,12 +35,7 @@ public static class StringFilter
     [FilterOperator("isNull")]
     public static Expression<Func<string, bool>> IsNull => column => column == null;
 
-    /// <summary>Extracts a <see cref="string"/> from a JSON String value. Returns
-    /// <see langword="false"/> with a populated <paramref name="error"/> when the JSON value
-    /// is any other kind.</summary>
-    /// <param name="element">The JSON value to read.</param>
-    /// <param name="value">The extracted string, or <see cref="string.Empty"/> on failure.</param>
-    /// <param name="error">A human-readable explanation of the type mismatch on failure.</param>
+    /// <summary>Extracts a <see cref="string"/> from a JSON String; returns false with a populated <paramref name="error"/> for any other JSON kind.</summary>
     public static bool TryGetValue(JsonElement element, out string value, out string error)
     {
         if (element.ValueKind == JsonValueKind.String)
@@ -54,12 +49,7 @@ public static class StringFilter
         return false;
     }
 
-    /// <summary>Extracts a <see cref="string"/>[] from a JSON Array of Strings. Returns
-    /// <see langword="false"/> with a populated <paramref name="error"/> when the JSON value
-    /// is not an array or any element is not a JSON String.</summary>
-    /// <param name="element">The JSON array to read.</param>
-    /// <param name="values">The extracted strings, or an empty array on failure.</param>
-    /// <param name="error">A human-readable explanation of the type mismatch on failure.</param>
+    /// <summary>Extracts a <see cref="string"/>[] from a JSON Array of Strings via <see cref="TryGetValue"/>.</summary>
     public static bool TryGetArray(JsonElement element, out string[] values, out string error)
     {
         if (element.ValueKind != JsonValueKind.Array)

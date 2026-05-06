@@ -44,20 +44,16 @@ A `[Map(nameof(User.Name), Profile = typeof(StringFilterPlus))]` then makes `fuz
 
 ## Variations
 
-- **Standalone profiles** — omit `BasedOn` and declare every operator from scratch. A standalone profile must also implement the JSON value extractors the generator calls (`TryGetValue`, `TryGetArray` for whichever value shapes the operators use), or `FN0016` fires.
+- **Standalone profiles** — omit `BasedOn` and declare every operator from scratch. A standalone profile must also implement the JSON value extractors the generator calls (`TryGetValue`, `TryGetArray` for whichever value shapes the operators use), or `FN0015` fires.
 - **Multiple profiles per CLR type** — declaring more than one profile for the same `TColumn` is allowed but makes built-in resolution ambiguous. Every `[Map]` for a property of that type must then specify `Profile = typeof(...)` explicitly (the sample app's `StringFilterPlus` triggers this contract for `string`).
 - **Unary operators** — return `Expression<Func<TColumn, bool>>` for operators like `isNull` that take no value.
 
 ## Pitfalls
 
-- `[FilterOperator]`-decorated members must be `public static`, otherwise `FN0011` fires.
-- The same operator name cannot appear twice on one profile — `FN0017` flags duplicates (including duplicates that arise via `BasedOn` if you re-declare an inherited operator with a different body).
+- `[FilterOperator]`-decorated members must be `public static`, otherwise `FN0010` fires.
+- The same operator name cannot appear twice on one profile — `FN0016` flags duplicates (including duplicates that arise via `BasedOn` if you re-declare an inherited operator with a different body).
 - Operator bodies that call methods outside EF Core's translatable allow-list emit `FN1007`. The operator still compiles and runs, but the predicate may fall back to client-side evaluation or fail at query time depending on the provider.
 
 ## See also
 
 - [Intercepting filter values](intercepting-values.md)
-- [FilterProfile attribute reference](../reference/attributes/filter-profile.md)
-- [FilterOperator attribute reference](../reference/attributes/filter-operator.md)
-- [FN0011 — `[FilterOperator]` member must be public static](../reference/diagnostics/FN0011.md)
-- [FN1007 — operator body uses untranslatable method](../reference/diagnostics/FN1007.md)

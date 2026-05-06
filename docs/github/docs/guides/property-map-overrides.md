@@ -71,5 +71,3 @@ The contrast with `[Map]`: a `[Map]` method is empty and points at a profile tha
 ## See also
 
 - [Mapping properties](mapping-properties.md)
-- [PropertyMap attribute reference](../reference/attributes/property-map.md)
-- [FN0003 — property has both `[Map]` and `[PropertyMap]`](../reference/diagnostics/FN0003.md)

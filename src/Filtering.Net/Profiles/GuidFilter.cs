@@ -23,12 +23,7 @@ public static class GuidFilter
     [FilterOperator("isNull")]
     public static Expression<Func<Guid?, bool>> IsNull => column => column == null;
 
-    /// <summary>Extracts a <see cref="Guid"/> from a JSON String formatted as a Guid. Returns
-    /// <see langword="false"/> when the JSON value is any other kind, or the string is not a
-    /// valid GUID format.</summary>
-    /// <param name="element">The JSON value to read.</param>
-    /// <param name="value">The extracted Guid, or <see cref="Guid.Empty"/> on failure.</param>
-    /// <param name="error">A human-readable explanation of the failure.</param>
+    /// <summary>Extracts a <see cref="Guid"/> from a JSON String; returns false for non-string values or invalid GUID formats.</summary>
     public static bool TryGetValue(JsonElement element, out Guid value, out string error)
     {
         if (element.ValueKind != JsonValueKind.String)
@@ -46,11 +41,7 @@ public static class GuidFilter
         return false;
     }
 
-    /// <summary>Extracts a <see cref="Guid"/>[] from a JSON Array of Guid strings. Returns
-    /// <see langword="false"/> with the per-element error on the first failed element.</summary>
-    /// <param name="element">The JSON array to read.</param>
-    /// <param name="values">The extracted Guids, or an empty array on failure.</param>
-    /// <param name="error">A human-readable explanation of the failure.</param>
+    /// <summary>Extracts a <see cref="Guid"/>[] from a JSON Array of Guid strings via <see cref="TryGetValue"/>.</summary>
     public static bool TryGetArray(JsonElement element, out Guid[] values, out string error)
     {
         if (element.ValueKind != JsonValueKind.Array)

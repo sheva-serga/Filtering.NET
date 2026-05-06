@@ -8,18 +8,8 @@ namespace Filtering.Net.EntityFrameworkCore;
 /// </summary>
 public static class FilteringEntityFrameworkExtensions
 {
-    /// <summary>
-    /// Validates the request, applies the filter expression and sort/paging, then asynchronously
-    /// executes both a <c>COUNT</c> over the filtered query and a <c>ToListAsync</c> over the
-    /// paginated query against the database. Returns a <see cref="PageResult{TEntity}"/> bundling
-    /// the slice with the unfiltered total count.
-    /// </summary>
+    /// <summary>Validates <paramref name="request"/>, applies filter/sort/paging, and returns a <see cref="PageResult{TEntity}"/> backed by a <c>COUNT</c> and <c>ToListAsync</c> against the database.</summary>
     /// <typeparam name="TEntity">The entity type the query targets.</typeparam>
-    /// <param name="query">The base <see cref="IQueryable{T}"/> (typically a DbSet or a
-    /// pre-narrowed projection of one).</param>
-    /// <param name="definition">The generated filter definition for <typeparamref name="TEntity"/>.</param>
-    /// <param name="request">The structured filter/sort/page request to apply.</param>
-    /// <param name="cancellationToken">Token forwarded to the async EF Core operations.</param>
     /// <exception cref="FilterValidationException">Thrown when the request fails validation.</exception>
     public static async Task<PageResult<TEntity>> ApplyPagedAsync<TEntity>(
         this IQueryable<TEntity> query,

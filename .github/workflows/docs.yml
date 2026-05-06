@@ -2,7 +2,7 @@ name: docs
 
 on:
   push:
-    branches: [main]
+    tags: ['v*']
     paths:
       - 'docs/github/**'
       - '.github/workflows/docs.yml'

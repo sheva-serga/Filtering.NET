@@ -3,27 +3,15 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Filtering.Net.Generator;
 
-/// <summary>
-/// Extractor for the second pipeline branch: classes annotated with <c>[FilterProfile]</c>.
-/// Walks <c>[FilterOperator]</c>-marked members, validates them, and returns a
-/// <see cref="ProfileModel"/> + any diagnostics raised along the way.
-/// Phase-6 diagnostics emitted from here: FN0011 (NonStaticOperator), FN0013 (InvalidBaseProfile),
-/// FN1001 (DateTimeUtcNowInLambda), FN1007 (UntranslatableMethodInOperator).
-/// </summary>
 internal static class ProfileExtractor
 {
     private const string FilterProfileAttributeFullName = "Filtering.Net.FilterProfileAttribute<T>";
     private const string FilterOperatorAttributeFullName = "Filtering.Net.FilterOperatorAttribute";
 
-    /// <summary>Allow-list of method full names known to be EF-Core-translatable. Anything outside the list trips FN1007.</summary>
     private static readonly HashSet<string> EfTranslatableMethods = BuildTranslatableMethodSet();
 
-    /// <summary>
-    /// Member-access expressions that count as "DateTime / DateTimeOffset .UtcNow / .Now"
-    /// for the FN1001 check. Comparing on the rendered "DateTime.UtcNow" string lets us
-    /// catch both <c>DateTime.UtcNow</c> and <c>System.DateTime.UtcNow</c> (the latter via
-    /// the symbol resolution path) without needing semantic info on every visit.
-    /// </summary>
+    // Rendered display names for the FN1001 check — catches both short and fully-qualified forms
+    // without requiring semantic info on every visit.
     private static readonly HashSet<string> ClockMemberDisplayNames = new(StringComparer.Ordinal)
     {
         "DateTime.UtcNow",
@@ -53,12 +41,11 @@ internal static class ProfileExtractor
         var operatorNames = new List<string>();
         var seenOperatorNames = new HashSet<string>(StringComparer.Ordinal);
 
-        // When the consuming project references Microsoft.EntityFrameworkCore, treat every method
-        // on the EF.Functions extension surface as translatable. Without this, custom EF.Functions
-        // extensions (e.g., npgsql's TrigramsAreSimilar) would trip FN1007.
+        // When EF Core is referenced, any EF.Functions.* call is translatable — including custom
+        // extensions like npgsql's TrigramsAreSimilar that aren't in the static allow-list.
         var efIsReferenced = IsEntityFrameworkCoreReferenced(context.SemanticModel.Compilation);
 
-        // FN0013: BasedOn must itself carry [FilterProfile].
+        // FN0012: BasedOn must itself carry [FilterProfile].
         var profileAttribute = context.Attributes.FirstOrDefault();
         var hasBasedOn = profileAttribute is not null && HasBasedOnNamedArg(profileAttribute);
         if (profileAttribute is not null)
@@ -74,7 +61,7 @@ internal static class ProfileExtractor
             var operatorAttribute = FindFilterOperatorAttribute(member.GetAttributes());
             if (operatorAttribute is null) continue;
 
-            // FN0011: [FilterOperator] must be on a public static member.
+            // FN0010: [FilterOperator] must be on a public static member.
             if (member.DeclaredAccessibility != Accessibility.Public || !member.IsStatic)
             {
                 diagnostics.Add(DiagnosticInfo.From(
@@ -92,8 +79,7 @@ internal static class ProfileExtractor
                 }
                 else
                 {
-                    // FN0017: same operator name declared more than once on this profile.
-                    // The first occurrence is silent; subsequent duplicates fire on their own location.
+                    // FN0016: first occurrence is silent; subsequent duplicates fire on their location.
                     diagnostics.Add(DiagnosticInfo.From(
                         DiagnosticDescriptors.DuplicateOperatorOnProfile,
                         member.Locations.FirstOrDefault(),
@@ -106,9 +92,8 @@ internal static class ProfileExtractor
             ScanOperatorBody(member, diagnostics, cancellationToken, efIsReferenced);
         }
 
-        // FN0016: a standalone profile (no BasedOn) must declare its own extractor method(s)
-        // for the operator shapes it uses. Profiles that delegate to a base via BasedOn are
-        // exempted — the base profile's own FN0016 check covers that side.
+        // FN0015: standalone profiles (no BasedOn) must own their extractor methods;
+        // profiles with BasedOn delegate to the base, which is checked separately.
         if (!hasBasedOn && operatorNames.Count > 0)
         {
             ReportMissingExtractors(profileSymbol, profileFullName, operatorNames, diagnostics);
@@ -124,8 +109,6 @@ internal static class ProfileExtractor
             Diagnostics: new EquatableList<DiagnosticInfo>(diagnostics));
     }
 
-    /// <summary>True when the [FilterProfile&lt;T&gt;] attribute carries a <c>BasedOn = typeof(...)</c>
-    /// named argument with a non-null type value.</summary>
     private static bool HasBasedOnNamedArg(AttributeData profileAttribute)
     {
         foreach (var namedArgument in profileAttribute.NamedArguments)
@@ -136,10 +119,6 @@ internal static class ProfileExtractor
         return false;
     }
 
-    /// <summary>FN0016: ensure the profile declares <c>TryGetValue</c> when any scalar-shape
-    /// operator is configured, and <c>TryGetArray</c> when the <c>in</c> operator is configured.
-    /// Methods are looked up by name + public-static accessibility; signature-mismatch errors
-    /// surface in consumer compilation.</summary>
     private static void ReportMissingExtractors(
         INamedTypeSymbol profileSymbol,
         string profileFullName,
@@ -187,7 +166,6 @@ internal static class ProfileExtractor
         return false;
     }
 
-    /// <summary>FN0013: emit if [FilterProfile(BasedOn = typeof(X))] X isn't itself marked [FilterProfile].</summary>
     private static void ValidateBasedOnNamedArg(
         INamedTypeSymbol profileSymbol,
         AttributeData profileAttribute,
@@ -221,8 +199,6 @@ internal static class ProfileExtractor
         return null;
     }
 
-    /// <summary>FN1001 + FN1007: walk the syntax of the operator member's body looking for
-    /// clock members and untranslatable invocations.</summary>
     private static void ScanOperatorBody(
         ISymbol operatorMember,
         List<DiagnosticInfo> diagnostics,
@@ -247,7 +223,6 @@ internal static class ProfileExtractor
                 }
             }
 
-            // FN1007: any invocation of a method not in the EF-translatable allow-list.
             foreach (var invocation in syntaxNode.DescendantNodes().OfType<InvocationExpressionSyntax>())
             {
                 var (DisplayName, IsAllowed) = MatchAgainstAllowList(invocation.Expression, efIsReferenced);
@@ -261,18 +236,6 @@ internal static class ProfileExtractor
         }
     }
 
-    /// <summary>
-    /// Tries to match the invocation target syntax against the allow-list. We accept either:
-    /// <list type="bullet">
-    /// <item>The full rendering (e.g., <c>string.IsNullOrEmpty</c>, <c>EF.Functions.Like</c>) so dotted statics resolve.</item>
-    /// <item>The right-most member name alone (e.g., <c>Contains</c> for <c>column.Contains</c>) so instance / extension calls on a runtime parameter resolve.</item>
-    /// </list>
-    /// When <paramref name="efIsReferenced"/> is true, any invocation rooted on
-    /// <c>EF.Functions.*</c> is allowed unconditionally — the consuming project has EF Core in its
-    /// graph, so even custom EF.Functions extensions (npgsql trigrams, full-text search helpers,
-    /// etc.) translate.
-    /// Returns the matched display name (when matched) and a flag.
-    /// </summary>
     private static (string? DisplayName, bool IsAllowed) MatchAgainstAllowList(
         ExpressionSyntax invocationTarget,
         bool efIsReferenced)
@@ -307,21 +270,13 @@ internal static class ProfileExtractor
         }
     }
 
-    /// <summary>
-    /// True when the invocation target is rooted on <c>EF.Functions.*</c>. Detects both
-    /// <c>EF.Functions.Foo(...)</c> and the rare <c>Microsoft.EntityFrameworkCore.EF.Functions.Foo(...)</c>.
-    /// Walks the member-access spine until it reaches an <see cref="IdentifierNameSyntax"/>; the
-    /// identifier preceding the right-most must be <c>Functions</c> and the one before that must
-    /// end in <c>EF</c>.
-    /// </summary>
+    // Detects EF.Functions.Foo(...) and Microsoft.EntityFrameworkCore.EF.Functions.Foo(...).
     private static bool IsEfFunctionsAccess(MemberAccessExpressionSyntax memberAccess)
     {
-        // Drill through Foo.Bar.Baz down to the leftmost identifier or "EF.Functions" sub-spine.
         var leftExpression = memberAccess.Expression;
         if (leftExpression is not MemberAccessExpressionSyntax leftMemberAccess) return false;
         if (leftMemberAccess.Name.Identifier.Text != "Functions") return false;
 
-        // Now leftMemberAccess.Expression must end with the "EF" identifier.
         return leftMemberAccess.Expression switch
         {
             IdentifierNameSyntax leftIdentifier => leftIdentifier.Identifier.Text == "EF",
@@ -330,7 +285,6 @@ internal static class ProfileExtractor
         };
     }
 
-    /// <summary>True when the compilation references a Microsoft.EntityFrameworkCore* assembly.</summary>
     private static bool IsEntityFrameworkCoreReferenced(Compilation compilation)
     {
         foreach (var assemblyName in compilation.ReferencedAssemblyNames)
@@ -343,30 +297,21 @@ internal static class ProfileExtractor
         return false;
     }
 
-    /// <summary>
-    /// Static allow-list of methods we know EF Core translates without client-eval. Includes
-    /// instance method short-names (e.g., <c>Contains</c>) so syntactic matches like
-    /// <c>column.Contains(value)</c> resolve correctly without semantic info.
-    /// </summary>
+    // Short names (e.g., "Contains") match instance/extension calls on runtime parameters
+    // without needing semantic info.
     private static HashSet<string> BuildTranslatableMethodSet()
     {
         var set = new HashSet<string>(StringComparer.Ordinal)
         {
-            // string instance methods (matched syntactically as <expr>.Method)
             "Contains", "StartsWith", "EndsWith", "ToLower", "ToUpper", "Trim", "Substring",
-            // string statics
             "string.IsNullOrEmpty", "string.IsNullOrWhiteSpace", "string.Concat",
             "String.IsNullOrEmpty", "String.IsNullOrWhiteSpace", "String.Concat",
-            // Enumerable / Queryable extensions (matched on short-name as <expr>.Any)
             "Any", "All", "Select", "Where", "Count", "FirstOrDefault", "Single", "SingleOrDefault",
-            // Math
             "Math.Abs", "Math.Max", "Math.Min", "Math.Round", "Math.Floor", "Math.Ceiling",
             "Math.Pow", "Math.Sqrt", "Math.Sign",
-            // ToString-like
             "ToString",
-            // EF.Functions.* — pre-seed the most common entries so projects that *don't* reference
-            // EF Core directly (rare, but possible) still get clean output. When EF is referenced,
-            // the allow-list is broadened to every EF.Functions.* method via syntactic detection.
+            // Pre-seed common entries; when EF Core is referenced the allow-list broadens to
+            // all EF.Functions.* via syntactic detection in IsEfFunctionsAccess.
             "EF.Functions.Like", "EF.Functions.ILike", "EF.Functions.Collate",
         };
         return set;

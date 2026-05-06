@@ -58,12 +58,11 @@ A request leaf:
 
 ## Pitfalls
 
-- When the column is stored as a string in the database (the typical EF Core value-converter setup), pair the `[Map]` with `[ConvertWith<EnumStringConverter>]` so EF emits `WHERE status = 'Active'` instead of `WHERE status = 0`. Without the converter the generated predicate composes against the model-side enum (numeric by default) and the column type and value type misalign.
+- When the column is stored as a string in the database, register an EF Core `ValueConverter<TEnum, string>` on the model side via `modelBuilder.Entity<T>().Property(x => x.Status).HasConversion<MyEnumStringConverter>()` in `OnModelCreating`. EF then translates the generated predicate against the model-side enum into the right SQL (`WHERE status = 'Active'`) — Filtering.Net stays out of that pipeline.
 - An invalid enum name in the JSON value (`"value": "Bogus"`) fails validation with `InvalidValueFormat` — the deserializer rejects it before predicate building.
 - Adding a `[FilterProfile<UserStatus>]` of your own collides with the auto-emitted one; remove the auto-emission path by selecting your custom profile via `[Map(..., Profile = typeof(MyUserStatusFilter))]` on every relevant `[Map]`.
 
 ## See also
 
-- [Value conversion with `[ConvertWith<TConverter>]`](value-conversion.md)
 - [Mapping properties](mapping-properties.md)
 - [Profiles and operators](../concepts/profiles-and-operators.md)

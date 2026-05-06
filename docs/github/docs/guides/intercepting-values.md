@@ -47,12 +47,9 @@ A request with `{ "field": "email", "op": "eq", "value": "Alice@Example.com" }` 
 ## Pitfalls
 
 - The interceptor method must be `internal` or `public`. The generator emits each property's dispatch logic into a `file`-scoped class (its own compilation unit), so a `private` interceptor is invisible from the emitted code and produces a CS-error at consumer-build time.
-- Only one `[InterceptValue]` per property is allowed. A second one fires `FN0010`.
-- An `[InterceptValue]` whose property name does not match any `[Map]` on the same class raises `FN0014` — orphan interceptors are almost always typos.
+- Only one `[InterceptValue]` per property is allowed. A second one fires `FN0009`.
+- An `[InterceptValue]` whose property name does not match any `[Map]` on the same class raises `FN0013` — orphan interceptors are almost always typos.
 
 ## See also
 
 - [Mapping properties](mapping-properties.md)
-- [InterceptValue attribute reference](../reference/attributes/intercept-value.md)
-- [FN0010 — duplicate value interceptor](../reference/diagnostics/FN0010.md)
-- [FN0014 — interceptor declared without matching `[Map]`](../reference/diagnostics/FN0014.md)

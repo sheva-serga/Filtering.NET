@@ -13,7 +13,7 @@ Source-generated filter / sort / page library for `IQueryable<T>` and EF Core. C
 | `tests/Filtering.Net.Tests/` | Runtime unit tests. |
 | `tests/Filtering.Net.Generator.Tests/` | Generator extraction + emission + analyzer tests. Mix of compile-and-run, snapshot (`Verify.Xunit`), and runtime end-to-end. |
 | `tests/Filtering.Net.EntityFrameworkCore.Tests/` | EF integration tests against SQLite + Testcontainers Postgres / SQL Server. |
-| `docs/github/docs/reference/diagnostics/` | One markdown explainer per `FN0xxx` / `FN1xxx` rule (mkdocs-material site source). New diagnostics MUST add a file here. |
+| `docs/github/docs/diagnostics/index.md` | Single mkdocs catalogue page listing every `FN0xxx` / `FN1xxx` rule. New diagnostics add a row here. |
 
 ## Build / test commands
 
@@ -38,7 +38,7 @@ dotnet test tests/Filtering.Net.Generator.Tests --filter "FullyQualifiedName~Com
 - **Pipeline branches** in `FilterGenerator.cs`: branch 1 walks `[GenerateFilter<TEntity>]` partials → emits filter classes; branch 2 walks `[FilterProfile<T>]` classes → emits per-profile diagnostics. Cross-pipeline diagnostics (FN1003 / FN1004) join both `.Collect()` outputs.
 - **Model extraction** is in `ModelExtraction/` and produces `EquatableList<T>`-based records so the Roslyn cache can deduplicate compilations cheaply.
 - **Emission** uses Scriban templates source-embedded into the analyzer DLL (`PackageScribanIncludeSource`). Each emitter exposes `BuildView(model) → record` plus `Emit(model) → string` that delegates to `ScribanRuntime.Render`. `SourceEmitter.cs` is the orchestrator that composes child emitter outputs into the top-level `FilterClass.scriban`.
-- **Analyzer rules** are catalogued in `Diagnostics/DiagnosticDescriptors.cs`. Errors are `FN0001`–`FN0017`, warnings are `FN1001`–`FN1008`. Every rule has a sibling `docs/github/docs/reference/diagnostics/FNxxxx.md` explainer that ships on the mkdocs-material site at `https://sheva-serga.github.io/Filtering.NET/reference/diagnostics/FNxxxx/`; the descriptor's `helpLinkUri` points at it.
+- **Analyzer rules** are catalogued in `Diagnostics/DiagnosticDescriptors.cs`. Errors are `FN0001`–`FN0016`, warnings are `FN1001`–`FN1008`. Every descriptor's `helpLinkUri` points at the single catalogue page on the mkdocs-material site (`https://sheva-serga.github.io/Filtering.NET/diagnostics/`); add a new rule by registering its descriptor here and appending a row to `docs/github/docs/diagnostics/index.md`.
 
 ## Snapshot-test workflow
 
@@ -53,10 +53,10 @@ Compile-and-run and runtime-behaviour tests (`*_Compiles`, `EmittedCodeCompilesT
 
 ## Adding a new diagnostic
 
-1. Add a `DiagnosticDescriptor` to `DiagnosticDescriptors.cs` with the next `FN0xxx` / `FN1xxx` id.
-2. Create `docs/github/docs/reference/diagnostics/FNxxxx.md` — frontmatter (`title`, `description`), what triggers it, how to fix, and a "See also" section. Add an entry under `nav` in `docs/github/mkdocs.yml`.
+1. Add a `DiagnosticDescriptor` to `DiagnosticDescriptors.cs` with the next `FN0xxx` / `FN1xxx` id; reuse the shared `HelpLink` constant.
+2. Append a row to the appropriate table in `docs/github/docs/diagnostics/index.md` (errors or warnings).
 3. Wire it into the relevant extractor / analyzer.
-4. Add a `tests/Filtering.Net.Generator.Tests/.../*.cs` test that asserts the diagnostic fires (and doesn't fire when the offending construct is removed).
+4. Add a `tests/Filtering.Net.Generator.Tests/Diagnostics/Fn0xxxTests.cs` (or `Fn1xxxTests.cs`) that asserts the diagnostic fires and doesn't fire when the offending construct is removed.
 
 ## Worktrees
 

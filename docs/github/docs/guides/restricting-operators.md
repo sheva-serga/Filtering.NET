@@ -40,6 +40,3 @@ A request that sends `{ "field": "email", "op": "startsWith", "value": "..." }` 
 ## See also
 
 - [Mapping properties](mapping-properties.md)
-- [Map attribute reference](../reference/attributes/map.md)
-- [FilterDefaults attribute reference](../reference/attributes/filter-defaults.md)
-- [FN1005 — property allows zero operators](../reference/diagnostics/FN1005.md)

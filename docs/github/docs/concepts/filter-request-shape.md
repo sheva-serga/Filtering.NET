@@ -84,4 +84,3 @@ The same numeric-enum convention applies to `LogicalOp` (`And = 0`, `Or = 1`) â€
 
 - [Validation philosophy](validation-philosophy.md)
 - [Profiles and operators](profiles-and-operators.md)
-- [FilterRequest reference](../reference/types/filter-request.md)

@@ -3,11 +3,8 @@ using Microsoft.CodeAnalysis.Text;
 
 namespace Filtering.Net.Generator;
 
-/// <summary>
-/// Cacheable location info. Holds only primitive/value data so it can pass through the
-/// incremental pipeline without breaking equality (the Roslyn <see cref="Location"/> type
-/// captures non-equatable references like <see cref="SyntaxTree"/>).
-/// </summary>
+// Primitive-only record so it passes through the incremental pipeline without breaking equality
+// (Roslyn's Location captures non-equatable SyntaxTree references).
 internal sealed record LocationInfo(string FilePath, TextSpan TextSpan, LinePositionSpan LineSpan)
 {
     public Location ToLocation() => Location.Create(FilePath, TextSpan, LineSpan);
