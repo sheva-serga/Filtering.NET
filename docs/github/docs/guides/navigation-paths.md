@@ -30,7 +30,7 @@ public partial class UserFilter
 Sample request leaf:
 
 ```json
-{ "field": "departmentName", "operator": "eq", "value": "Engineering" }
+{ "field": "departmentName", "op": "eq", "value": "Engineering" }
 ```
 
 EF Core translates the predicate into a SQL join through the `Department` navigation.

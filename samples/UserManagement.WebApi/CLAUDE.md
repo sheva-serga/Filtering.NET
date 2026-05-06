@@ -26,9 +26,12 @@ samples/UserManagement.WebApi/
 │   ├── UserFilter.cs            # [GenerateFilter<User>] partial — feature catalogue
 │   └── StringFilterPlus.cs      # custom [FilterProfile<string>] adding the fuzzy operator
 ├── Json/SampleJsonContext.cs    # JsonSerializerContext for trim/AOT-clean typed-value deserialization
-├── Data/AppDbContext.cs         # EF Core context
+├── Data/
+│   ├── AppDbContext.cs          # EF Core context
+│   └── DatabaseInitializer.cs   # MigrateAsync + idempotent demo-data seeder (4 departments + 10 users)
+├── Migrations/                  # EF Core migrations (InitialCreate is the only one)
 ├── Controllers/UsersController.cs
-├── Program.cs                   # WebApplication setup + AddFiltering(SampleJsonContext.Default)
+├── Program.cs                   # WebApplication setup + AddFiltering(SampleJsonContext.Default) + DatabaseInitializer.MigrateAndSeedAsync
 ├── appsettings.json
 ├── docker-compose.yml           # Postgres container with healthcheck
 └── README.md
@@ -44,14 +47,15 @@ samples/UserManagement.WebApi/
 
 ```sh
 docker compose up -d   # Postgres on :5432
-dotnet run             # API on :5000 / :5001
+dotnet run             # API on :5000 / :5001 — calls DatabaseInitializer.MigrateAndSeedAsync at startup
 ```
 
-The connection string in `appsettings.json` matches the docker-compose defaults. Swap `UseNpgsql` in `Program.cs` for `UseSqlServer` / `UseSqlite` to retarget — `Filtering.Net` itself is provider-agnostic.
+`Program.cs` awaits `DatabaseInitializer.MigrateAndSeedAsync(app.Services)` before `app.MapControllers()`, so a fresh container gets the schema (via `Database.MigrateAsync`) and the demo seed in one shot. `MigrateAsync` is idempotent; the seeder short-circuits when `Users` is non-empty. Apply migrations explicitly with `dotnet ef database update --project samples/UserManagement.WebApi` if you want to inspect the SQL before launch.
+
+The connection string in `appsettings.json` matches the docker-compose defaults. Swap `UseNpgsql` in `Program.cs` for `UseSqlServer` / `UseSqlite` to retarget — `Filtering.Net` itself is provider-agnostic. Note that the `Migrations/` folder is Npgsql-specific (it carries `Npgsql:ValueGenerationStrategy` annotations); switching providers means re-generating it.
 
 ## What's intentionally omitted
 
 - Auth, logging, OpenAPI generation — orthogonal to filtering and would only obscure the example.
-- Migrations — `EnsureCreatedAsync` is enough for a sample. Real apps would use `dotnet ef migrations`.
 - Multi-tenant filtering — handled at the `IQueryable<User>` source (e.g., `dbContext.Users.Where(u => u.TenantId == tenantId)`) before passing to `ApplyPagedAsync`. Outside this sample's scope.
 - `[PropertyMap]` full DSL override — supported by the library but requires enough setup that it belongs in a dedicated sample.

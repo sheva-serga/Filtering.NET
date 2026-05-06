@@ -20,8 +20,8 @@ A `FilterRequest` is a typed JSON document that carries everything a client need
 {
   "where": {
     "and": [
-      { "field": "Name", "operator": "contains", "value": "ali" },
-      { "field": "IsActive", "operator": "eq", "value": true }
+      { "field": "Name", "op": "contains", "value": "ali" },
+      { "field": "IsActive", "op": "eq", "value": true }
     ]
   },
   "sort": [{ "field": "Age", "dir": 1 }],
@@ -35,7 +35,7 @@ A `FilterRequest` is a typed JSON document that carries everything a client need
 `FilterNode` is the abstract base. Two concrete shapes derive from it:
 
 - **`FilterGroup`** — `{ "and": [...] }` or `{ "or": [...] }`. Carries a list of child nodes and a `LogicalOp` (`And = 0`, `Or = 1`). Groups can nest arbitrarily deep, bounded by `MaxNestingDepth` in the filter class's `[FilterDefaults]`.
-- **`FilterLeaf`** — `{ "field": "...", "operator": "...", "value": ... }`. The value's JSON kind is checked against the operator's expected shape during validation.
+- **`FilterLeaf`** — `{ "field": "...", "op": "...", "value": ... }`. The value's JSON kind is checked against the operator's expected shape during validation.
 
 A nested example combining both groups:
 
@@ -43,11 +43,11 @@ A nested example combining both groups:
 {
   "where": {
     "or": [
-      { "field": "IsActive", "operator": "eq", "value": false },
+      { "field": "IsActive", "op": "eq", "value": false },
       {
         "and": [
-          { "field": "Age", "operator": "gte", "value": 18 },
-          { "field": "Name", "operator": "startsWith", "value": "A" }
+          { "field": "Age", "op": "gte", "value": 18 },
+          { "field": "Name", "op": "startsWith", "value": "A" }
         ]
       }
     ]
@@ -61,7 +61,7 @@ This selects users who are inactive *or* who are at least 18 *and* whose name st
 
 `FilterNodeJsonConverter` discriminates on the shape of the JSON object:
 
-- Presence of `field` (with sibling `operator` and `value`) → deserialize as `FilterLeaf`.
+- Presence of `field` (with sibling `op` and `value`) → deserialize as `FilterLeaf`.
 - Presence of `and` or `or` → deserialize as `FilterGroup`.
 
 There is no `$type` discriminator and no `JsonPolymorphic` attribute. Clients post the natural shape and the converter picks the right runtime type.

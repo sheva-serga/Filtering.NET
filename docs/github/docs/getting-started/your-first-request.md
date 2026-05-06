@@ -36,14 +36,14 @@ public async Task<ActionResult<PageResult<User>>> Search(
 
 ## The request body
 
-Clients post a `FilterRequest` as JSON. The `where` field is a polymorphic `FilterNode` — a tree of `FilterGroup` (with `and` or `or`) and `FilterLeaf` (with `field` + `operator` + `value`) nodes:
+Clients post a `FilterRequest` as JSON. The `where` field is a polymorphic `FilterNode` — a tree of `FilterGroup` (with `and` or `or`) and `FilterLeaf` (with `field` + `op` + `value`) nodes:
 
 ```json
 {
   "where": {
     "and": [
-      { "field": "Name", "operator": "contains", "value": "ali" },
-      { "field": "IsActive", "operator": "eq", "value": true }
+      { "field": "Name", "op": "contains", "value": "ali" },
+      { "field": "IsActive", "op": "eq", "value": true }
     ]
   },
   "sort": [{ "field": "Age", "dir": 1 }],

@@ -1,5 +1,4 @@
 using Filtering.Net;
-using Microsoft.EntityFrameworkCore;
 using UserManagement.WebApi.Data;
 using UserManagement.WebApi.Json;
 
@@ -20,6 +19,8 @@ builder.Services.AddFiltering(SampleJsonContext.Default);
 builder.Services.AddEndpointsApiExplorer();
 
 var app = builder.Build();
+
+await DatabaseInitializer.MigrateAndSeedAsync(app.Services);
 
 app.MapControllers();
 app.MapGet("/", () =>

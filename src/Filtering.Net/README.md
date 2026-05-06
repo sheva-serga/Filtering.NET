@@ -61,7 +61,7 @@ IQueryable<User> result = users.Apply(userFilter, request);
 ## Key types
 
 - **`FilterRequest`** — `where` (`FilterNode`), `sort` (`SortItem[]`), `page`, `pageSize`. Polymorphic JSON via `FilterNodeJsonConverter`.
-- **`FilterNode`** — base; `FilterGroup` (`and`/`or` of children) and `FilterLeaf` (`field` + `operator` + `value`).
+- **`FilterNode`** — base; `FilterGroup` (`and`/`or` of children) and `FilterLeaf` (`field` + `op` + `value`).
 - **`SortItem`** — `field` + `dir` (`Asc` / `Desc`).
 - **`IFilterDefinition<T>`** — composite interface every generated filter class implements: `Validate(...)`, `ApplyFilter(...)`, `ApplySorting(...)`.
 - **`FilterValidationResult` / `FilterValidationError`** — structured error shape with JSON-pointer-style paths and codes.

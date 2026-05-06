@@ -46,7 +46,7 @@ public partial class UserFilter
 A request leaf:
 
 ```json
-{ "field": "Status", "operator": "in", "value": ["Active", "Pending"] }
+{ "field": "Status", "op": "in", "value": ["Active", "Pending"] }
 ```
 
 ## Variations

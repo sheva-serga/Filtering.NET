@@ -46,11 +46,20 @@ Start Postgres:
 docker compose up -d
 ```
 
-Run the API:
+Run the API (the host calls `Database.MigrateAsync` + a one-shot seed at startup, so the schema and demo data are populated automatically on first launch):
 
 ```sh
 dotnet run
 ```
+
+If you'd rather apply migrations explicitly before starting the API:
+
+```sh
+dotnet ef database update --project samples/UserManagement.WebApi
+dotnet run --project samples/UserManagement.WebApi
+```
+
+The seeder lives in `Data/DatabaseInitializer.cs` and only runs when the `Users` table is empty — it inserts 4 departments (Engineering, Marketing, Support, Finance) and 10 users covering every `UserStatus` value, mixed `IsActive`, ages 23–52, and `CreatedAt` spread across Jan–Feb 2026.
 
 ## Example requests
 
@@ -60,7 +69,7 @@ Substring match on `Name` (uses `contains` from the inherited built-in profile):
 curl -X POST http://localhost:5000/users/search \
      -H "Content-Type: application/json" \
      -d '{
-       "where": { "field": "Name", "operator": "contains", "value": "ali" },
+       "where": { "field": "Name", "op": "contains", "value": "ali" },
        "sort":  [{ "field": "Name", "dir": 0 }],
        "page": 1,
        "pageSize": 10
@@ -72,7 +81,7 @@ Custom `fuzzy` operator from `StringFilterPlus` (case-insensitive substring):
 ```sh
 curl -X POST http://localhost:5000/users/search \
      -H "Content-Type: application/json" \
-     -d '{ "where": { "field": "Name", "operator": "fuzzy", "value": "ALI" } }'
+     -d '{ "where": { "field": "Name", "op": "fuzzy", "value": "ALI" } }'
 ```
 
 Custom `ilike` operator from `StringFilterPlus` (SQL LIKE pattern via `EF.Functions.ILike` — Postgres-specific case-insensitive match). The caller supplies the LIKE pattern with `%` / `_` wildcards:
@@ -80,7 +89,7 @@ Custom `ilike` operator from `StringFilterPlus` (SQL LIKE pattern via `EF.Functi
 ```sh
 curl -X POST http://localhost:5000/users/search \
      -H "Content-Type: application/json" \
-     -d '{ "where": { "field": "Name", "operator": "ilike", "value": "ali%" } }'
+     -d '{ "where": { "field": "Name", "op": "ilike", "value": "ali%" } }'
 ```
 
 Aliased navigation path — targets the related `Department.Name` column under the friendly key `departmentName`:
@@ -88,7 +97,7 @@ Aliased navigation path — targets the related `Department.Name` column under t
 ```sh
 curl -X POST http://localhost:5000/users/search \
      -H "Content-Type: application/json" \
-     -d '{ "where": { "field": "departmentName", "operator": "eq", "value": "Engineering" } }'
+     -d '{ "where": { "field": "departmentName", "op": "eq", "value": "Engineering" } }'
 ```
 
 Enum match on the auto-emitted `UserStatus` profile:
@@ -96,7 +105,7 @@ Enum match on the auto-emitted `UserStatus` profile:
 ```sh
 curl -X POST http://localhost:5000/users/search \
      -H "Content-Type: application/json" \
-     -d '{ "where": { "field": "Status", "operator": "in", "value": ["Active", "Pending"] } }'
+     -d '{ "where": { "field": "Status", "op": "in", "value": ["Active", "Pending"] } }'
 ```
 
 Operator-restriction violation — this fails validation because `Email` is restricted to `eq` / `contains` / `isNull`:
@@ -104,7 +113,7 @@ Operator-restriction violation — this fails validation because `Email` is rest
 ```sh
 curl -X POST http://localhost:5000/users/validate \
      -H "Content-Type: application/json" \
-     -d '{ "where": { "field": "Email", "operator": "startsWith", "value": "alice" } }'
+     -d '{ "where": { "field": "Email", "op": "startsWith", "value": "alice" } }'
 # 400 Bad Request — operator not allowed on Email
 ```
 
@@ -117,9 +126,12 @@ samples/UserManagement.WebApi/
 │   ├── UserFilter.cs            # [GenerateFilter<User>] partial — feature-by-feature catalogue
 │   └── StringFilterPlus.cs      # custom [FilterProfile<string>] adding the fuzzy operator
 ├── Json/SampleJsonContext.cs    # JsonSerializerContext for trim/AOT-clean typed-value deserialization
-├── Data/AppDbContext.cs         # EF Core context
+├── Data/
+│   ├── AppDbContext.cs          # EF Core context
+│   └── DatabaseInitializer.cs   # MigrateAsync + idempotent demo-data seeder
+├── Migrations/                  # EF Core migrations (InitialCreate)
 ├── Controllers/UsersController.cs
-├── Program.cs                   # WebApplication setup + AddFiltering(SampleJsonContext.Default)
+├── Program.cs                   # WebApplication setup + AddFiltering(SampleJsonContext.Default) + DatabaseInitializer.MigrateAndSeedAsync
 ├── appsettings.json
 └── docker-compose.yml           # Postgres container with named volume + healthcheck
 ```
