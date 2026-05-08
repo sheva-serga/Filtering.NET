@@ -4,4 +4,5 @@ namespace Filtering.Net.Generator;
 internal static class TrackingNames
 {
     internal const string FilterClassModels = nameof(FilterClassModels);
+    internal const string ResolvedFilterClassModels = nameof(ResolvedFilterClassModels);
 }

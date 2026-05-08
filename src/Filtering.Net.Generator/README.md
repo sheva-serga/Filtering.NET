@@ -1,6 +1,6 @@
 # Filtering.Net.Generator
 
-Roslyn incremental source generator + 24-rule analyzer for [Filtering.Net](https://www.nuget.org/packages/Filtering.Net/). Emits typed `IFilterDefinition<T>` implementations and a DI extension at compile time. Catches translatable-method mistakes before EF Core sees them.
+Roslyn incremental source generator + 30-rule analyzer for [Filtering.Net](https://www.nuget.org/packages/Filtering.Net/). Emits typed `IFilterDefinition<T>` implementations and a DI extension at compile time. Catches translatable-method mistakes before EF Core sees them.
 
 This package is **analyzer-only** — it has no runtime DLL. Install it alongside `Filtering.Net`.
 
@@ -72,7 +72,7 @@ Then `[Map(nameof(User.Name), Profile = typeof(StringFilterPlus))]` and the new 
 
 ## Diagnostics
 
-24 rules total: 16 errors (`FN0001`–`FN0016`) and 8 warnings (`FN1001`–`FN1008`). The full catalogue with one-line summaries lives at the [diagnostics catalogue](https://sheva-serga.github.io/Filtering.NET/diagnostics/) on the docs site.
+30 rules total: 22 errors (`FN0001`–`FN0022`) and 8 warnings (`FN1001`–`FN1008`). The full catalogue with one-line summaries lives at the [diagnostics catalogue](https://sheva-serga.github.io/Filtering.NET/diagnostics/) on the docs site.
 
 | Id | Severity | Summary |
 |----|----------|---------|
@@ -92,6 +92,12 @@ Then `[Map(nameof(User.Name), Profile = typeof(StringFilterPlus))]` and the new 
 | FN0014 | Error | Property's CLR type is matched by multiple profiles — use `Profile = typeof(...)` on the `[Map]` to pick one. |
 | FN0015 | Error | Standalone profile has no `BasedOn` and is missing required extractor method(s). |
 | FN0016 | Error | Same operator name declared more than once on a single profile. |
+| FN0017 | Error | `[MapNested]` introduces a cycle in the filter-inlining graph. |
+| FN0018 | Error | `[MapNested<T>]` references a filter class declared outside the current compilation. |
+| FN0019 | Error | Auto-resolve `[MapNested]` finds two or more `[GenerateFilter<TNav>]` candidates. |
+| FN0020 | Error | Auto-resolve finds zero `[GenerateFilter<TNav>]` candidates for the navigation target type. |
+| FN0021 | Error | Named property doesn't exist, isn't a reference type, or is a primitive/value type. |
+| FN0022 | Error | Named navigation is a collection type; collection navigations are deferred to a future version. |
 | FN1001 | Warning | `[FilterOperator]` body references `DateTime.UtcNow`/`Now` directly inside the lambda. |
 | FN1002 | Warning | Property is mapped but not marked `Sortable = true` — likely omission for a sortable type. |
 | FN1003 | Warning | Profile is declared but never referenced by any `[Map(..., Profile = ...)]`. |

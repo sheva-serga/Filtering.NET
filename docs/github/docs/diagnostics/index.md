@@ -1,11 +1,11 @@
 ---
 title: Diagnostics catalogue
-description: 24 analyzer rules — 16 errors (FN0001–FN0016) and 8 warnings (FN1001–FN1008).
+description: 30 analyzer rules — 22 errors (FN0001–FN0022) and 8 warnings (FN1001–FN1008).
 ---
 
 # Diagnostics catalogue
 
-Filtering.Net ships 24 compile-time analyzer rules — 16 errors (`FN0001`–`FN0016`) and 8 warnings (`FN1001`–`FN1008`). Both `dotnet build` and the IDE surface them; the rule's `helpLinkUri` brings you back to this page.
+Filtering.Net ships 30 compile-time analyzer rules — 22 errors (`FN0001`–`FN0022`) and 8 warnings (`FN1001`–`FN1008`). Both `dotnet build` and the IDE surface them; the rule's `helpLinkUri` brings you back to this page.
 
 ## Errors
 
@@ -27,6 +27,12 @@ Filtering.Net ships 24 compile-time analyzer rules — 16 errors (`FN0001`–`FN
 | FN0014 | AmbiguousProfile | Property's CLR type matches multiple profiles; use `[Map(typeof(...))]` to pick one. |
 | FN0015 | ProfileMissingExtractor | Standalone `[FilterProfile]` is missing required extractor methods (`TryGetValue` / `TryGetArray`). |
 | FN0016 | DuplicateOperatorOnProfile | Operator name is declared more than once on the same profile. |
+| FN0017 | NestedCycle | `[MapNested]` introduces a cycle in the filter-inlining graph (e.g. `User.Manager: User`). |
+| FN0018 | NestedCrossAssembly | `[MapNested<T>]` references a filter class declared outside the current compilation. |
+| FN0019 | NestedAmbiguous | Auto-resolve `[MapNested(nameof(...))]` finds two or more `[GenerateFilter<TNav>]` candidates. |
+| FN0020 | NestedTargetNotFound | Auto-resolve finds zero `[GenerateFilter<TNav>]` candidates for the navigation target type. |
+| FN0021 | NestedNavigationInvalid | Named property doesn't exist, isn't a reference type, or is a primitive/value type. |
+| FN0022 | NestedCollectionUnsupported | Named navigation is a collection type; collection navigations are deferred to a future version. |
 
 ## Warnings
 

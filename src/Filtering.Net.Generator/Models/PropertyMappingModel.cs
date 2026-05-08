@@ -11,4 +11,7 @@ internal sealed record PropertyMappingModel(
     string DefaultSortDirection,
     string ConfigurationMethodName,
     EquatableList<CustomOperatorModel> CustomOperators,
-    bool HasTypedValueOperator);
+    bool HasTypedValueOperator,
+    LocationInfo? DeclarationLocation = null,
+    LocationInfo? InliningSiteLocation = null,
+    string? SourceFilterClassFqn = null);

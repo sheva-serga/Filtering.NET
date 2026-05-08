@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+- `[MapNested]` and `[MapNested<TFilter>]` attributes for compile-time filter inlining via navigation properties. The generator splices another `[GenerateFilter<TNav>]` partial's `[Map]` mappings (with `Sortable`, `Alias`, `Only`/`Except`, custom `[FilterOperator]` bodies) into the host filter under a dotted prefix at compile time. Reference navigations only in v1; collection navigations and `[InterceptValue]` / `[PropertyMap]` splice-through are deferred. New error diagnostics `FN0017 NestedCycle`, `FN0018 NestedCrossAssembly`, `FN0019 NestedAmbiguous`, `FN0020 NestedTargetNotFound`, `FN0021 NestedNavigationInvalid`, `FN0022 NestedCollectionUnsupported`. `FN0001 DuplicateMapping` broadened to cover any duplicate effective dotted path across `[Map]`, `[PropertyMap]`, and `[MapNested]`, with multi-source-list message and `additionalLocations` reporting.
+
 ## [0.1.2] - 2026-05-07
 
 ### Removed

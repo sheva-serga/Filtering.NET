@@ -9,15 +9,16 @@ internal static class DiagnosticDescriptors
     // Single help-link target — every rule's "More info" goes to the catalogue table.
     private const string HelpLink = "https://sheva-serga.github.io/Filtering.NET/diagnostics/";
 
-    // ---------- Errors (FN0001 - FN0016) ----------
+    // ---------- Errors (FN0001 - FN0022) ----------
 
-    public static readonly DiagnosticDescriptor DuplicateMap = new(
+    public static readonly DiagnosticDescriptor DuplicateMapping = new(
         id: "FN0001",
         title: "Duplicate filter mapping",
-        messageFormat: "Property '{0}' is mapped by multiple methods. Each property must have at most one [Map] declaration.",
+        messageFormat: "Filter path '{0}' is mapped by multiple sources on '{1}': {2}",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
+        description: "Each effective dotted filter path must be produced by at most one mapping ([Map], [PropertyMap], or [MapNested]) on a given filter class.",
         helpLinkUri: HelpLink);
 
     public static readonly DiagnosticDescriptor DuplicateSortable = new(
@@ -150,6 +151,61 @@ internal static class DiagnosticDescriptors
         id: "FN0016",
         title: "Duplicate operator declaration on profile",
         messageFormat: "Operator '{0}' is declared more than once on profile '{1}'. Each operator name must appear at most once per profile.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLink);
+
+    public static readonly DiagnosticDescriptor NestedCycle = new(
+        id: "FN0017",
+        title: "Cycle in [MapNested] graph",
+        messageFormat: "Cycle detected in [MapNested] graph involving filter classes: {0}.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        description: "[MapNested] cannot recursively reference a filter class that (transitively) references the host.",
+        helpLinkUri: HelpLink);
+
+    public static readonly DiagnosticDescriptor NestedCrossAssembly = new(
+        id: "FN0018",
+        title: "[MapNested<T>] references a filter class outside the current compilation",
+        messageFormat: "[MapNested<{0}>] references a filter class declared in another assembly. Cross-assembly nesting is not supported in v1.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLink);
+
+    public static readonly DiagnosticDescriptor NestedAmbiguous = new(
+        id: "FN0019",
+        title: "Auto-resolve [MapNested] is ambiguous",
+        messageFormat: "[MapNested(nameof({0}))] is ambiguous: {1} candidate filter classes target '{2}'. Use the generic form [MapNested<TFilter>] to pick one.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLink);
+
+    public static readonly DiagnosticDescriptor NestedTargetNotFound = new(
+        id: "FN0020",
+        title: "[MapNested] target filter class not found",
+        messageFormat: "[MapNested(nameof({0}))] cannot resolve a filter class for '{1}': no [GenerateFilter<{1}>] partial in this compilation.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLink);
+
+    public static readonly DiagnosticDescriptor NestedNavigationInvalid = new(
+        id: "FN0021",
+        title: "[MapNested] navigation property is not a single-target reference navigation",
+        messageFormat: "[MapNested(nameof({0}))] target property does not exist on '{1}', is a primitive/value type, or is not a single-target reference navigation.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLink);
+
+    public static readonly DiagnosticDescriptor NestedCollectionUnsupported = new(
+        id: "FN0022",
+        title: "[MapNested] on collection navigation is not supported in v1",
+        messageFormat: "[MapNested(nameof({0}))] target is a collection navigation; collection navigations require Any/All quantifier semantics and are deferred to a future version.",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,

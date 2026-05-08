@@ -12,4 +12,5 @@ internal sealed record FilterClassModel(
     EquatableList<InterceptorModel> Interceptors,
     EquatableList<PropertyOverrideModel> Overrides,
     LocationInfo? Location,
-    bool HasAnyTypedValueProperty);
+    bool HasAnyTypedValueProperty,
+    EquatableList<NestedMappingModel> NestedMappings);

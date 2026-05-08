@@ -15,7 +15,7 @@ A minimal ASP.NET Core 9 Web API showing how to wire `Filtering.Net` end-to-end 
 | Typed-value JSON deserialization + `JsonSerializerContext` wiring | `Json/SampleJsonContext.cs`, `Program.cs` `AddFiltering(SampleJsonContext.Default)` |
 | `[InterceptValue]` pre-validation hook | `MapEmail` &mdash; lowercases the value via `NormalizeEmail` |
 | Auto-emitted enum profile | `MapStatus` (the generator emits `Filtering.Net.Generated.UserStatusFilter` automatically) |
-| Navigation path with friendly alias | `MapDepartmentName` &mdash; maps `Department.Name` as `departmentName` |
+| `[MapNested]` filter inlining | `MapDepartment` &mdash; auto-resolves `DepartmentFilter` and exposes `department.id`, `department.name` |
 | Three controller endpoints | `Controllers/UsersController.cs` |
 
 ## Endpoints
@@ -83,12 +83,20 @@ curl -X POST http://localhost:5000/users/search \
      -d '{ "where": { "field": "Name", "op": "ilike", "value": "ali%" } }'
 ```
 
-Aliased navigation path &mdash; targets the related `Department.Name` column under the friendly key `departmentName`:
+Filter by nested filter via `[MapNested]` &mdash; `DepartmentFilter`'s mappings are inlined under the `department.` prefix:
 
 ```sh
 curl -X POST http://localhost:5000/users/search \
      -H "Content-Type: application/json" \
-     -d '{ "where": { "field": "departmentName", "op": "eq", "value": "Engineering" } }'
+     -d '{ "where": { "field": "department.name", "op": "eq", "value": "Engineering" } }'
+```
+
+Sort by the same nested column (sortable propagates from `DepartmentFilter`'s `[Map(... Sortable = true)]`):
+
+```sh
+curl -X POST http://localhost:5000/users/search \
+     -H "Content-Type: application/json" \
+     -d '{ "sort": [{ "field": "department.name", "dir": 0 }] }'
 ```
 
 Enum match on the auto-emitted `UserStatus` profile:

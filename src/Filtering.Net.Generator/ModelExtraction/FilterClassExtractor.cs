@@ -54,9 +54,9 @@ internal static class FilterClassExtractor
         var interceptors = new List<InterceptorModel>();
         var overrides = new List<PropertyOverrideModel>();
 
-        // mappedPropertySortable.Value tracks whether the prior [Map] had Sortable=true — needed
-        // to pick FN0001 (DuplicateMap) vs FN0002 (DuplicateSortable) on a second declaration.
+        // Sortable picks FN0001 vs FN0002 on a duplicate; first method name fills FN0001's source list.
         var mappedPropertySortable = new Dictionary<string, bool>(StringComparer.Ordinal);
+        var mappedPropertyFirstMethodName = new Dictionary<string, string>(StringComparer.Ordinal);
         var interceptedPropertyNames = new HashSet<string>(StringComparer.Ordinal);
         var propertyMapNames = new HashSet<string>(StringComparer.Ordinal);
 
@@ -74,13 +74,15 @@ internal static class FilterClassExtractor
             {
                 ExtractMapMethod(
                     methodSymbol,
+                    classSymbol,
                     entityType,
                     mapAttribute,
                     compilation,
                     profileIndex,
                     diagnostics,
                     properties,
-                    mappedPropertySortable);
+                    mappedPropertySortable,
+                    mappedPropertyFirstMethodName);
             }
 
             if (interceptAttribute is not null)
@@ -143,6 +145,8 @@ internal static class FilterClassExtractor
             properties.Exists(propertyMappingModel => propertyMappingModel.HasTypedValueOperator)
             || overrides.Exists(propertyOverrideModel => propertyOverrideModel.HasTypedValueOperator);
 
+        var nestedMappings = MapNestedExtractor.Extract(classSymbol, cancellationToken);
+
         var model = new FilterClassModel(
             Namespace: classNamespace,
             ClassName: classSymbol.Name,
@@ -153,7 +157,8 @@ internal static class FilterClassExtractor
             Interceptors: new EquatableList<InterceptorModel>(interceptors),
             Overrides: new EquatableList<PropertyOverrideModel>(overrides),
             Location: LocationInfo.FromLocation(classSymbol.Locations.FirstOrDefault()),
-            HasAnyTypedValueProperty: hasAnyTypedValueProperty);
+            HasAnyTypedValueProperty: hasAnyTypedValueProperty,
+            NestedMappings: nestedMappings);
 
         return new FilterClassModelWithDiagnostics(
             Model: model,
@@ -162,13 +167,15 @@ internal static class FilterClassExtractor
 
     private static void ExtractMapMethod(
         IMethodSymbol methodSymbol,
+        INamedTypeSymbol classSymbol,
         INamedTypeSymbol entityType,
         AttributeData mapAttribute,
         Compilation compilation,
         ProfileIndex profileIndex,
         List<DiagnosticInfo> diagnostics,
         List<PropertyMappingModel> properties,
-        Dictionary<string, bool> mappedPropertySortable)
+        Dictionary<string, bool> mappedPropertySortable,
+        Dictionary<string, string> mappedPropertyFirstMethodName)
     {
         if (!IsPartial(methodSymbol))
         {
@@ -189,9 +196,11 @@ internal static class FilterClassExtractor
             {
                 EmitDuplicateMapDiagnosticIfNeeded(
                     methodSymbol,
+                    classSymbol,
                     attemptedName!,
                     sortableOnThisMap: ReadSortableNamedArg(mapAttribute),
                     mappedPropertySortable,
+                    mappedPropertyFirstMethodName,
                     diagnostics);
             }
             return;
@@ -202,24 +211,27 @@ internal static class FilterClassExtractor
         {
             EmitDuplicateMapDiagnosticIfNeeded(
                 methodSymbol,
+                classSymbol,
                 extractionResult.Model.PropertyName,
                 sortableOnThisMap: modelSortable,
                 mappedPropertySortable,
+                mappedPropertyFirstMethodName,
                 diagnostics);
             return;
         }
 
         mappedPropertySortable[extractionResult.Model.PropertyName] = modelSortable;
+        mappedPropertyFirstMethodName[extractionResult.Model.PropertyName] = methodSymbol.Name;
         properties.Add(extractionResult.Model);
     }
 
-    // Picks FN0002 (DuplicateSortable) when both the prior and current mapping are Sortable=true;
-    // otherwise emits the more general FN0001 (DuplicateMap).
     private static void EmitDuplicateMapDiagnosticIfNeeded(
         IMethodSymbol methodSymbol,
+        INamedTypeSymbol classSymbol,
         string propertyName,
         bool sortableOnThisMap,
         Dictionary<string, bool> mappedPropertySortable,
+        Dictionary<string, string> mappedPropertyFirstMethodName,
         List<DiagnosticInfo> diagnostics)
     {
         var location = methodSymbol.Locations.FirstOrDefault();
@@ -233,13 +245,19 @@ internal static class FilterClassExtractor
                     propertyName));
                 return;
             }
+            mappedPropertyFirstMethodName.TryGetValue(propertyName, out var previousMethodName);
+            var hostFqn = classSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat).Replace("global::", "");
+            var sources = "[Map] " + (previousMethodName ?? "<unknown>") + ", [Map] " + methodSymbol.Name;
             diagnostics.Add(DiagnosticInfo.From(
-                DiagnosticDescriptors.DuplicateMap,
+                DiagnosticDescriptors.DuplicateMapping,
                 location,
-                propertyName));
+                propertyName,
+                hostFqn,
+                sources));
             return;
         }
         mappedPropertySortable[propertyName] = sortableOnThisMap;
+        mappedPropertyFirstMethodName[propertyName] = methodSymbol.Name;
     }
 
     private static void DetectAliasCollisions(

@@ -1,3 +1,5 @@
+using System.Collections.Immutable;
+
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 
@@ -25,6 +27,21 @@ internal static class GeneratorRunner
         bool excludeDiAbstractions = true,
         bool excludeEntityFrameworkCore = false)
     {
+        var extractionResults = ExtractFilterClassResults(sourceCode, excludeDiAbstractions, excludeEntityFrameworkCore);
+        var models = new List<FilterClassModel>();
+        foreach (var extractionResult in extractionResults)
+        {
+            if (extractionResult.Model is { } model)
+                models.Add(model);
+        }
+        return models;
+    }
+
+    public static IReadOnlyList<FilterClassModelWithDiagnostics> ExtractFilterClassResults(
+        string sourceCode,
+        bool excludeDiAbstractions = true,
+        bool excludeEntityFrameworkCore = false)
+    {
         var compilation = BuildCompilation(sourceCode, excludeDiAbstractions, excludeEntityFrameworkCore);
         var driverOptions = new GeneratorDriverOptions(
             disabledOutputs: IncrementalGeneratorOutputKind.None,
@@ -39,7 +56,7 @@ internal static class GeneratorRunner
 
         var runResult = driver.RunGenerators(compilation).GetRunResult();
 
-        var models = new List<FilterClassModel>();
+        var extractionResults = new List<FilterClassModelWithDiagnostics>();
         foreach (var generatorResult in runResult.Results)
         {
             if (!generatorResult.TrackedSteps.TryGetValue(TrackingNames.FilterClassModels, out var steps))
@@ -48,12 +65,12 @@ internal static class GeneratorRunner
             {
                 foreach (var (value, _) in step.Outputs)
                 {
-                    if (value is FilterClassModelWithDiagnostics { Model: { } model })
-                        models.Add(model);
+                    if (value is FilterClassModelWithDiagnostics extractionResult)
+                        extractionResults.Add(extractionResult);
                 }
             }
         }
-        return models;
+        return extractionResults;
     }
 
     public static (GeneratorDriverRunResult RunResult, Compilation UpdatedCompilation) RunAndUpdate(
@@ -67,10 +84,10 @@ internal static class GeneratorRunner
         return (driver.GetRunResult(), updated);
     }
 
-    private static CSharpCompilation BuildCompilation(
+    internal static CSharpCompilation BuildCompilation(
         string sourceCode,
-        bool excludeDiAbstractions,
-        bool excludeEntityFrameworkCore)
+        bool excludeDiAbstractions = true,
+        bool excludeEntityFrameworkCore = false)
     {
         var syntaxTree = CSharpSyntaxTree.ParseText(sourceCode);
         var references = ResolveReferences(excludeDiAbstractions, excludeEntityFrameworkCore);

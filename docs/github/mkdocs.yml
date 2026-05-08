@@ -79,6 +79,7 @@ nav:
       - Intercepting values: guides/intercepting-values.md
       - Filtering enums: guides/filtering-enums.md
       - Navigation paths and aliases: guides/navigation-paths.md
+      - Nested filter inlining: guides/nested-filters.md
       - Page settings: guides/page-settings.md
       - DI integration: guides/di-integration.md
       - Async paged queries: guides/async-paged-queries.md

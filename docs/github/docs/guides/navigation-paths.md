@@ -51,3 +51,4 @@ EF Core translates the predicate into a SQL join through the `Department` naviga
 ## See also
 
 - [Mapping properties](mapping-properties.md)
+- [Nested filter inlining](nested-filters.md) — when the related entity has its own `[GenerateFilter<TRelated>]` partial.

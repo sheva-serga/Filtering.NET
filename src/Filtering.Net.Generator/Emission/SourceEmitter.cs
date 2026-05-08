@@ -13,7 +13,15 @@ internal static class SourceEmitter
         var hasNamespace = !string.IsNullOrEmpty(model.Namespace);
         var indent = hasNamespace ? "        " : "    ";
         var perPropertyIndent = hasNamespace ? "    " : string.Empty;
-        var configurationMethodNames = model.Properties.Select(p => p.ConfigurationMethodName).ToList();
+        // Only the host's own partial methods get implementation parts: direct [Map]/[PropertyMap]
+        // (SourceFilterClassFqn is null) plus each [MapNested]. Spliced properties carry inner-filter
+        // method names that aren't declared on this host; emitting them yields CS8795/CS0757.
+        var configurationMethodNames = model.Properties
+            .Where(property => property.SourceFilterClassFqn is null)
+            .Select(property => property.ConfigurationMethodName)
+            .Concat(model.NestedMappings.Select(nestedMapping => nestedMapping.HostMethodName))
+            .Distinct(StringComparer.Ordinal)
+            .ToList();
 
         var validateNodeBody = Indent(ValidateNodeEmitter.Emit(model), indent);
         var validateSortBody = Indent(ValidateSortEmitter.Emit(model), indent);

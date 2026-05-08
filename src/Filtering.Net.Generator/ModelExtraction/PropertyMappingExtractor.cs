@@ -219,6 +219,8 @@ internal static class PropertyMappingExtractor
 
         var hasTypedValueOperator = filteredCustomOperators.Exists(customOperator => customOperator.ValueClrType is not null);
 
+        var declarationLocation = LocationInfo.FromLocation(mapAttribute.ApplicationSyntaxReference?.GetSyntax().GetLocation());
+
         var model = new PropertyMappingModel(
             PropertyName: propertyName!,
             PropertyClrType: propertyClrType,
@@ -230,7 +232,8 @@ internal static class PropertyMappingExtractor
             DefaultSortDirection: defaultSortDirection,
             ConfigurationMethodName: methodSymbol.Name,
             CustomOperators: new EquatableList<CustomOperatorModel>(filteredCustomOperators),
-            HasTypedValueOperator: hasTypedValueOperator);
+            HasTypedValueOperator: hasTypedValueOperator,
+            DeclarationLocation: declarationLocation);
 
         return new PropertyMappingExtractionResult(Model: model, Diagnostics: diagnostics);
     }

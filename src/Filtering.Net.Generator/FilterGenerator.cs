@@ -27,8 +27,24 @@ public sealed class FilterGenerator : IIncrementalGenerator
         // Always report the per-class diagnostics (regardless of whether a model came back).
         context.RegisterSourceOutput(filterClasses, ReportFilterClassDiagnostics);
 
-        var modelsForEmission = filterClasses
-            .Select(static (extractionResult, _) => extractionResult.Model)
+        // [MapNested] splice runs after extraction; needs every host's model plus the compilation symbol table.
+        var allHostsCollected = filterClasses.Collect();
+        var resolvedHosts = filterClasses
+            .Combine(allHostsCollected)
+            .Combine(context.CompilationProvider)
+            .Select(static (input, cancellationToken) =>
+            {
+                var perHost = input.Left.Left;
+                var allHosts = input.Left.Right;
+                var compilation = input.Right;
+                return NestedFilterResolver.Resolve(perHost, allHosts, compilation, cancellationToken);
+            })
+            .WithTrackingName(TrackingNames.ResolvedFilterClassModels);
+
+        context.RegisterSourceOutput(resolvedHosts, ReportResolvedDiagnostics);
+
+        var modelsForEmission = resolvedHosts
+            .Select(static (resolved, _) => resolved.Model)
             .Where(static model => model is not null);
         context.RegisterSourceOutput(modelsForEmission, GenerateForFilterClass!);
 
@@ -73,6 +89,14 @@ public sealed class FilterGenerator : IIncrementalGenerator
     private static void ReportFilterClassDiagnostics(SourceProductionContext sourceProductionContext, FilterClassModelWithDiagnostics extractionResult)
     {
         foreach (var diagnosticInfo in extractionResult.Diagnostics)
+        {
+            sourceProductionContext.ReportDiagnostic(diagnosticInfo.ToDiagnostic());
+        }
+    }
+
+    private static void ReportResolvedDiagnostics(SourceProductionContext sourceProductionContext, NestedFilterResolver.ResolvedHost resolvedHost)
+    {
+        foreach (var diagnosticInfo in resolvedHost.Diagnostics)
         {
             sourceProductionContext.ReportDiagnostic(diagnosticInfo.ToDiagnostic());
         }

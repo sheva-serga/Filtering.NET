@@ -46,7 +46,7 @@ public partial class UserFilter
     [Map(nameof(User.Status), Sortable = true)]
     private static partial void MapStatus();
 
-    // Navigation path with Alias — exposes Department.Name as 'departmentName'.
-    [Map("Department.Name", Profile = typeof(StringFilter), Alias = "departmentName", Sortable = true)]
-    private static partial void MapDepartmentName();
+    // [MapNested] — inlines DepartmentFilter's mappings under the 'department.' prefix.
+    [MapNested(nameof(User.Department))]
+    private static partial void MapDepartment();
 }
