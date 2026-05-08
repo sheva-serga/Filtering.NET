@@ -29,18 +29,22 @@ internal static class NestedFilterResolver
         var mergedProperties = new List<PropertyMappingModel>(hostModel.Properties);
 
         // Seeded with the host so a [MapNested] whose target is the host itself trips the cycle
-        // check on the first recursive entry rather than infinite-looping.
+        // check on the first recursive entry rather than infinite-looping. The parallel location
+        // stack mirrors the visited-set so cycle diagnostics can report every [MapNested] site
+        // along the path as additionalLocations.
         var visitedFilterClasses = new HashSet<string>(StringComparer.Ordinal);
+        var nestedSiteStack = new Stack<Location?>();
         var hostFqn = string.IsNullOrEmpty(hostModel.Namespace)
             ? hostModel.ClassName
             : hostModel.Namespace + "." + hostModel.ClassName;
         visitedFilterClasses.Add(hostFqn);
+        nestedSiteStack.Push(null);
 
         foreach (var nested in hostModel.NestedMappings)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            var targetModel = ResolveTargetForNested(nested, hostEntitySymbol, allHostExtractionResults, newDiagnostics);
+            var targetModel = ResolveTargetForNested(nested, hostEntitySymbol, compilation, allHostExtractionResults, newDiagnostics);
             if (targetModel is null) continue;
 
             var spliced = SpliceMappings(
@@ -52,6 +56,7 @@ internal static class NestedFilterResolver
                 compilation,
                 newDiagnostics,
                 visitedFilterClasses,
+                nestedSiteStack,
                 cancellationToken);
             mergedProperties.AddRange(spliced);
         }
@@ -135,6 +140,7 @@ internal static class NestedFilterResolver
     private static FilterClassModel? ResolveTargetForNested(
         NestedMappingModel nested,
         INamedTypeSymbol? hostEntitySymbol,
+        Compilation compilation,
         ImmutableArray<FilterClassModelWithDiagnostics> allHostExtractionResults,
         List<DiagnosticInfo> diagnosticsSink)
     {
@@ -145,9 +151,15 @@ internal static class NestedFilterResolver
 
         if (navProperty is null || IsPrimitiveOrValueType(navProperty.Type))
         {
+            // navProperty may be null entirely (name typo) — primary site is the only location;
+            // when the property is found-but-primitive we surface its declaration as additional.
+            var navAdditionalLocations = navProperty is not null
+                ? CollectSymbolLocations(navProperty)
+                : Array.Empty<Location>();
             diagnosticsSink.Add(DiagnosticInfo.From(
                 DiagnosticDescriptors.NestedNavigationInvalid,
                 nested.AttributeLocation?.ToLocation() ?? Location.None,
+                navAdditionalLocations,
                 nested.NavigationPropertyName,
                 hostEntitySymbol?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat).Replace("global::", string.Empty) ?? string.Empty));
             return null;
@@ -159,6 +171,7 @@ internal static class NestedFilterResolver
             diagnosticsSink.Add(DiagnosticInfo.From(
                 DiagnosticDescriptors.NestedCollectionUnsupported,
                 nested.AttributeLocation?.ToLocation() ?? Location.None,
+                CollectSymbolLocations(navProperty),
                 nested.NavigationPropertyName));
             return null;
         }
@@ -186,9 +199,16 @@ internal static class NestedFilterResolver
                     return candidate;
                 }
             }
+            // Surface the explicit T type's declaration when it lives in this compilation; cross-
+            // assembly references typically have no syntax-tree location and contribute nothing.
+            var explicitSymbol = compilation.GetTypeByMetadataName(nested.ExplicitFilterClassFqn);
+            var explicitAdditionalLocations = explicitSymbol is not null
+                ? CollectSymbolLocations(explicitSymbol)
+                : Array.Empty<Location>();
             diagnosticsSink.Add(DiagnosticInfo.From(
                 DiagnosticDescriptors.NestedCrossAssembly,
                 nested.AttributeLocation?.ToLocation() ?? Location.None,
+                explicitAdditionalLocations,
                 nested.ExplicitFilterClassFqn));
             return null;
         }
@@ -198,21 +218,43 @@ internal static class NestedFilterResolver
             diagnosticsSink.Add(DiagnosticInfo.From(
                 DiagnosticDescriptors.NestedTargetNotFound,
                 nested.AttributeLocation?.ToLocation() ?? Location.None,
+                CollectSymbolLocations(navProperty),
                 nested.NavigationPropertyName,
                 navTypeFqn));
             return null;
         }
         if (candidates.Count > 1)
         {
+            var candidateLocations = new List<Location>(candidates.Count);
+            foreach (var candidate in candidates)
+            {
+                var candidateLocation = candidate.Location?.ToLocation();
+                if (candidateLocation is not null)
+                {
+                    candidateLocations.Add(candidateLocation);
+                }
+            }
             diagnosticsSink.Add(DiagnosticInfo.From(
                 DiagnosticDescriptors.NestedAmbiguous,
                 nested.AttributeLocation?.ToLocation() ?? Location.None,
+                candidateLocations.ToArray(),
                 nested.NavigationPropertyName,
                 candidates.Count.ToString(CultureInfo.InvariantCulture),
                 navTypeFqn));
             return null;
         }
         return candidates[0];
+    }
+
+    private static Location[] CollectSymbolLocations(ISymbol symbol)
+    {
+        var collected = new List<Location>(symbol.Locations.Length);
+        foreach (var symbolLocation in symbol.Locations)
+        {
+            if (symbolLocation is null || symbolLocation == Location.None) continue;
+            collected.Add(symbolLocation);
+        }
+        return collected.ToArray();
     }
 
     // accumulatedClrPath threads verbatim navigation names so emitted lambdas hit real entity members;
@@ -228,6 +270,7 @@ internal static class NestedFilterResolver
         Compilation compilation,
         List<DiagnosticInfo> diagnosticsSink,
         HashSet<string> visitedFilterClasses,
+        Stack<Location?> nestedSiteStack,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -240,12 +283,21 @@ internal static class NestedFilterResolver
         if (!visitedFilterClasses.Add(targetClassFqn))
         {
             var cyclePath = string.Join(" -> ", visitedFilterClasses.Append(targetClassFqn));
+            // The currently-being-visited [MapNested] is the primary squiggle; every previously-
+            // pushed site on the DFS path becomes additional, in declaration order.
+            var pathLocations = new List<Location>();
+            foreach (var stackedLocation in nestedSiteStack.Reverse())
+            {
+                if (stackedLocation is not null) pathLocations.Add(stackedLocation);
+            }
             diagnosticsSink.Add(DiagnosticInfo.From(
                 DiagnosticDescriptors.NestedCycle,
                 originalNested.AttributeLocation?.ToLocation() ?? Location.None,
+                pathLocations.ToArray(),
                 cyclePath));
             return output;
         }
+        nestedSiteStack.Push(originalNested.AttributeLocation?.ToLocation());
 
         try
         {
@@ -272,7 +324,7 @@ internal static class NestedFilterResolver
             foreach (var transitive in target.NestedMappings)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var transitiveTarget = ResolveTargetForNested(transitive, targetEntitySymbol, allHostExtractionResults, diagnosticsSink);
+                var transitiveTarget = ResolveTargetForNested(transitive, targetEntitySymbol, compilation, allHostExtractionResults, diagnosticsSink);
                 if (transitiveTarget is null) continue;
 
                 output.AddRange(SpliceMappings(
@@ -284,6 +336,7 @@ internal static class NestedFilterResolver
                     compilation,
                     diagnosticsSink,
                     visitedFilterClasses,
+                    nestedSiteStack,
                     cancellationToken));
             }
         }
@@ -291,6 +344,7 @@ internal static class NestedFilterResolver
         {
             // Pop on exit so sibling branches can legitimately re-enter the same target.
             visitedFilterClasses.Remove(targetClassFqn);
+            nestedSiteStack.Pop();
         }
 
         return output;

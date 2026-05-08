@@ -7,21 +7,20 @@ namespace Filtering.Net.Generator.Tests.Diagnostics;
 public class Fn0018Tests
 {
     [Fact]
-    public void Generic_TFilterHasNoGenerateFilterAttribute_FiresFN0018()
+    public void AutoResolve_TwoCandidateFilters_FiresFN0018()
     {
         // Arrange
-        // FakeFilter has no [GenerateFilter<>], so it never appears as a host extraction result.
-        // The resolver's explicit-filter-class lookup misses and FN0018 fires.
         var source = """
             using Filtering.Net;
             namespace TestNs;
             public class Department { public string Name { get; set; } = ""; }
             public class User { public Department Department { get; set; } = new(); }
-            public class FakeFilter { }
+            [GenerateFilter<Department>] public partial class DepartmentFilterA { }
+            [GenerateFilter<Department>] public partial class DepartmentFilterB { }
             [GenerateFilter<User>]
             public partial class UserFilter
             {
-                [MapNested<FakeFilter>(nameof(User.Department))]
+                [MapNested(nameof(User.Department))]
                 private static partial void MapDepartment();
             }
             """;
@@ -34,7 +33,7 @@ public class Fn0018Tests
     }
 
     [Fact]
-    public void Generic_TFilterIsRealFilterClass_DoesNotFireFN0018()
+    public void Generic_DisambiguatesAmbiguity_DoesNotFireFN0018()
     {
         // Arrange
         var source = """
@@ -42,11 +41,12 @@ public class Fn0018Tests
             namespace TestNs;
             public class Department { public string Name { get; set; } = ""; }
             public class User { public Department Department { get; set; } = new(); }
-            [GenerateFilter<Department>] public partial class DeptFilter { }
+            [GenerateFilter<Department>] public partial class DepartmentFilterA { }
+            [GenerateFilter<Department>] public partial class DepartmentFilterB { }
             [GenerateFilter<User>]
             public partial class UserFilter
             {
-                [MapNested<DeptFilter>(nameof(User.Department))]
+                [MapNested<DepartmentFilterA>(nameof(User.Department))]
                 private static partial void MapDepartment();
             }
             """;
@@ -56,5 +56,31 @@ public class Fn0018Tests
 
         // Assert
         result.Diagnostics.Should().NotContain(diagnostic => diagnostic.Id == "FN0018");
+    }
+
+    [Fact]
+    public void NestedAmbiguous_ReportsBothCandidateFiltersAsAdditionalLocations()
+    {
+        // Arrange
+        var source = """
+            using Filtering.Net;
+            namespace TestNs;
+            public class Department { public string Name { get; set; } = ""; }
+            public class User { public Department Department { get; set; } = new(); }
+            [GenerateFilter<Department>] public partial class DepartmentFilterA { }
+            [GenerateFilter<Department>] public partial class DepartmentFilterB { }
+            [GenerateFilter<User>]
+            public partial class UserFilter
+            {
+                [MapNested(nameof(User.Department))]
+                private static partial void MapDepartment();
+            }
+            """;
+
+        // Act
+        // (no separate act step — AssertDiagnosticHasAdditionalLocations is the verification)
+
+        // Assert
+        DiagnosticTestHelpers.AssertDiagnosticHasAdditionalLocations(source, "FN0018", expectedAdditionalCount: 2);
     }
 }

@@ -1,10 +1,10 @@
 namespace Filtering.Net.Generator.Tests.Diagnostics;
 
-/// <summary>Tests for FN0004 (PropertyNotFound): [Map] references a property that doesn't exist on the entity.</summary>
+/// <summary>Tests for FN0004 (IncompatibleProfile): explicit Profile = typeof(...) doesn't match the property's CLR type.</summary>
 public class Fn0004Tests
 {
     [Fact]
-    public void PropertyNameNotOnEntity_FiresFN0004()
+    public void Int32FilterOnStringProperty_FiresFN0004()
     {
         // Arrange
         var source = """
@@ -14,8 +14,8 @@ public class Fn0004Tests
             [GenerateFilter<User>]
             public partial class UserFilter
             {
-                [Map("DoesNotExist")]
-                private static partial void MapBad();
+                [Map(nameof(User.Name), Profile = typeof(Int32Filter))]
+                private static partial void MapName();
             }
             """;
 
@@ -27,7 +27,7 @@ public class Fn0004Tests
     }
 
     [Fact]
-    public void PropertyExists_DoesNotFireFN0004()
+    public void StringFilterOnStringProperty_DoesNotFireFN0004()
     {
         // Arrange
         var source = """
@@ -37,7 +37,7 @@ public class Fn0004Tests
             [GenerateFilter<User>]
             public partial class UserFilter
             {
-                [Map(nameof(User.Name))]
+                [Map(nameof(User.Name), Profile = typeof(StringFilter))]
                 private static partial void MapName();
             }
             """;
@@ -47,5 +47,34 @@ public class Fn0004Tests
 
         // Assert
         DiagnosticTestHelpers.AssertNoDiagnostic(source, "FN0004");
+    }
+
+    [Fact]
+    public void IncompatibleProfile_MetadataProfile_DoesNotCarryAdditionalLocation()
+    {
+        // Arrange — FN0004 only fires for built-in profile mismatches (IsCompatible defaults to
+        // true for source-defined profiles); built-in profiles live in metadata, so their
+        // Locations.FirstOrDefault() carries Kind=MetadataFile, which LocationInfo.FromLocation
+        // filters out (metadata locations cannot survive a Location.Create round-trip). The
+        // additional-location count is therefore 0 in practice — the audit's intent (point at the
+        // profile declaration) is unrealisable until the resolver can synthesise a source-side
+        // hint for metadata profiles.
+        var source = """
+            using Filtering.Net;
+            namespace TestNs;
+            public class User { public string Name { get; set; } = ""; }
+            [GenerateFilter<User>]
+            public partial class UserFilter
+            {
+                [Map(nameof(User.Name), Profile = typeof(Int32Filter))]
+                private static partial void MapName();
+            }
+            """;
+
+        // Act
+        // (no separate act step — AssertDiagnosticHasAdditionalLocations is the verification)
+
+        // Assert
+        DiagnosticTestHelpers.AssertDiagnosticHasAdditionalLocations(source, "FN0004", expectedAdditionalCount: 0);
     }
 }

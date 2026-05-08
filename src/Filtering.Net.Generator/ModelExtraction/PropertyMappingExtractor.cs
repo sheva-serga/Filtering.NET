@@ -31,9 +31,14 @@ internal static class PropertyMappingExtractor
         var propertySymbol = resolution.LeafProperty;
         if (propertySymbol is null)
         {
+            var entityLocation = entityType.Locations.FirstOrDefault();
+            var additionalLocations = entityLocation is not null
+                ? new[] { entityLocation }
+                : Array.Empty<Location>();
             diagnostics.Add(DiagnosticInfo.From(
                 DiagnosticDescriptors.PropertyNotFound,
                 mapLocation,
+                additionalLocations,
                 propertyName!,
                 entityType.ToDisplayString()));
             return new PropertyMappingExtractionResult(Model: null, Diagnostics: diagnostics);
@@ -98,9 +103,14 @@ internal static class PropertyMappingExtractor
             resolvedProfileSymbol = explicitProfile;
             if (!ProfileResolver.IsCompatible(propertySymbol.Type, resolvedProfile.ProfileFullName))
             {
+                var profileLocation = explicitProfile.Locations.FirstOrDefault();
+                var additionalLocations = profileLocation is not null
+                    ? new[] { profileLocation }
+                    : Array.Empty<Location>();
                 diagnostics.Add(DiagnosticInfo.From(
                     DiagnosticDescriptors.IncompatibleProfile,
                     mapLocation,
+                    additionalLocations,
                     resolvedProfile.ProfileFullName,
                     propertyName!,
                     propertyClrType));
@@ -111,9 +121,20 @@ internal static class PropertyMappingExtractor
             var candidates = ProfileResolver.ResolveCandidates(propertySymbol.Type, profileIndex);
             if (candidates.Count > 1)
             {
+                var candidateLocations = new List<Location>(candidates.Count);
+                foreach (var candidateFullName in candidates.ProfileFullNames)
+                {
+                    var candidateSymbol = compilation.GetTypeByMetadataName(candidateFullName);
+                    var candidateLocation = candidateSymbol?.Locations.FirstOrDefault();
+                    if (candidateLocation is not null)
+                    {
+                        candidateLocations.Add(candidateLocation);
+                    }
+                }
                 diagnostics.Add(DiagnosticInfo.From(
                     DiagnosticDescriptors.AmbiguousProfile,
                     mapLocation,
+                    candidateLocations.ToArray(),
                     propertyName!,
                     propertyClrType,
                     string.Join(", ", candidates.ProfileFullNames)));
@@ -141,9 +162,14 @@ internal static class PropertyMappingExtractor
 
             if (resolvedProfile is null)
             {
+                var entityPropertyLocation = propertySymbol.Locations.FirstOrDefault();
+                var additionalLocations = entityPropertyLocation is not null
+                    ? new[] { entityPropertyLocation }
+                    : Array.Empty<Location>();
                 diagnostics.Add(DiagnosticInfo.From(
                     DiagnosticDescriptors.NoInferableProfile,
                     mapLocation,
+                    additionalLocations,
                     propertyName!,
                     propertyClrType));
                 return new PropertyMappingExtractionResult(Model: null, Diagnostics: diagnostics);

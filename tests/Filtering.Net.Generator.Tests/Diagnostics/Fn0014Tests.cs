@@ -3,28 +3,19 @@ namespace Filtering.Net.Generator.Tests.Diagnostics;
 public class Fn0014Tests
 {
     [Fact]
-    public void TwoProfilesForSameIntType_FiresFN0014()
+    public void StandaloneProfileWithScalarOperator_AndNoTryGetValue_FiresFN0014()
     {
-        // Arrange — Filtering.Net already ships [FilterProfile<int>] (Int32Filter); the
-        // hand-written profile below makes int an ambiguous match on a [Map] without an
-        // explicit Profile = typeof(...).
+        // Arrange
         var source = """
             using System;
             using System.Linq.Expressions;
             using Filtering.Net;
             namespace TestNs;
-            [FilterProfile<int>]
-            public static class MyIntFilter
+            [FilterProfile<string>]
+            public static class CustomProfile
             {
                 [FilterOperator("eq")]
-                public static Expression<Func<int, int, bool>> Eq => (column, value) => column == value;
-            }
-            public class User { public int Id { get; set; } }
-            [GenerateFilter<User>]
-            public partial class UserFilter
-            {
-                [Map(nameof(User.Id))]
-                private static partial void MapId();
+                public static Expression<Func<string, string, bool>> Eq => (column, value) => column == value;
             }
             """;
 
@@ -34,32 +25,184 @@ public class Fn0014Tests
     }
 
     [Fact]
-    public void HandWrittenEnumProfileCollidesWithAutoEmitted_FiresFN0014()
+    public void StandaloneProfileWithInOperator_AndNoTryGetArray_FiresFN0014()
+    {
+        // Arrange
+        var source = """
+            using System;
+            using System.Linq;
+            using System.Linq.Expressions;
+            using System.Text.Json;
+            using Filtering.Net;
+            namespace TestNs;
+            [FilterProfile<string>]
+            public static class CustomProfile
+            {
+                [FilterOperator("in")]
+                public static Expression<Func<string, string[], bool>> In => (column, values) => values.Contains(column);
+
+                public static bool TryGetValue(JsonElement element, out string value, out string error)
+                {
+                    value = ""; error = ""; return true;
+                }
+                // Missing TryGetArray.
+            }
+            """;
+
+        // Act
+        // Assert
+        DiagnosticTestHelpers.AssertDiagnostic(source, "FN0014");
+    }
+
+    [Fact]
+    public void StandaloneProfileWithBothExtractors_DoesNotFireFN0014()
+    {
+        // Arrange
+        var source = """
+            using System;
+            using System.Linq;
+            using System.Linq.Expressions;
+            using System.Text.Json;
+            using Filtering.Net;
+            namespace TestNs;
+            [FilterProfile<string>]
+            public static class CustomProfile
+            {
+                [FilterOperator("eq")]
+                public static Expression<Func<string, string, bool>> Eq => (column, value) => column == value;
+
+                [FilterOperator("in")]
+                public static Expression<Func<string, string[], bool>> In => (column, values) => values.Contains(column);
+
+                public static bool TryGetValue(JsonElement element, out string value, out string error)
+                {
+                    value = ""; error = ""; return true;
+                }
+
+                public static bool TryGetArray(JsonElement element, out string[] values, out string error)
+                {
+                    values = []; error = ""; return true;
+                }
+            }
+            """;
+
+        // Act
+        // Assert
+        DiagnosticTestHelpers.AssertNoDiagnostic(source, "FN0014");
+    }
+
+    [Fact]
+    public void ProfileWithBasedOn_DoesNotFireFN0014_EvenWithoutOwnExtractors()
     {
         // Arrange
         var source = """
             using System;
             using System.Linq.Expressions;
             using Filtering.Net;
-
             namespace TestNs;
+            [FilterProfile<string>(BasedOn = typeof(StringFilter))]
+            public static class DerivedProfile
+            {
+                [FilterOperator("fuzzy")]
+                public static Expression<Func<string, string, bool>> Fuzzy => (column, value) => column.Contains(value);
+            }
+            """;
 
-            public enum UserStatus { Active, Closed }
+        // Act
+        // Assert
+        DiagnosticTestHelpers.AssertNoDiagnostic(source, "FN0014");
+    }
 
-            [FilterProfile<UserStatus>]
-            public static class MyUserStatusFilter
+    [Fact]
+    public void StandaloneProfileWithOnlyIsNullOperator_DoesNotFireFN0014()
+    {
+        // Arrange — isNull is None-shape and uses neither TryGetValue nor TryGetArray.
+        var source = """
+            using System;
+            using System.Linq.Expressions;
+            using Filtering.Net;
+            namespace TestNs;
+            [FilterProfile<string>]
+            public static class IsNullOnlyProfile
+            {
+                [FilterOperator("isNull")]
+                public static Expression<Func<string, bool>> IsNull => column => column == null;
+            }
+            """;
+
+        // Act
+        // Assert
+        DiagnosticTestHelpers.AssertNoDiagnostic(source, "FN0014");
+    }
+
+    [Fact]
+    public void StandaloneProfileWithNoOperators_DoesNotFireFN0014()
+    {
+        // Arrange
+        var source = """
+            using Filtering.Net;
+            namespace TestNs;
+            [FilterProfile<string>]
+            public static class EmptyProfile { }
+            """;
+
+        // Act
+        // Assert
+        DiagnosticTestHelpers.AssertNoDiagnostic(source, "FN0014");
+    }
+
+    [Fact]
+    public void StandaloneProfileWithScalarAndIn_AndOnlyTryGetValue_FiresFN0014ForTryGetArray()
+    {
+        // Arrange
+        var source = """
+            using System;
+            using System.Linq;
+            using System.Linq.Expressions;
+            using System.Text.Json;
+            using Filtering.Net;
+            namespace TestNs;
+            [FilterProfile<string>]
+            public static class CustomProfile
             {
                 [FilterOperator("eq")]
-                public static Expression<Func<UserStatus, UserStatus, bool>> Eq => (column, value) => column == value;
+                public static Expression<Func<string, string, bool>> Eq => (column, value) => column == value;
+
+                [FilterOperator("in")]
+                public static Expression<Func<string, string[], bool>> In => (column, values) => values.Contains(column);
+
+                public static bool TryGetValue(JsonElement element, out string value, out string error)
+                {
+                    value = ""; error = ""; return true;
+                }
             }
+            """;
 
-            public class User { public UserStatus Status { get; set; } }
+        // Act
+        // Assert
+        DiagnosticTestHelpers.AssertDiagnostic(source, "FN0014");
+    }
 
-            [GenerateFilter<User>]
-            public partial class UserFilter
+    [Fact]
+    public void StandaloneProfileWithNonStaticTryGetValue_FiresFN0014()
+    {
+        // Arrange — public static is the contract; instance methods don't count.
+        var source = """
+            using System;
+            using System.Linq.Expressions;
+            using System.Text.Json;
+            using Filtering.Net;
+            namespace TestNs;
+            [FilterProfile<string>]
+            public class CustomProfile
             {
-                [Map(nameof(User.Status))]
-                private static partial void MapStatus();
+                [FilterOperator("eq")]
+                public static Expression<Func<string, string, bool>> Eq => (column, value) => column == value;
+
+                public bool TryGetValue(JsonElement element, out string value, out string error)
+                {
+                    value = ""; error = ""; return true;
+                }
             }
             """;
 

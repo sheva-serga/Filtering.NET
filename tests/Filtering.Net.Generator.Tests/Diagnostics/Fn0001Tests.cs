@@ -178,4 +178,56 @@ public class Fn0001Tests
         // Assert
         DiagnosticTestHelpers.AssertNoDiagnostic(source, "FN0001");
     }
+
+    [Fact]
+    public void TwoSortableMapsForSameProperty_FiresFN0001NotFN0002()
+    {
+        // Arrange
+        var source = """
+            using Filtering.Net;
+            namespace TestNs;
+            public class User { public string Name { get; set; } = ""; }
+            [GenerateFilter<User>]
+            public partial class UserFilter
+            {
+                [Map(nameof(User.Name), Sortable = true)]
+                private static partial void MapNameOne();
+                [Map(nameof(User.Name), Sortable = true)]
+                private static partial void MapNameTwo();
+            }
+            """;
+
+        // Act
+        var diagnostics = DiagnosticTestHelpers.GetDiagnostics(source);
+
+        // Assert
+        var observedIds = diagnostics.Select(diagnostic => diagnostic.Id).ToList();
+        observedIds.Should().Contain("FN0001");
+        observedIds.Should().NotContain("FN0002");
+    }
+
+    [Fact]
+    public void DuplicateMap_ReportsPriorMapAsAdditionalLocation()
+    {
+        // Arrange
+        var source = """
+            using Filtering.Net;
+            namespace TestNs;
+            public class User { public string Name { get; set; } = ""; }
+            [GenerateFilter<User>]
+            public partial class UserFilter
+            {
+                [Map(nameof(User.Name))]
+                private static partial void MapNameFirst();
+                [Map(nameof(User.Name))]
+                private static partial void MapNameSecond();
+            }
+            """;
+
+        // Act
+        // (no separate act step — AssertDiagnosticHasAdditionalLocations is the verification)
+
+        // Assert
+        DiagnosticTestHelpers.AssertDiagnosticHasAdditionalLocations(source, "FN0001", expectedAdditionalCount: 1);
+    }
 }

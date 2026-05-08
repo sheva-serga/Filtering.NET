@@ -3,19 +3,20 @@ namespace Filtering.Net.Generator.Tests.Diagnostics;
 public class Fn0010Tests
 {
     [Fact]
-    public void FilterOperatorOnInstanceMember_FiresFN0010()
+    public void AliasMatchesAnotherPropertyName_FiresFN0010()
     {
         // Arrange
         var source = """
-            using System;
-            using System.Linq.Expressions;
             using Filtering.Net;
             namespace TestNs;
-            [FilterProfile<string>]
-            public class CustomProfile
+            public class User { public string Name { get; set; } = ""; public string Nickname { get; set; } = ""; }
+            [GenerateFilter<User>]
+            public partial class UserFilter
             {
-                [FilterOperator("eq")]
-                public Expression<Func<string, string, bool>> Eq => (column, value) => column == value;
+                [Map(nameof(User.Name))]
+                private static partial void MapName();
+                [Map(nameof(User.Nickname), Alias = "name")]
+                private static partial void MapNickname();
             }
             """;
 
@@ -25,19 +26,20 @@ public class Fn0010Tests
     }
 
     [Fact]
-    public void FilterOperatorOnPrivateStaticMember_FiresFN0010()
+    public void TwoAliasesIdentical_FiresFN0010()
     {
-        // Arrange — public is also required, not just static.
+        // Arrange
         var source = """
-            using System;
-            using System.Linq.Expressions;
             using Filtering.Net;
             namespace TestNs;
-            [FilterProfile<string>]
-            public static class CustomProfile
+            public class User { public string Name { get; set; } = ""; public string Nickname { get; set; } = ""; }
+            [GenerateFilter<User>]
+            public partial class UserFilter
             {
-                [FilterOperator("eq")]
-                private static Expression<Func<string, string, bool>> Eq => (column, value) => column == value;
+                [Map(nameof(User.Name), Alias = "title")]
+                private static partial void MapName();
+                [Map(nameof(User.Nickname), Alias = "TITLE")]
+                private static partial void MapNickname();
             }
             """;
 
@@ -47,24 +49,48 @@ public class Fn0010Tests
     }
 
     [Fact]
-    public void FilterOperatorOnPublicStaticMember_DoesNotFireFN0010()
+    public void DistinctAliases_DoesNotFireFN0010()
     {
         // Arrange
         var source = """
-            using System;
-            using System.Linq.Expressions;
             using Filtering.Net;
             namespace TestNs;
-            [FilterProfile<string>]
-            public static class CustomProfile
+            public class User { public string Name { get; set; } = ""; public string Nickname { get; set; } = ""; }
+            [GenerateFilter<User>]
+            public partial class UserFilter
             {
-                [FilterOperator("eq")]
-                public static Expression<Func<string, string, bool>> Eq => (column, value) => column == value;
+                [Map(nameof(User.Name), Alias = "fullName")]
+                private static partial void MapName();
+                [Map(nameof(User.Nickname), Alias = "shortName")]
+                private static partial void MapNickname();
             }
             """;
 
         // Act
         // Assert
         DiagnosticTestHelpers.AssertNoDiagnostic(source, "FN0010");
+    }
+
+    [Fact]
+    public void AliasCollision_ReportsCollidingPropertyAsAdditionalLocation()
+    {
+        // Arrange — 2-site collision: Nickname's alias collides with Name's property name.
+        var source = """
+            using Filtering.Net;
+            namespace TestNs;
+            public class User { public string Name { get; set; } = ""; public string Nickname { get; set; } = ""; }
+            [GenerateFilter<User>]
+            public partial class UserFilter
+            {
+                [Map(nameof(User.Name))]
+                private static partial void MapName();
+                [Map(nameof(User.Nickname), Alias = "name")]
+                private static partial void MapNickname();
+            }
+            """;
+
+        // Act
+        // Assert
+        DiagnosticTestHelpers.AssertDiagnosticHasAdditionalLocations(source, "FN0010", expectedAdditionalCount: 1);
     }
 }

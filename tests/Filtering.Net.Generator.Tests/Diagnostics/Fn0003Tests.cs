@@ -1,10 +1,10 @@
 namespace Filtering.Net.Generator.Tests.Diagnostics;
 
-/// <summary>Tests for FN0003 (MapAndPropertyMapBoth): a property declared on both [Map] and [PropertyMap].</summary>
+/// <summary>Tests for FN0003 (PropertyNotFound): [Map] references a property that doesn't exist on the entity.</summary>
 public class Fn0003Tests
 {
     [Fact]
-    public void MapAndPropertyMapForSameProperty_FiresFN0003()
+    public void PropertyNameNotOnEntity_FiresFN0003()
     {
         // Arrange
         var source = """
@@ -14,10 +14,8 @@ public class Fn0003Tests
             [GenerateFilter<User>]
             public partial class UserFilter
             {
-                [Map(nameof(User.Name))]
-                private static partial void MapName();
-                [PropertyMap(nameof(User.Name))]
-                private static void OverrideName(FilterRuleBuilder<User, string> rule) { }
+                [Map("DoesNotExist")]
+                private static partial void MapBad();
             }
             """;
 
@@ -29,7 +27,7 @@ public class Fn0003Tests
     }
 
     [Fact]
-    public void MapOnly_DoesNotFireFN0003()
+    public void PropertyExists_DoesNotFireFN0003()
     {
         // Arrange
         var source = """
@@ -49,5 +47,28 @@ public class Fn0003Tests
 
         // Assert
         DiagnosticTestHelpers.AssertNoDiagnostic(source, "FN0003");
+    }
+
+    [Fact]
+    public void PropertyNotFound_ReportsHostEntityAsAdditionalLocation()
+    {
+        // Arrange
+        var source = """
+            using Filtering.Net;
+            namespace TestNs;
+            public class User { public string Name { get; set; } = ""; }
+            [GenerateFilter<User>]
+            public partial class UserFilter
+            {
+                [Map("DoesNotExist")]
+                private static partial void MapBad();
+            }
+            """;
+
+        // Act
+        // (no separate act step — AssertDiagnosticHasAdditionalLocations is the verification)
+
+        // Assert
+        DiagnosticTestHelpers.AssertDiagnosticHasAdditionalLocations(source, "FN0003", expectedAdditionalCount: 1);
     }
 }

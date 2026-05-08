@@ -39,7 +39,9 @@ internal static class ProfileExtractor
 
         var profileFullName = profileSymbol.ToDisplayString();
         var operatorNames = new List<string>();
-        var seenOperatorNames = new HashSet<string>(StringComparer.Ordinal);
+        // Tracks first-occurrence location per operator name so a subsequent duplicate diagnostic
+        // can point at the original declaration via additionalLocations.
+        var firstOperatorLocation = new Dictionary<string, Location?>(StringComparer.Ordinal);
 
         // When EF Core is referenced, any EF.Functions.* call is translatable — including custom
         // extensions like npgsql's TrigramsAreSimilar that aren't in the static allow-list.
@@ -73,16 +75,22 @@ internal static class ProfileExtractor
             if (operatorAttribute.ConstructorArguments.Length > 0
                 && operatorAttribute.ConstructorArguments[0].Value is string operatorName)
             {
-                if (seenOperatorNames.Add(operatorName))
+                var memberLocation = member.Locations.FirstOrDefault();
+                if (!firstOperatorLocation.ContainsKey(operatorName))
                 {
                     operatorNames.Add(operatorName);
+                    firstOperatorLocation[operatorName] = memberLocation;
                 }
                 else
                 {
-                    // FN0016: first occurrence is silent; subsequent duplicates fire on their location.
+                    var firstLocation = firstOperatorLocation[operatorName];
+                    var additionalLocations = firstLocation is not null
+                        ? new[] { firstLocation }
+                        : Array.Empty<Location>();
                     diagnostics.Add(DiagnosticInfo.From(
                         DiagnosticDescriptors.DuplicateOperatorOnProfile,
-                        member.Locations.FirstOrDefault(),
+                        memberLocation,
+                        additionalLocations,
                         operatorName,
                         profileFullName));
                 }
@@ -179,9 +187,14 @@ internal static class ProfileExtractor
                 attributeData.AttributeClass?.OriginalDefinition?.ToDisplayString() == FilterProfileAttributeFullName);
             if (!basedOnHasProfileAttr)
             {
+                var basedOnLocation = basedOnType.Locations.FirstOrDefault();
+                var additionalLocations = basedOnLocation is not null && basedOnLocation != Location.None
+                    ? new[] { basedOnLocation }
+                    : Array.Empty<Location>();
                 diagnostics.Add(DiagnosticInfo.From(
                     DiagnosticDescriptors.InvalidBaseProfile,
                     profileSymbol.Locations.FirstOrDefault(),
+                    additionalLocations,
                     basedOnType.ToDisplayString()));
             }
         }

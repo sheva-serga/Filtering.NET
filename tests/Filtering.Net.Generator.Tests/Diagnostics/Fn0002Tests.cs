@@ -1,12 +1,10 @@
-using AwesomeAssertions;
-
 namespace Filtering.Net.Generator.Tests.Diagnostics;
 
-/// <summary>Tests for FN0002 (DuplicateSortable): two [Map] entries for the same property both set Sortable=true.</summary>
+/// <summary>Tests for FN0002 (MapAndPropertyMapBoth): a property declared on both [Map] and [PropertyMap].</summary>
 public class Fn0002Tests
 {
     [Fact]
-    public void TwoSortableMapsForSameProperty_FiresFN0002()
+    public void MapAndPropertyMapForSameProperty_FiresFN0002()
     {
         // Arrange
         var source = """
@@ -16,10 +14,10 @@ public class Fn0002Tests
             [GenerateFilter<User>]
             public partial class UserFilter
             {
-                [Map(nameof(User.Name), Sortable = true)]
-                private static partial void MapNameOne();
-                [Map(nameof(User.Name), Sortable = true)]
-                private static partial void MapNameTwo();
+                [Map(nameof(User.Name))]
+                private static partial void MapName();
+                [PropertyMap(nameof(User.Name))]
+                private static void OverrideName(FilterRuleBuilder<User, string> rule) { }
             }
             """;
 
@@ -31,35 +29,7 @@ public class Fn0002Tests
     }
 
     [Fact]
-    public void DuplicateNonSortable_FiresFN0001NotFN0002()
-    {
-        // Arrange
-        // When both duplicates are NOT sortable=true we want the general FN0001, never FN0002.
-        var source = """
-            using Filtering.Net;
-            namespace TestNs;
-            public class User { public string Name { get; set; } = ""; }
-            [GenerateFilter<User>]
-            public partial class UserFilter
-            {
-                [Map(nameof(User.Name))]
-                private static partial void MapNameOne();
-                [Map(nameof(User.Name))]
-                private static partial void MapNameTwo();
-            }
-            """;
-
-        // Act
-        var result = GeneratorRunner.RunDriver(source, excludeDiAbstractions: false).GetRunResult();
-
-        // Assert
-        var ids = result.Diagnostics.Select(diagnostic => diagnostic.Id).ToList();
-        ids.Should().Contain("FN0001");
-        ids.Should().NotContain("FN0002");
-    }
-
-    [Fact]
-    public void SingleSortableMap_DoesNotFireFN0002()
+    public void MapOnly_DoesNotFireFN0002()
     {
         // Arrange
         var source = """
@@ -69,7 +39,7 @@ public class Fn0002Tests
             [GenerateFilter<User>]
             public partial class UserFilter
             {
-                [Map(nameof(User.Name), Sortable = true)]
+                [Map(nameof(User.Name))]
                 private static partial void MapName();
             }
             """;
@@ -79,5 +49,30 @@ public class Fn0002Tests
 
         // Assert
         DiagnosticTestHelpers.AssertNoDiagnostic(source, "FN0002");
+    }
+
+    [Fact]
+    public void MapAndPropertyMapBoth_ReportsCollidingMapAsAdditionalLocation()
+    {
+        // Arrange
+        var source = """
+            using Filtering.Net;
+            namespace TestNs;
+            public class User { public string Name { get; set; } = ""; }
+            [GenerateFilter<User>]
+            public partial class UserFilter
+            {
+                [Map(nameof(User.Name))]
+                private static partial void MapName();
+                [PropertyMap(nameof(User.Name))]
+                private static void OverrideName(FilterRuleBuilder<User, string> rule) { }
+            }
+            """;
+
+        // Act
+        // (no separate act step — AssertDiagnosticHasAdditionalLocations is the verification)
+
+        // Assert
+        DiagnosticTestHelpers.AssertDiagnosticHasAdditionalLocations(source, "FN0002", expectedAdditionalCount: 1);
     }
 }

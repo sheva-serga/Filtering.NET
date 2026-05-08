@@ -3,15 +3,19 @@ namespace Filtering.Net.Generator.Tests.Diagnostics;
 public class Fn0012Tests
 {
     [Fact]
-    public void BasedOnReferencesNonProfile_FiresFN0012()
+    public void InterceptValueWithoutMap_FiresFN0012()
     {
         // Arrange
         var source = """
             using Filtering.Net;
             namespace TestNs;
-            public class NotAProfile { }
-            [FilterProfile<string>(BasedOn = typeof(NotAProfile))]
-            public static class CustomProfile { }
+            public class User { public string Name { get; set; } = ""; }
+            [GenerateFilter<User>]
+            public partial class UserFilter
+            {
+                [InterceptValue(nameof(User.Name))]
+                private static string TrimName(string value) => value.Trim();
+            }
             """;
 
         // Act
@@ -20,32 +24,21 @@ public class Fn0012Tests
     }
 
     [Fact]
-    public void BasedOnReferencesAnotherProfile_DoesNotFireFN0012()
+    public void InterceptValueWithMatchingMap_DoesNotFireFN0012()
     {
         // Arrange
         var source = """
             using Filtering.Net;
             namespace TestNs;
-            [FilterProfile<string>]
-            public static class BaseProfile { }
-            [FilterProfile<string>(BasedOn = typeof(BaseProfile))]
-            public static class DerivedProfile { }
-            """;
-
-        // Act
-        // Assert
-        DiagnosticTestHelpers.AssertNoDiagnostic(source, "FN0012");
-    }
-
-    [Fact]
-    public void NoBasedOn_DoesNotFireFN0012()
-    {
-        // Arrange
-        var source = """
-            using Filtering.Net;
-            namespace TestNs;
-            [FilterProfile<string>]
-            public static class StandaloneProfile { }
+            public class User { public string Name { get; set; } = ""; }
+            [GenerateFilter<User>]
+            public partial class UserFilter
+            {
+                [Map(nameof(User.Name))]
+                private static partial void MapName();
+                [InterceptValue(nameof(User.Name))]
+                private static string TrimName(string value) => value.Trim();
+            }
             """;
 
         // Act

@@ -54,7 +54,7 @@ public class ExtractionTests
     }
 
     [Fact]
-    public void RunDriver_PropertyNotFoundOnEntity_EmitsFN0004()
+    public void RunDriver_PropertyNotFoundOnEntity_EmitsFN0003()
     {
         // Arrange
         var consumerSource = """
@@ -73,6 +73,6 @@ public class ExtractionTests
         var generatorRunResult = GeneratorRunner.RunDriver(consumerSource, excludeDiAbstractions: false).GetRunResult();
 
         // Assert
-        generatorRunResult.Diagnostics.Select(diagnostic => diagnostic.Id).Should().Contain("FN0004");
+        generatorRunResult.Diagnostics.Select(diagnostic => diagnostic.Id).Should().Contain("FN0003");
     }
 }

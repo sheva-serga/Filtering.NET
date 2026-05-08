@@ -7,7 +7,7 @@ namespace Filtering.Net.Generator.Tests.Diagnostics;
 public class Fn0019Tests
 {
     [Fact]
-    public void AutoResolve_TwoCandidateFilters_FiresFN0019()
+    public void AutoResolve_NoCandidateFilters_FiresFN0019()
     {
         // Arrange
         var source = """
@@ -15,8 +15,6 @@ public class Fn0019Tests
             namespace TestNs;
             public class Department { public string Name { get; set; } = ""; }
             public class User { public Department Department { get; set; } = new(); }
-            [GenerateFilter<Department>] public partial class DepartmentFilterA { }
-            [GenerateFilter<Department>] public partial class DepartmentFilterB { }
             [GenerateFilter<User>]
             public partial class UserFilter
             {
@@ -33,7 +31,7 @@ public class Fn0019Tests
     }
 
     [Fact]
-    public void Generic_DisambiguatesAmbiguity_DoesNotFireFN0019()
+    public void AutoResolve_HasCandidate_DoesNotFireFN0019()
     {
         // Arrange
         var source = """
@@ -41,12 +39,11 @@ public class Fn0019Tests
             namespace TestNs;
             public class Department { public string Name { get; set; } = ""; }
             public class User { public Department Department { get; set; } = new(); }
-            [GenerateFilter<Department>] public partial class DepartmentFilterA { }
-            [GenerateFilter<Department>] public partial class DepartmentFilterB { }
+            [GenerateFilter<Department>] public partial class DepartmentFilter { }
             [GenerateFilter<User>]
             public partial class UserFilter
             {
-                [MapNested<DepartmentFilterA>(nameof(User.Department))]
+                [MapNested(nameof(User.Department))]
                 private static partial void MapDepartment();
             }
             """;
@@ -56,5 +53,30 @@ public class Fn0019Tests
 
         // Assert
         result.Diagnostics.Should().NotContain(diagnostic => diagnostic.Id == "FN0019");
+    }
+
+    [Fact]
+    public void NestedTargetNotFound_ReportsNavigationPropertyAsAdditionalLocation()
+    {
+        // Arrange — Department has no [GenerateFilter<>] partner so resolution finds zero candidates;
+        // the navigation property declaration is the lone additional location.
+        var source = """
+            using Filtering.Net;
+            namespace TestNs;
+            public class Department { public string Name { get; set; } = ""; }
+            public class User { public Department Department { get; set; } = new(); }
+            [GenerateFilter<User>]
+            public partial class UserFilter
+            {
+                [MapNested(nameof(User.Department))]
+                private static partial void MapDepartment();
+            }
+            """;
+
+        // Act
+        // (no separate act step — AssertDiagnosticHasAdditionalLocations is the verification)
+
+        // Assert
+        DiagnosticTestHelpers.AssertDiagnosticHasAdditionalLocations(source, "FN0019", expectedAdditionalCount: 1);
     }
 }

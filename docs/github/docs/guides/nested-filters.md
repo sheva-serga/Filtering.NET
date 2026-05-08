@@ -37,7 +37,7 @@ Wire fields exposed by `UserFilter`: `name`, `department.id`, `department.name`.
 
 ## Auto-resolve vs explicit
 
-- `[MapNested(nameof(User.Department))]` — auto-resolves the unique `[GenerateFilter<Department>]` partial in the compilation. Two candidates → `FN0019`.
+- `[MapNested(nameof(User.Department))]` — auto-resolves the unique `[GenerateFilter<Department>]` partial in the compilation. Two candidates → `FN0018`.
 - `[MapNested<DepartmentFilter>(nameof(User.Department))]` — explicit, type-checked at the call site. Use when there are multiple filter classes for the same entity.
 
 ## Configuration knobs
@@ -49,16 +49,16 @@ Wire fields exposed by `UserFilter`: `name`, `department.id`, `department.name`.
 
 ## Transitive nesting
 
-Merge is recursive: if `DepartmentFilter` itself has `[MapNested(nameof(Department.Company))]`, then `UserFilter` exposes `department.company.*` paths automatically. Cycles are caught at compile time as `FN0017 NestedCycle`.
+Merge is recursive: if `DepartmentFilter` itself has `[MapNested(nameof(Department.Company))]`, then `UserFilter` exposes `department.company.*` paths automatically. Cycles are caught at compile time as `FN0016 NestedCycle`.
 
 ## v1 limitations
 
 - `[InterceptValue]` and `[PropertyMap]` overrides on the source filter do **not** propagate through `[MapNested]` splice in v1 — the spliced host calls into raw column accessors, not through the source filter's wrappers. Splice-through for these is a future-version follow-up.
-- Cross-assembly is unsupported in v1 — the target filter class must live in the same compilation. `FN0018 NestedCrossAssembly`.
-- Collection navigations (`User.Posts: List<Post>`) are unsupported in v1 — `FN0022 NestedCollectionUnsupported`. Reference navigations only.
+- Cross-assembly is unsupported in v1 — the target filter class must live in the same compilation. `FN0017 NestedCrossAssembly`.
+- Collection navigations (`User.Posts: List<Post>`) are unsupported in v1 — `FN0021 NestedCollectionUnsupported`. Reference navigations only.
 - Duplicate paths across `[Map]`, `[PropertyMap]`, and `[MapNested]` produce `FN0001 DuplicateMapping` with all conflicting locations reported.
 
 ## See also
 
 - [Navigation paths and aliases](navigation-paths.md) — the per-column form.
-- [Diagnostics catalogue](../diagnostics/index.md) — `FN0017`–`FN0022`.
+- [Diagnostics catalogue](../diagnostics/index.md) — `FN0016`–`FN0021`.

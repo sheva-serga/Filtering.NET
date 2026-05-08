@@ -13,6 +13,9 @@ internal sealed record LocationInfo(string FilePath, TextSpan TextSpan, LinePosi
     {
         if (location is null) return null;
         if (location == Location.None) return null;
+        // MetadataFile locations (BCL types and referenced assemblies) cannot survive a
+        // Location.Create round-trip — their line span carries no usable path.
+        if (location.Kind == LocationKind.MetadataFile) return null;
         if (location.SourceTree is not null)
         {
             return new LocationInfo(

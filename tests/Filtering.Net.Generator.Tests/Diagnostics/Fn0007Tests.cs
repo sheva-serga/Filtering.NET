@@ -3,18 +3,19 @@ namespace Filtering.Net.Generator.Tests.Diagnostics;
 public class Fn0007Tests
 {
     [Fact]
-    public void MapMethodWithoutPartial_FiresFN0007()
+    public void CustomTypePropertyWithoutExplicitProfile_FiresFN0007()
     {
         // Arrange
         var source = """
             using Filtering.Net;
             namespace TestNs;
-            public class User { public string Name { get; set; } = ""; }
-            [GenerateFilter<User>]
-            public partial class UserFilter
+            public class Money { public decimal Amount { get; set; } public string Currency { get; set; } = ""; }
+            public class Order { public Money Total { get; set; } = new(); }
+            [GenerateFilter<Order>]
+            public partial class OrderFilter
             {
-                [Map(nameof(User.Name))]
-                private static void MapName() { }
+                [Map(nameof(Order.Total))]
+                private static partial void MapTotal();
             }
             """;
 
@@ -24,7 +25,7 @@ public class Fn0007Tests
     }
 
     [Fact]
-    public void MapMethodWithPartial_DoesNotFireFN0007()
+    public void StringPropertyWithoutExplicitProfile_DoesNotFireFN0007()
     {
         // Arrange
         var source = """
@@ -42,5 +43,29 @@ public class Fn0007Tests
         // Act
         // Assert
         DiagnosticTestHelpers.AssertNoDiagnostic(source, "FN0007");
+    }
+
+    [Fact]
+    public void NoInferableProfile_ReportsEntityPropertyAsAdditionalLocation()
+    {
+        // Arrange
+        var source = """
+            using Filtering.Net;
+            namespace TestNs;
+            public class Money { public decimal Amount { get; set; } public string Currency { get; set; } = ""; }
+            public class Order { public Money Total { get; set; } = new(); }
+            [GenerateFilter<Order>]
+            public partial class OrderFilter
+            {
+                [Map(nameof(Order.Total))]
+                private static partial void MapTotal();
+            }
+            """;
+
+        // Act
+        // (no separate act step — AssertDiagnosticHasAdditionalLocations is the verification)
+
+        // Assert
+        DiagnosticTestHelpers.AssertDiagnosticHasAdditionalLocations(source, "FN0007", expectedAdditionalCount: 1);
     }
 }

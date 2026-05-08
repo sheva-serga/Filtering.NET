@@ -1,38 +1,37 @@
 ---
 title: Diagnostics catalogue
-description: 30 analyzer rules — 22 errors (FN0001–FN0022) and 8 warnings (FN1001–FN1008).
+description: 29 analyzer rules — 21 errors (FN0001–FN0021) and 8 warnings (FN1001–FN1008).
 ---
 
 # Diagnostics catalogue
 
-Filtering.Net ships 30 compile-time analyzer rules — 22 errors (`FN0001`–`FN0022`) and 8 warnings (`FN1001`–`FN1008`). Both `dotnet build` and the IDE surface them; the rule's `helpLinkUri` brings you back to this page.
+Filtering.Net ships 29 compile-time analyzer rules — 21 errors (`FN0001`–`FN0021`) and 8 warnings (`FN1001`–`FN1008`). Both `dotnet build` and the IDE surface them; the rule's `helpLinkUri` brings you back to this page.
 
 ## Errors
 
 | Id | Rule | Trigger |
 |----|------|---------|
-| FN0001 | DuplicateMap | Property is mapped by multiple `[Map]` methods on the same filter class. |
-| FN0002 | DuplicateSortable | Property is marked `Sortable = true` on multiple `[Map]` methods. |
-| FN0003 | MapAndPropertyMapBoth | Property has both `[Map]` and `[PropertyMap]`. Use one or the other. |
-| FN0004 | PropertyNotFound | Property does not exist on the entity type passed to `[GenerateFilter<T>]`. |
-| FN0005 | IncompatibleProfile | Profile cannot be applied to the property's CLR type. |
-| FN0006 | UnknownOperator | Operator name is not declared by the resolved profile. |
-| FN0007 | MissingPartial | `[Map]` method is not declared `partial`. |
-| FN0008 | NoInferableProfile | Property's CLR type has no built-in primitive profile; specify `Profile = typeof(...)` explicitly. |
-| FN0009 | DuplicateInterceptor | Property has multiple `[InterceptValue]` declarations. |
-| FN0010 | NonStaticOperator | `[FilterOperator]` member must be `public static`. |
-| FN0011 | AliasCollision | Alias collides with another property or alias on the entity (case-insensitive). |
-| FN0012 | InvalidBaseProfile | `[FilterProfile(BasedOn = typeof(X))]` references a type not marked with `[FilterProfile]`. |
-| FN0013 | InterceptorWithoutMap | `[InterceptValue]` declared without a matching `[Map]` for the property. |
-| FN0014 | AmbiguousProfile | Property's CLR type matches multiple profiles; use `[Map(typeof(...))]` to pick one. |
-| FN0015 | ProfileMissingExtractor | Standalone `[FilterProfile]` is missing required extractor methods (`TryGetValue` / `TryGetArray`). |
-| FN0016 | DuplicateOperatorOnProfile | Operator name is declared more than once on the same profile. |
-| FN0017 | NestedCycle | `[MapNested]` introduces a cycle in the filter-inlining graph (e.g. `User.Manager: User`). |
-| FN0018 | NestedCrossAssembly | `[MapNested<T>]` references a filter class declared outside the current compilation. |
-| FN0019 | NestedAmbiguous | Auto-resolve `[MapNested(nameof(...))]` finds two or more `[GenerateFilter<TNav>]` candidates. |
-| FN0020 | NestedTargetNotFound | Auto-resolve finds zero `[GenerateFilter<TNav>]` candidates for the navigation target type. |
-| FN0021 | NestedNavigationInvalid | Named property doesn't exist, isn't a reference type, or is a primitive/value type. |
-| FN0022 | NestedCollectionUnsupported | Named navigation is a collection type; collection navigations are deferred to a future version. |
+| FN0001 | DuplicateMapping | Filter path is mapped by multiple sources (`[Map]`, `[PropertyMap]`, or `[MapNested]`) on the same filter class. |
+| FN0002 | MapAndPropertyMapBoth | Property has both `[Map]` and `[PropertyMap]`. Use one or the other. |
+| FN0003 | PropertyNotFound | Property does not exist on the entity type passed to `[GenerateFilter<T>]`. |
+| FN0004 | IncompatibleProfile | Profile cannot be applied to the property's CLR type. |
+| FN0005 | UnknownOperator | Operator name is not declared by the resolved profile. |
+| FN0006 | MissingPartial | `[Map]` method is not declared `partial`. |
+| FN0007 | NoInferableProfile | Property's CLR type has no built-in primitive profile; specify `Profile = typeof(...)` explicitly. |
+| FN0008 | DuplicateInterceptor | Property has multiple `[InterceptValue]` declarations. |
+| FN0009 | NonStaticOperator | `[FilterOperator]` member must be `public static`. |
+| FN0010 | AliasCollision | Alias collides with another property or alias on the entity (case-insensitive). |
+| FN0011 | InvalidBaseProfile | `[FilterProfile(BasedOn = typeof(X))]` references a type not marked with `[FilterProfile]`. |
+| FN0012 | InterceptorWithoutMap | `[InterceptValue]` declared without a matching `[Map]` for the property. |
+| FN0013 | AmbiguousProfile | Property's CLR type matches multiple profiles; use `[Map(typeof(...))]` to pick one. |
+| FN0014 | ProfileMissingExtractor | Standalone `[FilterProfile]` is missing required extractor methods (`TryGetValue` / `TryGetArray`). |
+| FN0015 | DuplicateOperatorOnProfile | Operator name is declared more than once on the same profile. |
+| FN0016 | NestedCycle | `[MapNested]` introduces a cycle in the filter-inlining graph (e.g. `User.Manager: User`). |
+| FN0017 | NestedCrossAssembly | `[MapNested<T>]` references a filter class declared outside the current compilation. |
+| FN0018 | NestedAmbiguous | Auto-resolve `[MapNested(nameof(...))]` finds two or more `[GenerateFilter<TNav>]` candidates. |
+| FN0019 | NestedTargetNotFound | Auto-resolve finds zero `[GenerateFilter<TNav>]` candidates for the navigation target type. |
+| FN0020 | NestedNavigationInvalid | Named property doesn't exist, isn't a reference type, or is a primitive/value type. |
+| FN0021 | NestedCollectionUnsupported | Named navigation is a collection type; collection navigations are deferred to a future version. |
 
 ## Warnings
 

@@ -7,20 +7,21 @@ namespace Filtering.Net.Generator.Tests.Diagnostics;
 public class Fn0021Tests
 {
     [Fact]
-    public void NavigationDoesNotExistOnHostEntity_FiresFN0021()
+    public void NavigationIsCollection_FiresFN0021()
     {
         // Arrange
         var source = """
+            using System.Collections.Generic;
             using Filtering.Net;
             namespace TestNs;
-            public class Department { public string Name { get; set; } = ""; }
-            public class User { public string Email { get; set; } = ""; }
-            [GenerateFilter<Department>] public partial class DepartmentFilter { }
+            public class Post { public string Title { get; set; } = ""; }
+            public class User { public List<Post> Posts { get; set; } = new(); }
+            [GenerateFilter<Post>] public partial class PostFilter { }
             [GenerateFilter<User>]
             public partial class UserFilter
             {
-                [MapNested("Department")]
-                private static partial void MapDepartment();
+                [MapNested(nameof(User.Posts))]
+                private static partial void MapPosts();
             }
             """;
 
@@ -32,7 +33,7 @@ public class Fn0021Tests
     }
 
     [Fact]
-    public void ValidReferenceNavigation_DoesNotFireFN0021()
+    public void SingleReferenceNavigation_DoesNotFireFN0021()
     {
         // Arrange
         var source = """
@@ -54,5 +55,31 @@ public class Fn0021Tests
 
         // Assert
         result.Diagnostics.Should().NotContain(diagnostic => diagnostic.Id == "FN0021");
+    }
+
+    [Fact]
+    public void NestedCollectionUnsupported_ReportsCollectionNavigationAsAdditionalLocation()
+    {
+        // Arrange
+        var source = """
+            using System.Collections.Generic;
+            using Filtering.Net;
+            namespace TestNs;
+            public class Post { public string Title { get; set; } = ""; }
+            public class User { public List<Post> Posts { get; set; } = new(); }
+            [GenerateFilter<Post>] public partial class PostFilter { }
+            [GenerateFilter<User>]
+            public partial class UserFilter
+            {
+                [MapNested(nameof(User.Posts))]
+                private static partial void MapPosts();
+            }
+            """;
+
+        // Act
+        // (no separate act step — AssertDiagnosticHasAdditionalLocations is the verification)
+
+        // Assert
+        DiagnosticTestHelpers.AssertDiagnosticHasAdditionalLocations(source, "FN0021", expectedAdditionalCount: 1);
     }
 }

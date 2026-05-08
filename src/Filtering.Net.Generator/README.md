@@ -1,6 +1,6 @@
 # Filtering.Net.Generator
 
-Roslyn incremental source generator + 30-rule analyzer for [Filtering.Net](https://www.nuget.org/packages/Filtering.Net/). Emits typed `IFilterDefinition<T>` implementations and a DI extension at compile time. Catches translatable-method mistakes before EF Core sees them.
+Roslyn incremental source generator + 29-rule analyzer for [Filtering.Net](https://www.nuget.org/packages/Filtering.Net/). Emits typed `IFilterDefinition<T>` implementations and a DI extension at compile time. Catches translatable-method mistakes before EF Core sees them.
 
 This package is **analyzer-only** — it has no runtime DLL. Install it alongside `Filtering.Net`.
 
@@ -72,32 +72,31 @@ Then `[Map(nameof(User.Name), Profile = typeof(StringFilterPlus))]` and the new 
 
 ## Diagnostics
 
-30 rules total: 22 errors (`FN0001`–`FN0022`) and 8 warnings (`FN1001`–`FN1008`). The full catalogue with one-line summaries lives at the [diagnostics catalogue](https://sheva-serga.github.io/Filtering.NET/diagnostics/) on the docs site.
+29 rules total: 21 errors (`FN0001`–`FN0021`) and 8 warnings (`FN1001`–`FN1008`). The full catalogue with one-line summaries lives at the [diagnostics catalogue](https://sheva-serga.github.io/Filtering.NET/diagnostics/) on the docs site.
 
 | Id | Severity | Summary |
 |----|----------|---------|
-| FN0001 | Error | Property is mapped by multiple `[Map]` methods — each property must have at most one `[Map]` declaration. |
-| FN0002 | Error | Property is marked `Sortable = true` on multiple `[Map]` methods. |
-| FN0003 | Error | Property has both a `[Map]` and a `[PropertyMap]` — use one or the other. |
-| FN0004 | Error | Property referenced by `[Map]` or `[PropertyMap]` does not exist on the entity type. |
-| FN0005 | Error | Profile cannot be applied to the property — the profile's column type is incompatible with the property's CLR type. |
-| FN0006 | Error | Operator referenced in `For(...).Operator(...)` is not declared by the resolved profile. |
-| FN0007 | Error | `[Map]` method is not declared `partial` — the generator can only emit implementations for partial methods. |
-| FN0008 | Error | Property's CLR type has no built-in primitive profile; specify `Profile = typeof(...)` explicitly. |
-| FN0009 | Error | Property has multiple `[InterceptValue]` declarations. |
-| FN0010 | Error | `[FilterOperator]` member is not `public static`. |
-| FN0011 | Error | Alias collides with another property or alias on the entity (case-insensitive). |
-| FN0012 | Error | `[FilterProfile(BasedOn = typeof(...))]` references a type that is not marked with `[FilterProfile]`. |
-| FN0013 | Error | Property has `[InterceptValue]` but no matching `[Map]` declaration. |
-| FN0014 | Error | Property's CLR type is matched by multiple profiles — use `Profile = typeof(...)` on the `[Map]` to pick one. |
-| FN0015 | Error | Standalone profile has no `BasedOn` and is missing required extractor method(s). |
-| FN0016 | Error | Same operator name declared more than once on a single profile. |
-| FN0017 | Error | `[MapNested]` introduces a cycle in the filter-inlining graph. |
-| FN0018 | Error | `[MapNested<T>]` references a filter class declared outside the current compilation. |
-| FN0019 | Error | Auto-resolve `[MapNested]` finds two or more `[GenerateFilter<TNav>]` candidates. |
-| FN0020 | Error | Auto-resolve finds zero `[GenerateFilter<TNav>]` candidates for the navigation target type. |
-| FN0021 | Error | Named property doesn't exist, isn't a reference type, or is a primitive/value type. |
-| FN0022 | Error | Named navigation is a collection type; collection navigations are deferred to a future version. |
+| FN0001 | Error | Filter path is mapped by multiple sources (`[Map]`, `[PropertyMap]`, or `[MapNested]`) on the same filter class. |
+| FN0002 | Error | Property has both a `[Map]` and a `[PropertyMap]` — use one or the other. |
+| FN0003 | Error | Property referenced by `[Map]` or `[PropertyMap]` does not exist on the entity type. |
+| FN0004 | Error | Profile cannot be applied to the property — the profile's column type is incompatible with the property's CLR type. |
+| FN0005 | Error | Operator referenced in `For(...).Operator(...)` is not declared by the resolved profile. |
+| FN0006 | Error | `[Map]` method is not declared `partial` — the generator can only emit implementations for partial methods. |
+| FN0007 | Error | Property's CLR type has no built-in primitive profile; specify `Profile = typeof(...)` explicitly. |
+| FN0008 | Error | Property has multiple `[InterceptValue]` declarations. |
+| FN0009 | Error | `[FilterOperator]` member is not `public static`. |
+| FN0010 | Error | Alias collides with another property or alias on the entity (case-insensitive). |
+| FN0011 | Error | `[FilterProfile(BasedOn = typeof(...))]` references a type that is not marked with `[FilterProfile]`. |
+| FN0012 | Error | Property has `[InterceptValue]` but no matching `[Map]` declaration. |
+| FN0013 | Error | Property's CLR type is matched by multiple profiles — use `Profile = typeof(...)` on the `[Map]` to pick one. |
+| FN0014 | Error | Standalone profile has no `BasedOn` and is missing required extractor method(s). |
+| FN0015 | Error | Same operator name declared more than once on a single profile. |
+| FN0016 | Error | `[MapNested]` introduces a cycle in the filter-inlining graph. |
+| FN0017 | Error | `[MapNested<T>]` references a filter class declared outside the current compilation. |
+| FN0018 | Error | Auto-resolve `[MapNested]` finds two or more `[GenerateFilter<TNav>]` candidates. |
+| FN0019 | Error | Auto-resolve finds zero `[GenerateFilter<TNav>]` candidates for the navigation target type. |
+| FN0020 | Error | Named property doesn't exist, isn't a reference type, or is a primitive/value type. |
+| FN0021 | Error | Named navigation is a collection type; collection navigations are deferred to a future version. |
 | FN1001 | Warning | `[FilterOperator]` body references `DateTime.UtcNow`/`Now` directly inside the lambda. |
 | FN1002 | Warning | Property is mapped but not marked `Sortable = true` — likely omission for a sortable type. |
 | FN1003 | Warning | Profile is declared but never referenced by any `[Map(..., Profile = ...)]`. |

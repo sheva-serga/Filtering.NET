@@ -69,4 +69,38 @@ internal static class DiagnosticTestHelpers
 
         return runResult.Diagnostics;
     }
+
+    public static void AssertDiagnosticWithLocations(
+        string sourceCode,
+        string diagnosticId,
+        int primaryLine,
+        int primaryColumn,
+        params (int Line, int Column)[] additionalLines)
+    {
+        var diagnostics = GetDiagnostics(sourceCode);
+        var matching = diagnostics.Where(diagnostic => diagnostic.Id == diagnosticId).ToList();
+
+        matching.Should().NotBeEmpty(because: $"source should produce diagnostic {diagnosticId}");
+        var diagnostic = matching[0];
+        var primary = diagnostic.Location.GetLineSpan().StartLinePosition;
+        primary.Line.Should().Be(primaryLine - 1, because: $"primary location line for {diagnosticId}");
+        primary.Character.Should().Be(primaryColumn - 1, because: $"primary location column for {diagnosticId}");
+
+        diagnostic.AdditionalLocations.Should().HaveCount(additionalLines.Length,
+            because: $"{diagnosticId} should report {additionalLines.Length} additional locations");
+
+        for (var index = 0; index < additionalLines.Length; index++)
+        {
+            var expected = additionalLines[index];
+            var observed = diagnostic.AdditionalLocations[index].GetLineSpan().StartLinePosition;
+            observed.Line.Should().Be(expected.Line - 1);
+            observed.Character.Should().Be(expected.Column - 1);
+        }
+    }
+
+    public static void AssertDiagnosticHasAdditionalLocations(string sourceCode, string diagnosticId, int expectedAdditionalCount)
+    {
+        var diagnostic = GetDiagnostics(sourceCode).First(d => d.Id == diagnosticId);
+        diagnostic.AdditionalLocations.Should().HaveCount(expectedAdditionalCount);
+    }
 }

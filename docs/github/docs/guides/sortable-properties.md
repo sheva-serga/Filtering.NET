@@ -41,7 +41,7 @@ A consumer requesting `{ "sort": [{ "field": "createdAt" }, { "field": "id", "di
 
 ## Pitfalls
 
-- Only one `[Map]` per property is allowed to set `Sortable = true`. Repeating it on multiple methods triggers `FN0002`.
+- Only one `[Map]` per property is allowed (regardless of `Sortable` setting). Duplicates trigger `FN0001 DuplicateMapping`.
 - Properties with sortable-looking CLR types (numbers, dates) that are not marked `Sortable = true` raise `FN1002` as a friendly nudge.
 
 ## See also

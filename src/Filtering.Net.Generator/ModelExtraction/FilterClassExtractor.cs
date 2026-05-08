@@ -54,11 +54,10 @@ internal static class FilterClassExtractor
         var interceptors = new List<InterceptorModel>();
         var overrides = new List<PropertyOverrideModel>();
 
-        // Sortable picks FN0001 vs FN0002 on a duplicate; first method name fills FN0001's source list.
-        var mappedPropertySortable = new Dictionary<string, bool>(StringComparer.Ordinal);
         var mappedPropertyFirstMethodName = new Dictionary<string, string>(StringComparer.Ordinal);
-        var interceptedPropertyNames = new HashSet<string>(StringComparer.Ordinal);
-        var propertyMapNames = new HashSet<string>(StringComparer.Ordinal);
+        var mappedPropertyFirstLocation = new Dictionary<string, Location?>(StringComparer.Ordinal);
+        var interceptedPropertyFirstLocation = new Dictionary<string, Location?>(StringComparer.Ordinal);
+        var propertyMapFirstLocation = new Dictionary<string, Location?>(StringComparer.Ordinal);
 
         foreach (var member in classSymbol.GetMembers())
         {
@@ -81,8 +80,8 @@ internal static class FilterClassExtractor
                     profileIndex,
                     diagnostics,
                     properties,
-                    mappedPropertySortable,
-                    mappedPropertyFirstMethodName);
+                    mappedPropertyFirstMethodName,
+                    mappedPropertyFirstLocation);
             }
 
             if (interceptAttribute is not null)
@@ -92,7 +91,7 @@ internal static class FilterClassExtractor
                     interceptAttribute,
                     diagnostics,
                     interceptors,
-                    interceptedPropertyNames);
+                    interceptedPropertyFirstLocation);
             }
 
             if (propertyMapAttribute is not null)
@@ -102,36 +101,41 @@ internal static class FilterClassExtractor
                     propertyMapAttribute,
                     compilation,
                     overrides,
-                    propertyMapNames);
+                    propertyMapFirstLocation);
             }
         }
 
         // -------- Cross-method validations --------
 
-        // FN0003: Property name appearing in both [Map] and [PropertyMap].
-        foreach (var sharedPropertyName in mappedPropertySortable.Keys.Intersect(propertyMapNames, StringComparer.Ordinal))
+        // FN0002: same property name appearing in both [Map] and [PropertyMap].
+        // Primary squiggle on the [PropertyMap] site (more naturally available — it's the override
+        // shadowing the regular [Map]); additional points at the colliding [Map] method.
+        foreach (var sharedPropertyName in mappedPropertyFirstMethodName.Keys.Intersect(propertyMapFirstLocation.Keys, StringComparer.Ordinal))
         {
+            propertyMapFirstLocation.TryGetValue(sharedPropertyName, out var propertyMapLocation);
+            mappedPropertyFirstLocation.TryGetValue(sharedPropertyName, out var mapLocation);
+            var additionalLocations = mapLocation is not null
+                ? new[] { mapLocation }
+                : Array.Empty<Location>();
             diagnostics.Add(DiagnosticInfo.From(
                 DiagnosticDescriptors.MapAndPropertyMapBoth,
-                classSymbol.Locations.FirstOrDefault(),
+                propertyMapLocation ?? classSymbol.Locations.FirstOrDefault(),
+                additionalLocations,
                 sharedPropertyName));
         }
 
-        // FN0011: aliases must not collide (case-insensitively) with property names or other aliases.
         DetectAliasCollisions(properties, classSymbol, entityType, diagnostics);
 
-        // FN1002: numeric/date property mapped without Sortable=true.
         DetectMissingSortable(properties, classSymbol, diagnostics);
 
-        // FN0013: [InterceptValue] without a matching [Map].
-        foreach (var interceptedName in interceptedPropertyNames)
+        foreach (var interceptedEntry in interceptedPropertyFirstLocation)
         {
-            if (!mappedPropertySortable.ContainsKey(interceptedName))
+            if (!mappedPropertyFirstMethodName.ContainsKey(interceptedEntry.Key))
             {
                 diagnostics.Add(DiagnosticInfo.From(
                     DiagnosticDescriptors.InterceptorWithoutMap,
-                    classSymbol.Locations.FirstOrDefault(),
-                    interceptedName));
+                    interceptedEntry.Value ?? classSymbol.Locations.FirstOrDefault(),
+                    interceptedEntry.Key));
             }
         }
 
@@ -174,8 +178,8 @@ internal static class FilterClassExtractor
         ProfileIndex profileIndex,
         List<DiagnosticInfo> diagnostics,
         List<PropertyMappingModel> properties,
-        Dictionary<string, bool> mappedPropertySortable,
-        Dictionary<string, string> mappedPropertyFirstMethodName)
+        Dictionary<string, string> mappedPropertyFirstMethodName,
+        Dictionary<string, Location?> mappedPropertyFirstLocation)
     {
         if (!IsPartial(methodSymbol))
         {
@@ -190,7 +194,7 @@ internal static class FilterClassExtractor
 
         if (extractionResult.Model is null)
         {
-            // Still record the property name so a second [Map] for the same name fires FN0001.
+            // Record the attempted name so a second [Map] for the same name fires FN0001.
             var attemptedName = ReadConstructorString(mapAttribute, position: 0);
             if (!string.IsNullOrEmpty(attemptedName))
             {
@@ -198,30 +202,27 @@ internal static class FilterClassExtractor
                     methodSymbol,
                     classSymbol,
                     attemptedName!,
-                    sortableOnThisMap: ReadSortableNamedArg(mapAttribute),
-                    mappedPropertySortable,
                     mappedPropertyFirstMethodName,
+                    mappedPropertyFirstLocation,
                     diagnostics);
             }
             return;
         }
 
-        var modelSortable = extractionResult.Model.Sortable;
-        if (mappedPropertySortable.ContainsKey(extractionResult.Model.PropertyName))
+        if (mappedPropertyFirstMethodName.ContainsKey(extractionResult.Model.PropertyName))
         {
             EmitDuplicateMapDiagnosticIfNeeded(
                 methodSymbol,
                 classSymbol,
                 extractionResult.Model.PropertyName,
-                sortableOnThisMap: modelSortable,
-                mappedPropertySortable,
                 mappedPropertyFirstMethodName,
+                mappedPropertyFirstLocation,
                 diagnostics);
             return;
         }
 
-        mappedPropertySortable[extractionResult.Model.PropertyName] = modelSortable;
         mappedPropertyFirstMethodName[extractionResult.Model.PropertyName] = methodSymbol.Name;
+        mappedPropertyFirstLocation[extractionResult.Model.PropertyName] = methodSymbol.Locations.FirstOrDefault();
         properties.Add(extractionResult.Model);
     }
 
@@ -229,35 +230,30 @@ internal static class FilterClassExtractor
         IMethodSymbol methodSymbol,
         INamedTypeSymbol classSymbol,
         string propertyName,
-        bool sortableOnThisMap,
-        Dictionary<string, bool> mappedPropertySortable,
         Dictionary<string, string> mappedPropertyFirstMethodName,
+        Dictionary<string, Location?> mappedPropertyFirstLocation,
         List<DiagnosticInfo> diagnostics)
     {
         var location = methodSymbol.Locations.FirstOrDefault();
-        if (mappedPropertySortable.TryGetValue(propertyName, out var sortableAlreadySeen))
+        if (mappedPropertyFirstMethodName.TryGetValue(propertyName, out var previousMethodName))
         {
-            if (sortableAlreadySeen && sortableOnThisMap)
-            {
-                diagnostics.Add(DiagnosticInfo.From(
-                    DiagnosticDescriptors.DuplicateSortable,
-                    location,
-                    propertyName));
-                return;
-            }
-            mappedPropertyFirstMethodName.TryGetValue(propertyName, out var previousMethodName);
+            mappedPropertyFirstLocation.TryGetValue(propertyName, out var previousLocation);
             var hostFqn = classSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat).Replace("global::", "");
-            var sources = "[Map] " + (previousMethodName ?? "<unknown>") + ", [Map] " + methodSymbol.Name;
+            var sources = "[Map] " + previousMethodName + ", [Map] " + methodSymbol.Name;
+            var additionalLocations = previousLocation is not null
+                ? new[] { previousLocation }
+                : Array.Empty<Location>();
             diagnostics.Add(DiagnosticInfo.From(
                 DiagnosticDescriptors.DuplicateMapping,
                 location,
+                additionalLocations,
                 propertyName,
                 hostFqn,
                 sources));
             return;
         }
-        mappedPropertySortable[propertyName] = sortableOnThisMap;
         mappedPropertyFirstMethodName[propertyName] = methodSymbol.Name;
+        mappedPropertyFirstLocation[propertyName] = location;
     }
 
     private static void DetectAliasCollisions(
@@ -266,21 +262,40 @@ internal static class FilterClassExtractor
         INamedTypeSymbol entityType,
         List<DiagnosticInfo> diagnostics)
     {
-        var existingNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        // Tracks every site that has claimed a given case-folded name (property name or alias);
+        // a fresh collision reports every prior claimant as an additional location.
+        var nameToSites = new Dictionary<string, List<Location>>(StringComparer.OrdinalIgnoreCase);
         foreach (var mapping in properties)
         {
-            existingNames.Add(mapping.PropertyName);
+            var propertyLocation = mapping.DeclarationLocation?.ToLocation();
+            if (!nameToSites.TryGetValue(mapping.PropertyName, out var bucket))
+            {
+                bucket = new List<Location>();
+                nameToSites[mapping.PropertyName] = bucket;
+            }
+            if (propertyLocation is not null) bucket.Add(propertyLocation);
         }
         foreach (var mapping in properties)
         {
             if (string.IsNullOrEmpty(mapping.Alias)) continue;
-            if (!existingNames.Add(mapping.Alias!))
+            var aliasLocation = mapping.DeclarationLocation?.ToLocation();
+            if (nameToSites.TryGetValue(mapping.Alias!, out var existingSites))
             {
+                var primaryLocation = aliasLocation ?? classSymbol.Locations.FirstOrDefault();
+                var additionalLocations = existingSites.ToArray();
                 diagnostics.Add(DiagnosticInfo.From(
                     DiagnosticDescriptors.AliasCollision,
-                    classSymbol.Locations.FirstOrDefault(),
+                    primaryLocation,
+                    additionalLocations,
                     mapping.Alias!,
                     entityType.ToDisplayString()));
+                if (aliasLocation is not null) existingSites.Add(aliasLocation);
+            }
+            else
+            {
+                var bucket = new List<Location>();
+                if (aliasLocation is not null) bucket.Add(aliasLocation);
+                nameToSites[mapping.Alias!] = bucket;
             }
         }
     }
@@ -337,7 +352,7 @@ internal static class FilterClassExtractor
         AttributeData interceptAttribute,
         List<DiagnosticInfo> diagnostics,
         List<InterceptorModel> interceptors,
-        HashSet<string> interceptedPropertyNames)
+        Dictionary<string, Location?> interceptedPropertyFirstLocation)
     {
         var propertyName = ReadConstructorString(interceptAttribute, position: 0);
         if (string.IsNullOrEmpty(propertyName)) return;
@@ -351,14 +366,20 @@ internal static class FilterClassExtractor
             }
         }
 
-        if (!interceptedPropertyNames.Add(propertyName!))
+        var currentLocation = methodSymbol.Locations.FirstOrDefault();
+        if (interceptedPropertyFirstLocation.TryGetValue(propertyName!, out var firstLocation))
         {
+            var additionalLocations = firstLocation is not null
+                ? new[] { firstLocation }
+                : Array.Empty<Location>();
             diagnostics.Add(DiagnosticInfo.From(
                 DiagnosticDescriptors.DuplicateInterceptor,
-                methodSymbol.Locations.FirstOrDefault(),
+                currentLocation,
+                additionalLocations,
                 propertyName!));
             return;
         }
+        interceptedPropertyFirstLocation[propertyName!] = currentLocation;
 
         // ValueClrType is null when the interceptor has fewer than two parameters (malformed);
         // skipping the wrapper is safer than fabricating "object" and producing wrong code.
@@ -378,12 +399,15 @@ internal static class FilterClassExtractor
         AttributeData propertyMapAttribute,
         Compilation compilation,
         List<PropertyOverrideModel> overrides,
-        HashSet<string> propertyMapNames)
+        Dictionary<string, Location?> propertyMapFirstLocation)
     {
         var propertyName = ReadConstructorString(propertyMapAttribute, position: 0);
         if (string.IsNullOrEmpty(propertyName)) return;
 
-        propertyMapNames.Add(propertyName!);
+        if (!propertyMapFirstLocation.ContainsKey(propertyName!))
+        {
+            propertyMapFirstLocation[propertyName!] = methodSymbol.Locations.FirstOrDefault();
+        }
 
         overrides.Add(PropertyMapOverrideExtractor.Extract(methodSymbol, propertyName!, compilation));
     }
