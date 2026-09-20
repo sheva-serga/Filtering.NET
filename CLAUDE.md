@@ -1,12 +1,12 @@
 # CLAUDE.md — Filtering.Net solution
 
-Source-generated filter / sort / page library for `IQueryable<T>` and EF Core. Consumers declare `[GenerateFilter<TEntity>]` partials with `[Map]`-decorated methods; an incremental Roslyn generator emits `IFilterDefinition<TEntity>` plus DI wiring at compile time.
+Filter / sort / page library for `IQueryable<T>` and EF Core. Consumers declare `[GenerateFilter<TEntity>]` partials with `[Map]`-decorated methods. An incremental Roslyn generator emits a typed *schema* per class plus DI wiring; the generic engine `FilterDefinition<TEntity>` in the runtime does all validation, predicate composition, and sorting.
 
 ## Solution layout
 
 | Path | Role |
 |------|------|
-| `src/Filtering.Net/` | Runtime: attributes, request types (`FilterRequest`, `FilterNode`, `SortItem`), validation primitives, profile catalog, `IQueryable.Apply(...)` extension. `netstandard2.0`. |
+| `src/Filtering.Net/` | Runtime: attributes, request types, the `FilterDefinition<TEntity>` engine with `FilterSchema` / `FilterProperty` / `FilterProfile` / `FilterOperator`, built-in profiles, `IQueryable.Apply(...)` extension. `netstandard2.0`. |
 | `src/Filtering.Net.Generator/` | Roslyn incremental source generator + analyzer. Templates live as embedded `.scriban` resources under `Emission/Templates/`. `netstandard2.0`. |
 | `src/Filtering.Net.EntityFrameworkCore/` | EF async helpers (`ApplyPagedAsync`, `PageResult<T>`). Multi-targets `net8.0`/`net9.0`/`net10.0`. |
 | `samples/UserManagement.WebApi/` | ASP.NET Core 9 + EF Core 9 + PostgreSQL end-to-end demo. |
@@ -19,7 +19,7 @@ Source-generated filter / sort / page library for `IQueryable<T>` and EF Core. C
 
 ```sh
 dotnet build              # whole solution
-dotnet test               # 213 tests across 3 test projects
+dotnet test               # ~400 tests across 3 test projects
 dotnet test tests/Filtering.Net.Generator.Tests --filter "FullyQualifiedName~CompositeValidate"
 ```
 
@@ -35,10 +35,11 @@ dotnet test tests/Filtering.Net.Generator.Tests --filter "FullyQualifiedName~Com
 
 ## Source generator architecture
 
-- **Pipeline branches** in `FilterGenerator.cs`: branch 1 walks `[GenerateFilter<TEntity>]` partials → emits filter classes; branch 2 walks `[FilterProfile<T>]` classes → emits per-profile diagnostics. Cross-pipeline diagnostics (FN1003 / FN1004) join both `.Collect()` outputs.
+- **Split of responsibilities.** The generator emits only a schema: `CreateSchema` with one `FilterProperty.Map(...)` entry per mapping, constructors, and the `FilterDefinition<TEntity>` base. All filtering logic is generic runtime code. Consumer lambdas (`[FilterOperator]` members, `[PropertyMap]` methods, interceptors) are referenced and run as written, never parsed for emission. See `src/Filtering.Net/CLAUDE.md` for how predicates are spliced.
+- **Pipeline branches** in `FilterGenerator.cs`: branch 1 walks `[GenerateFilter<TEntity>]` partials → emits filter classes, `FilteringProfiles.g.cs` (runtime instances of user profiles), enum profiles, and the DI extension; branch 2 walks `[FilterProfile<T>]` classes → emits per-profile diagnostics. Cross-pipeline diagnostics (FN1003 / FN1004) join both `.Collect()` outputs.
 - **Model extraction** is in `ModelExtraction/` and produces `EquatableList<T>`-based records so the Roslyn cache can deduplicate compilations cheaply.
-- **Emission** uses Scriban templates source-embedded into the analyzer DLL (`PackageScribanIncludeSource`). Each emitter exposes `BuildView(model) → record` plus `Emit(model) → string` that delegates to `ScribanRuntime.Render`. `SourceEmitter.cs` is the orchestrator that composes child emitter outputs into the top-level `FilterClass.scriban`.
-- **Analyzer rules** are catalogued in `Diagnostics/DiagnosticDescriptors.cs`. Errors are `FN0001`–`FN0016`, warnings are `FN1001`–`FN1008`. Every descriptor's `helpLinkUri` points at the single catalogue page on the mkdocs-material site (`https://sheva-serga.github.io/Filtering.NET/diagnostics/`); add a new rule by registering its descriptor here and appending a row to `docs/github/docs/diagnostics/index.md`.
+- **Emission** uses Scriban templates source-embedded into the analyzer DLL (`PackageScribanIncludeSource`). Each emitter exposes `BuildView(model) → record` plus `Emit(model) → string` that delegates to `ScribanRuntime.Render`. `SourceEmitter.cs` builds the schema entries for `FilterClass.scriban`.
+- **Analyzer rules** are catalogued in `Diagnostics/DiagnosticDescriptors.cs`. Errors are `FN0001`–`FN0022`, warnings are `FN1001`–`FN1008`. Every descriptor's `helpLinkUri` points at the single catalogue page on the mkdocs-material site (`https://sheva-serga.github.io/Filtering.NET/diagnostics/`); add a new rule by registering its descriptor here and appending a row to `docs/github/docs/diagnostics/index.md`.
 
 ## Snapshot-test workflow
 

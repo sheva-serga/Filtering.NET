@@ -1,19 +1,21 @@
 ---
-title: Nested filter inlining
-description: Inline another [GenerateFilter] partial's mappings into a host filter under a dotted prefix with [MapNested].
+title: Nested filters
+description: Reuse another [GenerateFilter] partial's mappings under a dotted prefix with [MapNested].
 ---
 
-# Nested filter inlining
+# Nested filters
 
 ## What this does
 
-`[MapNested(nameof(User.Department))]` tells the source generator to inline another `[GenerateFilter<TNav>]` partial's mappings (every `[Map]`, `[PropertyMap]`, `[InterceptValue]`, `[FilterValidator]`, `[FilterOperator]`) into the host filter under a dotted prefix (default: the navigation property name in PascalCase). At runtime, the host's emitted dispatch table looks identical to one where every nav column was declared with `[Map("Department.X")]` by hand.
+`[MapNested(nameof(User.Department))]` makes the host filter reuse another `[GenerateFilter<TNav>]` partial. When the host is constructed it takes the nested filter's schema and re-roots every property on the host entity: the accessor `department => department.Name` becomes `user => user.Department.Name`, and the wire key gains the prefix.
+
+Everything the source filter configured comes along: `Sortable`, `Alias`, `Only` / `Except`, custom profile operators, `[InterceptValue]` methods, and `[PropertyMap]` rules.
 
 ## When to use
 
-- Your entity has a related entity whose `[GenerateFilter<TRelated>]` partial already maps every filterable column you want to expose.
-- You want `Only` / `Except` / `Prefix` / `DisableSorting` to compose with the related filter's existing setup.
-- The wire format stays flat — clients still send `field: "department.name"`.
+- A related entity already has a `[GenerateFilter<TRelated>]` partial that maps the columns you want to expose.
+- You want `Only` / `Except` / `Prefix` / `DisableSorting` to compose with that filter's existing setup.
+- The wire format should stay flat. Clients still send `field: "department.name"`.
 
 ## Minimal code
 
@@ -33,32 +35,35 @@ public partial class UserFilter
 }
 ```
 
-Wire fields exposed by `UserFilter`: `name`, `department.id`, `department.name`. Wire keys are case-insensitive at dispatch.
+Wire fields exposed by `UserFilter`: `name`, `department.id`, `department.name`. Wire keys are matched case-insensitively.
 
 ## Auto-resolve vs explicit
 
-- `[MapNested(nameof(User.Department))]` — auto-resolves the unique `[GenerateFilter<Department>]` partial in the compilation. Two candidates → `FN0018`.
-- `[MapNested<DepartmentFilter>(nameof(User.Department))]` — explicit, type-checked at the call site. Use when there are multiple filter classes for the same entity.
+- `[MapNested(nameof(User.Department))]` resolves the unique `[GenerateFilter<Department>]` partial in the compilation. Two candidates raise `FN0018`.
+- `[MapNested<DepartmentFilter>(nameof(User.Department))]` names the filter class. Use it when several filter classes target the same entity.
 
 ## Configuration knobs
 
-- `Prefix = "dept"` — overrides the default prefix on the wire (CLR navigation path is unaffected).
-- `Only = new[] { "Id", "Name" }` — restricts the merged paths to this allow-list (paths are relative to the nested filter, in CLR PascalCase).
-- `Except = new[] { "InternalNotes" }` — drops these paths from the merge.
-- `DisableSorting = true` — every merged column is non-sortable through this nesting, regardless of the source's `Sortable` setting.
+- `Prefix = "dept"` changes the prefix on the wire. The CLR path `Department.Name` stays valid as a key too.
+- `Only = new[] { "Id", "Name" }` keeps only these paths. Paths are relative to the nested filter, in CLR PascalCase.
+- `Except = new[] { "InternalNotes" }` drops these paths.
+- `DisableSorting = true` makes every property that arrives through this nesting non-sortable.
 
 ## Transitive nesting
 
-Merge is recursive: if `DepartmentFilter` itself has `[MapNested(nameof(Department.Company))]`, then `UserFilter` exposes `department.company.*` paths automatically. Cycles are caught at compile time as `FN0016 NestedCycle`.
+If `DepartmentFilter` itself has `[MapNested(nameof(Department.Company))]`, then `UserFilter` exposes `department.company.*` as well. `Only` and `Except` apply to the nested filter's own mappings. Properties it nests in turn follow their own `[MapNested]` settings. Cycles are caught at compile time as `FN0016 NestedCycle`.
 
-## v1 limitations
+## Typed operator values
 
-- `[InterceptValue]` and `[PropertyMap]` overrides on the source filter do **not** propagate through `[MapNested]` splice in v1 — the spliced host calls into raw column accessors, not through the source filter's wrappers. Splice-through for these is a future-version follow-up.
-- Cross-assembly is unsupported in v1 — the target filter class must live in the same compilation. `FN0017 NestedCrossAssembly`.
-- Collection navigations (`User.Posts: List<Post>`) are unsupported in v1 — `FN0021 NestedCollectionUnsupported`. Reference navigations only.
-- Duplicate paths across `[Map]`, `[PropertyMap]`, and `[MapNested]` produce `FN0001 DuplicateMapping` with all conflicting locations reported.
+If the nested filter, or anything it nests, has an operator that takes a typed value, the host also gets the `IJsonTypeInfoResolver` constructor and passes its resolver down. See [Trim / AOT-clean setup](aot-clean-setup.md).
+
+## Limitations
+
+- The target filter class must live in the same compilation. Otherwise `FN0017 NestedCrossAssembly` fires.
+- Collection navigations such as `User.Posts` are not supported and raise `FN0021 NestedCollectionUnsupported`.
+- The same path produced by `[Map]`, `[PropertyMap]`, and `[MapNested]` together raises `FN0001 DuplicateMapping`, reporting every conflicting site.
 
 ## See also
 
-- [Navigation paths and aliases](navigation-paths.md) — the per-column form.
-- [Diagnostics catalogue](../diagnostics/index.md) — `FN0016`–`FN0021`.
+- [Navigation paths and aliases](navigation-paths.md) for the per-column form.
+- [Diagnostics catalogue](../diagnostics/index.md), rules `FN0016` to `FN0021`.

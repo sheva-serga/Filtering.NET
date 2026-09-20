@@ -40,13 +40,14 @@ public static class StringFilterPlus
 }
 ```
 
-A `[Map(nameof(User.Name), Profile = typeof(StringFilterPlus))]` then makes `fuzzy` and `ilike` available on `User.Name`. The lambda body is inlined into the per-property `Build` method — there is no delegate dispatch at request time.
+A `[Map(nameof(User.Name), Profile = typeof(StringFilterPlus))]` then makes `fuzzy` and `ilike` available on `User.Name`. The generator emits a runtime `FilterProfile<string>` instance for the profile that references your members directly, so the lambdas run exactly as written.
 
 ## Variations
 
 - **Standalone profiles** — omit `BasedOn` and declare every operator from scratch. A standalone profile must also implement the JSON value extractors the generator calls (`TryGetValue`, `TryGetArray` for whichever value shapes the operators use), or `FN0015` fires.
 - **Multiple profiles per CLR type** — declaring more than one profile for the same `TColumn` is allowed but makes built-in resolution ambiguous. Every `[Map]` for a property of that type must then specify `Profile = typeof(...)` explicitly (the sample app's `StringFilterPlus` triggers this contract for `string`).
 - **Unary operators** — return `Expression<Func<TColumn, bool>>` for operators like `isNull` that take no value.
+- **Typed values** — every value operator you declare on your own profile has its value deserialized through System.Text.Json, so the filter class gets the `IJsonTypeInfoResolver` constructor. See [Trim / AOT-clean setup](aot-clean-setup.md).
 
 ## Pitfalls
 

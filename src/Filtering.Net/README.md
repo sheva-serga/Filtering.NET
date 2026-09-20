@@ -1,10 +1,10 @@
 # Filtering.Net
 
-Type-safe filter / sort / page request types for `IQueryable<T>`. Pair with [`Filtering.Net.Generator`](https://www.nuget.org/packages/Filtering.Net.Generator/) to get strongly-typed `IFilterDefinition<T>` implementations generated at compile time, and (optionally) [`Filtering.Net.EntityFrameworkCore`](https://www.nuget.org/packages/Filtering.Net.EntityFrameworkCore/) for `async` EF Core helpers.
+Type-safe filter / sort / page request types for `IQueryable<T>`. Pair with [`Filtering.Net.Generator`](https://www.nuget.org/packages/Filtering.Net.Generator/) to get a strongly-typed filter schema generated for each of your filter classes, and (optionally) [`Filtering.Net.EntityFrameworkCore`](https://www.nuget.org/packages/Filtering.Net.EntityFrameworkCore/) for `async` EF Core helpers.
 
 ## What it solves
 
-API consumers post structured JSON — groups of leaves with operators and values — instead of an opaque DSL fragment. Every request is validated before EF Core ever sees it; errors come back as a typed list of `FilterValidationError`s with paths and codes. There is no runtime expression-tree construction and no reflection on hot paths: the source generator (separate package) emits one typed predicate per `(property, operator)` pair.
+API consumers post structured JSON — groups of leaves with operators and values — instead of an opaque DSL fragment. Every request is validated before EF Core ever sees it; errors come back as a typed list of `FilterValidationError`s with paths and codes. The filter engine in this package composes predicates from compiler-checked accessor and operator lambdas, with no reflection over your types and no `Compile()`. The source generator (separate package) emits the typed schema that feeds it, or you can build one by hand.
 
 ## Install
 
@@ -67,7 +67,7 @@ IQueryable<User> result = users.Apply(userFilter, request);
 - **`FilterValidationResult` / `FilterValidationError`** — structured error shape with JSON-pointer-style paths and codes.
 - **`FilterValidationException`** — thrown by `Apply` when validation fails; carries the `Result` for HTTP 400 conversion.
 - **Built-in profiles** — `StringFilter`, `BoolFilter`, `GuidFilter`, `DateTimeFilter`, plus `Numeric/*` and `Temporal/*` per primitive. The generator picks one automatically based on the property's CLR type; override with `[Map(..., Profile = typeof(MyProfile))]`.
-- **Attributes** — `[GenerateFilter<T>]`, `[Map]`, `[PropertyMap]`, `[FilterProfile<T>]`, `[FilterOperator]`, `[FilterValidator]`, `[InterceptValue]`, `[FilterDefaults]`, `[PageSettings]`.
+- **Attributes** — `[GenerateFilter<T>]`, `[Map]`, `[PropertyMap]`, `[FilterProfile<T>]`, `[FilterOperator]`, `[InterceptValue]`, `[FilterDefaults]`, `[PageSettings]`.
 
 ## Synchronous vs async
 

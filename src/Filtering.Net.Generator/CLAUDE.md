@@ -1,15 +1,15 @@
 # CLAUDE.md — Filtering.Net.Generator
 
-Roslyn incremental source generator + analyzer. Walks `[GenerateFilter<TEntity>]` partial classes and `[FilterProfile<T>]` profile classes, emits typed `IFilterDefinition<TEntity>` implementations and an assembly-wide `AddFiltering` DI extension.
+Roslyn incremental source generator + analyzer. Walks `[GenerateFilter<TEntity>]` partial classes and `[FilterProfile<T>]` profile classes. Emits a *schema* per filter class over the runtime `FilterDefinition<TEntity>` engine, runtime instances for user-declared profiles, per-enum profiles, and an assembly-wide `AddFiltering` DI extension. The generator never emits filtering logic and never copies consumer lambda bodies.
 
-**Target:** `netstandard2.0` (loaded into the analyzer process). Ships as the `Filtering.Net.Generator` analyzer-only NuGet package — no runtime dependency.
+**Target:** `netstandard2.0` (loaded into the analyzer process). Ships as the `Filtering.Net.Generator` analyzer-only NuGet package.
 
 ## Two-pipeline architecture
 
 `FilterGenerator.cs` registers two `ForAttributeWithMetadataName` pipelines:
 
-1. **`[GenerateFilter<TEntity>]` branch** — extracts a `FilterClassModel`, reports per-class diagnostics, emits one source file per class via `SourceEmitter.EmitForClass`. A collected view drives the assembly-wide `AddFiltering()` extension and the per-enum auto-emitted profiles (`EnumProfileEmitter`).
-2. **`[FilterProfile<T>]` branch** — extracts profile-level models and reports per-profile diagnostics (`FN0006`, `FN0008`, `FN0013`, `FN1001`, `FN1002`, …).
+1. **`[GenerateFilter<TEntity>]` branch** — extracts a `FilterClassModel`, reports per-class diagnostics, runs `NestedFilterResolver`, emits one source file per class via `SourceEmitter.EmitForClass`. A collected view drives `AddFiltering()`, the per-enum profiles (`EnumProfileEmitter`), and `FilteringProfiles.g.cs` (`ProfileBridgeEmitter`).
+2. **`[FilterProfile<T>]` branch** — extracts profile-level models and reports per-profile diagnostics.
 
 Cross-pipeline diagnostics (`FN1003 ProfileUnused`, `FN1004 OperatorUnused`) join both `.Collect()` outputs.
 
@@ -17,54 +17,44 @@ Cross-pipeline diagnostics (`FN1003 ProfileUnused`, `FN1004 OperatorUnused`) joi
 
 | Folder | Role |
 |--------|------|
-| `Discovery/` | `EnumTypeCollector` — finds enums referenced anywhere in the filter class graph so the per-enum profile auto-emitter can emit one `[FilterProfile<TEnum>]` per. |
-| `ModelExtraction/` | `FilterClassExtractor`, `PropertyMappingExtractor`, `PropertyMapOverrideExtractor`, `ProfileExtractor`, `ProfileResolver`, `ProfileIndex(Builder)`. Pure-functional Roslyn-symbol-walkers that emit `EquatableList<T>`-based records. Models in `Models/`. |
-| `Models/` | Equatable record shapes used between extraction and emission. `FilterClassModel` is the top-level model. `EquatableList<T>` is the deduplication-friendly list type — use it everywhere a model carries a sequence. |
-| `Diagnostics/` | `DiagnosticDescriptors.cs` — every `FN0xxx` / `FN1xxx` registration. Every rule's `helpLinkUri` points at the single catalogue page (`https://sheva-serga.github.io/Filtering.NET/diagnostics/`), source at `docs/github/docs/diagnostics/index.md`. |
-| `Emission/` | All output. `*Emitter.cs` files own a slice of the generated file. Each exposes `BuildView(model) → record` and `Emit(model) → string` that delegates to a single `ScribanRuntime.Render` call. |
-| `Emission/Templates/` | `.scriban` templates. Embedded as `<EmbeddedResource>`. Each template's logical name maps to the resource `Filtering.Net.Generator.Emission.Templates.{Name}.scriban`. |
-| `Emission/Views/` | Per-template view-model records (PascalCase here, snake_case inside templates via Scriban's `StandardMemberRenamer` default). |
+| `Discovery/` | `EnumTypeCollector` — finds enums referenced by filter classes so one `[FilterProfile<TEnum>]` is emitted per enum. |
+| `ModelExtraction/` | `FilterClassExtractor`, `PropertyMappingExtractor`, `PropertyMapOverrideExtractor`, `MapNestedExtractor`, `NestedFilterResolver`, `ProfileExtractor`, `ProfileResolver`, `ProfileIndex(Builder)`, `ProfileBridgeBuilder`, `OperatorPredicateSignature`, `TypeNameFormatter`. Symbol walkers that emit `EquatableList<T>`-based records. |
+| `Models/` | Equatable record shapes between extraction and emission. `FilterClassModel` is the top-level model. |
+| `Diagnostics/` | `DiagnosticDescriptors.cs` — every `FN0xxx` / `FN1xxx` registration, all pointing at the single catalogue page. |
+| `Emission/` | `SourceEmitter` (filter class), `ProfileBridgeEmitter`, `EnumProfileEmitter`, `DiExtensionEmitter`, `ScribanRuntime`. |
+| `Emission/Templates/` | `FilterClass`, `ProfileBridge`, `EnumProfile`, `DiExtension` `.scriban` templates, embedded as resources. |
+| `Emission/Views/` | Per-template view-model records (PascalCase here, snake_case inside templates). |
+
+## What each piece decides
+
+- **`PropertyMappingExtractor`** resolves the profile, the allowed operators, `IsNullableValueType` (chooses `Map` vs `MapNullable`), and the chain of `ProfileBridgeModel`s the property's profile needs.
+- **`ProfileBridgeBuilder`** reads operator shapes from the member's declared type (`Expression<Func<TColumn, bool>>` or `Expression<Func<TColumn, TValue, bool>>`), not from syntax. Value operators on user profiles always use the typed-value (JSON resolver) factory. Built-in and enum profiles are referenced through their own `Profile` accessor and get no bridge.
+- **`PropertyMapOverrideExtractor`** reads `.Operator(...)` calls only to learn operator names and value types, for FN1008 and for typed-value detection. Arity of the lambda decides unary vs value, because an untyped two-parameter lambda may fail to bind.
+- **`NestedFilterResolver`** still merges the nested filter's mappings into the host model. That merged list exists for diagnostics (FN0001 duplicates, cycles) and typed-value propagation. Emission uses only the host's own properties (`SourceFilterClassFqn is null`) plus `NestedMappings[*].ResolvedTargetClassFqn`; the actual lifting happens at runtime through `FilterSchema.LiftInto`.
+- **`HasAnyTypedValueProperty`** gates the resolver-accepting constructor pair. It is true when the class, or any filter it nests (including that filter's `[PropertyMap]` rules), has a typed-value operator.
 
 ## Emission contract
 
 ```
 SourceEmitter.EmitForClass(FilterClassModel)
-  → BuildView()                                 (pure C# composition)
-  → ScribanRuntime.Render("FilterClass", view)  (Scriban renders the top-level template)
-       references each child emitter's pre-rendered string in its view fields
-       (validate_node_body, apply_filter_body, per_property_class_bodies, …)
+  → BuildView()                                 one string per schema entry, formatted in C#
+  → ScribanRuntime.Render("FilterClass", view)  base class, ctor(s), marker bodies, CreateSchema
 ```
 
-Each child emitter:
-- Owns one `.scriban` template + one view-model record under `Views/`.
-- Returns a string; never writes directly to a builder.
-- Heavy logic stays in C# — operator-shape grouping (`OperatorShapeGrouping.cs`), profile lookup (`BuiltInProfileCatalog.cs`), lambda body rewriting (`CustomOperatorEmitter.cs`), value-shape resolution (`PropertyValueShape.cs`). Templates only loop and conditionally render.
-
-The `to_operator_id` Scriban filter is registered by `ScribanRuntime.Render`; it forwards to `EmissionNames.OperatorIdentifier` so templates can map `"isNull"` → `IsNull`.
+Templates only loop and branch. Scriban re-indents multi-line values to the column of the tag, so continuation indents in C# are relative, not absolute. Emitted files use `#nullable enable annotations` so consumer nullability mismatches never become warnings in generated code.
 
 ## Editing emitters
 
-When changing what the generator emits:
+1. Update the `.scriban` template and its view record under `Views/`.
+2. Update the emitter's `BuildView`.
+3. `dotnet test --filter "FullyQualifiedName~Compiles|FullyQualifiedName~EndToEnd"` MUST stay green.
+4. Re-bless snapshots under `Emission/Snapshots/` after inspecting the diffs. See the root `CLAUDE.md`.
 
-1. Update the `.scriban` template (or add a new one).
-2. Update the view-model record under `Views/` — fields are PascalCase; templates reference them as snake_case.
-3. Update the `*Emitter.cs` `BuildView` to populate the new fields.
-4. `dotnet test --filter "FullyQualifiedName~CompileEmittedCode"` MUST stay green — this is the regression net.
-5. Snapshot tests under `Emission/Snapshots/` will need re-blessing — see the root `CLAUDE.md` for the workflow.
-
-The Scriban runtime is source-embedded (`PackageScribanIncludeSource`), so the analyzer DLL has zero NuGet dependencies at consumer-build time. Don't take new package references without considering the source-embedding path.
+The Scriban runtime is source-embedded (`PackageScribanIncludeSource`), so the analyzer DLL has zero NuGet dependencies at consumer-build time.
 
 ## csproj quirks worth remembering
 
 - `<EnforceExtendedAnalyzerRules>true</EnforceExtendedAnalyzerRules>` — RS1xxx Roslyn-API-restriction rules apply.
-- `<PackageScribanIncludeSource>true</PackageScribanIncludeSource>` — Scriban is built from source into this assembly; we suppress NU190x security warnings on the Scriban package because no Scriban DLL ships at runtime.
-- `<NoWarn>` includes RS1032 (we like terminal periods on diagnostic messages), CS1591/CS1573/CS1574 (internals are intentionally undocumented), NU190x (Scriban source-embedding mitigates).
-- `<PolySharpExcludeGeneratedTypes>System.Runtime.CompilerServices.ModuleInitializerAttribute</PolySharpExcludeGeneratedTypes>` — avoids CS0433 when test project (net9.0) sees both polyfill and BCL definition.
-
-## Adding a new emitter
-
-1. New `*Emitter.cs` in `Emission/` with `Emit(model) → string` and `BuildView` returning a record from `Views/`.
-2. New `Views/{Name}View.cs` record.
-3. New `Templates/{Name}.scriban` (will be picked up by the `<EmbeddedResource Include="...\*.scriban" />` glob automatically).
-4. Wire it into `SourceEmitter.BuildView` if it composes into the per-class output, or into `FilterGenerator.RegisterSourceOutput` if it's a separate emission target (like the DI extension or per-enum profiles).
-5. Add a snapshot test under `tests/Filtering.Net.Generator.Tests/Emission/`.
+- `<PackageScribanIncludeSource>true</PackageScribanIncludeSource>` — Scriban is built from source into this assembly; NU190x warnings on the Scriban package are suppressed because no Scriban DLL ships.
+- `<NoWarn>` includes RS1032, CS1591/CS1573/CS1574 (internals are intentionally undocumented), NU190x.
+- `<PolySharpExcludeGeneratedTypes>System.Runtime.CompilerServices.ModuleInitializerAttribute</PolySharpExcludeGeneratedTypes>` — avoids CS0433 in the net9.0 test project.

@@ -34,7 +34,7 @@ A `FilterRequest` is a typed JSON document that carries everything a client need
 
 `FilterNode` is the abstract base. Two concrete shapes derive from it:
 
-- **`FilterGroup`** — `{ "and": [...] }` or `{ "or": [...] }`. Carries a list of child nodes and a `LogicalOp` (`And = 0`, `Or = 1`). Groups can nest arbitrarily deep, bounded by `MaxNestingDepth` in the filter class's `[FilterDefaults]`.
+- **`FilterGroup`** — `{ "and": [...] }` or `{ "or": [...] }`. Carries a list of child nodes and a `LogicalOp` (`And = 0`, `Or = 1`). Groups can nest arbitrarily deep, bounded by `MaxNestingDepth` from the assembly-level `[FilterDefaults]` (default 10). A request may hold at most `MaxLeafConditions` leaves (default 50).
 - **`FilterLeaf`** — `{ "field": "...", "op": "...", "value": ... }`. The value's JSON kind is checked against the operator's expected shape during validation.
 
 A nested example combining both groups:
@@ -73,7 +73,7 @@ For typed leaf values in trim / AOT scenarios, the converter consults a `JsonSer
 `SortItem` is a flat record:
 
 - `field` — string name of a property declared `Sortable = true` in its `[Map]`.
-- `dir` — `SortDir` enum: `Asc = 0`, `Desc = 1`. Clients post the integer; the converter reads it as the enum.
+- `dir` — `SortDir` enum: `Asc = 0`, `Desc = 1`. Clients post the integer; the converter reads it as the enum. When `dir` is omitted, the property's `DefaultSortDirection` applies.
 
 The same numeric-enum convention applies to `LogicalOp` (`And = 0`, `Or = 1`) — that's the value behind a `FilterGroup.Op` field, though most clients use the JSON `and` / `or` keys directly and never see the enum on the wire.
 

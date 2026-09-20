@@ -7,7 +7,7 @@ description: Mark properties sortable with Sortable = true and set default direc
 
 ## What this does
 
-`Sortable = true` on `[Map]` opts the property into the `sort` array of an incoming `FilterRequest`. The generator emits a typed `OrderBy` / `ThenBy` chain dispatch for that property. `DefaultSortDirection = SortDir.Desc` flips the default direction for `SortItem` entries that omit `Direction`.
+`Sortable = true` on `[Map]` opts the property into the `sort` array of an incoming `FilterRequest`. The engine applies a typed `OrderBy` / `ThenBy` chain for the requested fields. `DefaultSortDirection = SortDir.Desc` flips the default direction for `SortItem` entries that omit `dir`.
 
 ## When to use
 
@@ -36,7 +36,7 @@ A consumer requesting `{ "sort": [{ "field": "createdAt" }, { "field": "id", "di
 ## Variations
 
 - Multiple sortable properties — every `[Map]` with `Sortable = true` becomes a tie-breaker option in the `sort` array.
-- Explicit per-`SortItem` direction — `{ "field": "age", "direction": "asc" }` overrides the property's `DefaultSortDirection`.
+- Explicit per-`SortItem` direction — `{ "field": "age", "dir": 0 }` overrides the property's `DefaultSortDirection`.
 - Combine with `Alias = "..."` — the `sort[].field` matches the alias, not the underlying property name.
 
 ## Pitfalls

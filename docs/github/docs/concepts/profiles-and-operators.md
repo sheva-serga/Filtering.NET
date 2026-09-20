@@ -9,6 +9,8 @@ description: How [FilterProfile<T>] groups operators by column type, and how cus
 
 A *profile* is a static class decorated with `[FilterProfile<TColumn>]` that names a set of operators applicable to a column of CLR type `TColumn`. Operators are exposed as `[FilterOperator("name")]`-decorated methods that return `Expression<Func<TColumn, TValue, bool>>` (binary) or `Expression<Func<TColumn, bool>>` (unary).
 
+Every profile also has a runtime form, `FilterProfile<TColumn>`. Built-in profiles expose it as `StringFilter.Profile` and friends; for your own profiles the generator emits the instance. You only deal with it directly when [building a definition by hand](../guides/hand-built-definitions.md).
+
 Profiles decouple "which operators exist" from "which property uses them". A property picks a profile via `[Map(..., Profile = typeof(MyProfile))]`, or — when omitted — the generator's `ProfileResolver` picks a built-in by CLR type.
 
 ## Built-in profiles
@@ -37,21 +39,19 @@ Setting `Profile = typeof(MyProfile)` overrides the resolver entirely and bypass
 
 ## Custom profiles inherit via BasedOn
 
-Adding an operator to an existing surface is a six-line custom profile. Use `[BasedOn(typeof(...))]` to inherit every operator from the base profile, then add your own with `[FilterOperator]`:
+Adding an operator to an existing surface is a six-line custom profile. Set `BasedOn = typeof(...)` to inherit every operator from the base profile, then add your own with `[FilterOperator]`:
 
 ```csharp
-[FilterProfile<string>]
+[FilterProfile<string>(BasedOn = typeof(StringFilter))]
 public static class StringFilterPlus
 {
-    [BasedOn(typeof(StringFilter))] private static void Inherit() { }
-
     [FilterOperator("fuzzy")]
-    public static Expression<Func<string, string, bool>> Fuzzy() =>
+    public static Expression<Func<string, string, bool>> Fuzzy =>
         (column, value) => column.ToLower().Contains(value.ToLower());
 }
 ```
 
-Then `[Map(nameof(User.Name), Profile = typeof(StringFilterPlus))]` makes `fuzzy` available on `User.Name`. The lambda body is inlined into the per-property `Build` method — no delegate dispatch at runtime.
+Then `[Map(nameof(User.Name), Profile = typeof(StringFilterPlus))]` makes `fuzzy` available on `User.Name`. At runtime the operator is part of a `FilterProfile<string>` instance that the generator emits for `StringFilterPlus`. The engine substitutes the property's accessor for `column` and the parsed value for `value`.
 
 The analyzer also runs the body through its EF translatability allow-list and warns with `FN1007` if you call a method EF Core cannot translate.
 

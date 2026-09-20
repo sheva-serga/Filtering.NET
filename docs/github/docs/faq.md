@@ -30,15 +30,19 @@ No. The library targets EF Core 8 / 9. The runtime types build expression trees 
 
 ## Does the source generator work in Native AOT?
 
-Yes. The generator runs at compile time, so AOT-published apps are fine. Pair `AddFiltering` with a `JsonSerializerContext` (the `AddFiltering(IJsonTypeInfoResolver)` overload) to silence IL2026 / IL3050 warnings emitted by the typed-value deserialization path. See [Trim / AOT-clean setup](guides/aot-clean-setup.md).
+Yes. The generated schema and the runtime engine use no reflection over your types and never call `Compile()`, so AOT-published apps are fine. Pair `AddFiltering` with a `JsonSerializerContext` (the `AddFiltering(IJsonTypeInfoResolver)` overload) to silence IL2026 / IL3050 warnings emitted by the typed-value deserialization path. See [Trim / AOT-clean setup](guides/aot-clean-setup.md).
 
 ## How do I add a custom operator that takes two values (e.g., "between")?
 
 A built-in `between` operator already exists for numerics and temporals. For other multi-value custom operators you'll need to write a `[PropertyMap]` override that builds the expression manually — `[FilterOperator]` lambdas are single-value by design. See [Per-property override (PropertyMap)](guides/property-map-overrides.md).
 
-## Why does my interceptor method need to be `internal` instead of `private`?
+## Can my interceptor method be `private`?
 
-The generator emits each property's per-property class as a separate `file`-scoped compilation unit. From inside that file-scoped class, only `internal` or `public` members on the enclosing filter class are reachable. `private` interceptor methods would be inaccessible from the generated code, so the generator requires at least `internal`.
+Yes. The generated schema code lives inside your filter class, so it can reference `private` interceptor and `[PropertyMap]` methods. They do have to be `static`.
+
+## Are predicates built at compile time or at runtime?
+
+At runtime, per request, from typed pieces that were compiled ahead of time. The generator emits accessor lambdas and profile references; the engine splices them together with an `ExpressionVisitor`. See [How it works](concepts/how-it-works.md).
 
 ## How do I disable a built-in operator on a specific property?
 

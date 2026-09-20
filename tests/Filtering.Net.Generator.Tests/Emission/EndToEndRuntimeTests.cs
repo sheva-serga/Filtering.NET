@@ -182,6 +182,66 @@ public class EndToEndRuntimeTests
         resultNames.Should().BeEquivalentTo(["Alice", "Charlie"]);
     }
 
+    private const string InterceptorShapesSource = """
+        using System.Linq;
+        using System.Text.Json;
+        using Filtering.Net;
+        namespace Sample;
+        public class User { public string Name { get; set; } = ""; public int Age { get; set; } }
+        [GenerateFilter<User>]
+        public partial class UserFilter
+        {
+            [Map(nameof(User.Name))]
+            private static partial void MapName();
+
+            [InterceptValue(nameof(User.Name))]
+            private static string[] TrimNames(InterceptContext context, string[] values) =>
+                values.Select(value => value.Trim()).ToArray();
+
+            [Map(nameof(User.Age))]
+            private static partial void MapAge();
+
+            [InterceptValue(nameof(User.Age), Raw = true)]
+            private static int ParseAge(InterceptContext context, JsonElement element) =>
+                element.ValueKind == JsonValueKind.String && element.GetString() == "thirty" ? 30 : element.GetInt32();
+        }
+        """;
+
+    [Theory]
+    [InlineData("Name", "in", "[\" Bob \"]", "Bob")]
+    [InlineData("Age", "eq", "\"thirty\"", "Alice")]
+    public void ApplyFilter_PrivateArrayAndRawInterceptors_TransformValues(string field, string operatorName, string valueJson, string expectedName)
+    {
+        // Arrange
+        var assembly = RuntimeLoader.LoadGeneratedAssembly(InterceptorShapesSource);
+        var userFilterType = assembly.GetType("Sample.UserFilter")!;
+        var userType = assembly.GetType("Sample.User")!;
+        var instance = Activator.CreateInstance(userFilterType)!;
+        var listType = typeof(List<>).MakeGenericType(userType);
+        var typedList = Activator.CreateInstance(listType)!;
+        var addMethod = listType.GetMethod("Add")!;
+        addMethod.Invoke(typedList, [CreateUser(userType, "Alice", 30)]);
+        addMethod.Invoke(typedList, [CreateUser(userType, "Bob", 25)]);
+        var asQueryable = typeof(Queryable).GetMethods()
+            .First(m => m.Name == "AsQueryable" && m.IsGenericMethod)
+            .MakeGenericMethod(userType)
+            .Invoke(null, [typedList])!;
+        var leaf = new FilterLeaf(field, operatorName, JsonDocument.Parse(valueJson).RootElement);
+
+        // Act
+        var validationResult = (FilterValidationResult)userFilterType.GetMethods()
+            .First(m => m.Name == "Validate" && m.GetParameters().Length == 1 && m.GetParameters()[0].ParameterType == typeof(FilterNode))
+            .Invoke(instance, [leaf])!;
+        var filteredQuery = userFilterType.GetMethod("ApplyFilter")!.Invoke(instance, [asQueryable, (object?)leaf])!;
+        var nameProperty = userType.GetProperty("Name")!;
+        var matchedNames = ((System.Collections.IEnumerable)filteredQuery).Cast<object>()
+            .Select(user => (string)nameProperty.GetValue(user)!).ToList();
+
+        // Assert
+        validationResult.IsValid.Should().BeTrue();
+        matchedNames.Should().Equal(expectedName);
+    }
+
     private const string SimpleEmailFilterSource = """
         using Filtering.Net;
         namespace Sample;

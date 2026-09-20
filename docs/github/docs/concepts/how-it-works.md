@@ -1,38 +1,72 @@
 ---
 title: How it works
-description: Compile-time generation flow from [GenerateFilter<T>] to executable predicates.
+description: What the generator emits, what the runtime engine does, and where the line between them sits.
 ---
 
 # How it works
 
-## Compile-time, not runtime
+## Generated schema, generic engine
 
-Filtering.Net is a Roslyn incremental source generator. It runs in the analyzer process during `dotnet build` (and inside your IDE), walks every `[GenerateFilter<TEntity>]` partial class, and emits a sibling source file that contains the full `IFilterDefinition<TEntity>` implementation. The emitted code is plain C#: typed `Expression<Func<TEntity, bool>>` predicates per `(property, operator)` pair, typed `OrderBy` / `ThenBy` chains, and structured `Validate(...)` overloads.
+Filtering.Net splits the work in two:
 
-There is **no** runtime expression-tree construction. The runtime never calls `Expression.Property`, `Expression.MakeBinary`, or any reflection-based predicate builder. Every typed predicate exists as a method in your compiled assembly before the first request arrives. EF Core's translator sees the same shape it would see if you wrote the predicates by hand.
+- **The source generator** reads each `[GenerateFilter<TEntity>]` partial and emits a small *schema*: one entry per mapping, holding a typed accessor lambda (`entity => entity.Department.Name`), a reference to a profile, and the options you set (`Alias`, `Sortable`, `Only`, interceptors).
+- **The runtime engine**, `FilterDefinition<TEntity>`, is ordinary library code shared by every filter. It validates requests against the schema, composes predicates, and applies sorting and paging.
 
-## The two-pipeline architecture
+The generated half of a filter class is about thirty lines. It declares `FilterDefinition<TEntity>` as the base class and implements one method:
 
-The generator (`FilterGenerator.cs`) registers two `ForAttributeWithMetadataName` pipelines that run independently and emit to different targets:
+```csharp
+partial class UserFilter : FilterDefinition<User>
+{
+    public UserFilter() : base(CreateSchema(serializerOptions: null)) { }
 
-1. **`[GenerateFilter<TEntity>]` branch.** Extracts a `FilterClassModel` per declared partial, reports per-class diagnostics (`FN0001`–`FN0021` errors, `FN1001`–`FN1002`, `FN1005`–`FN1007` warnings), and emits one source file per class. A collected view of all classes drives the assembly-wide `services.AddFiltering()` extension and the per-enum auto-emitted profiles.
-2. **`[FilterProfile<T>]` branch.** Extracts profile-level models from custom profile classes and reports per-profile diagnostics like `FN0006` (operator missing), `FN0008` (no built-in match), `FN0013` (orphan interceptor), `FN1001` (`DateTime.UtcNow` in lambda), and `FN1002` (sortable omission).
+    internal static FilterSchema<User> CreateSchema(JsonSerializerOptions? serializerOptions) =>
+        new FilterSchemaBuilder<User>(new FilterSettings(50, 200, 10, 50), serializerOptions)
+            .Add(FilterProperty.Map("Name", (User entity) => entity.Name, StringFilter.Profile)
+                .Sortable()
+                .Build())
+            .AddRange(DepartmentFilter.CreateSchema(serializerOptions)
+                .LiftInto<User>(entity => entity.Department, "Department"))
+            .Build();
+}
+```
 
-Cross-pipeline diagnostics — `FN1003 ProfileUnused` and `FN1004 OperatorUnused` — join both `.Collect()` outputs so the generator can report a profile that no `[Map]` references, or an operator declared on a profile that no consumer uses.
+## How a predicate is built
+
+Profiles hold typed operator templates such as `(column, value) => column.Contains(value)`. When a request arrives, the engine takes the operator template, substitutes the property's accessor for `column`, substitutes the parsed value for `value`, and hands the result to `IQueryable.Where`. The substitution is an `ExpressionVisitor` pass over trees the C# compiler already built and type-checked.
+
+What this means in practice:
+
+- **No reflection over your types.** Accessors and operators are compiler-checked lambdas. Nothing is looked up by name at runtime.
+- **No `Compile()`.** The engine only rearranges expression trees; your query provider consumes them.
+- **Trim and Native AOT clean.** See [Trim / AOT-clean setup](../guides/aot-clean-setup.md).
+- **Values become SQL parameters.** A value is spliced in as a member access on a holder object, the same shape a C# closure produces, so EF Core parameterizes it instead of inlining a literal.
+- **Nullable columns behave like C#.** For an `int?` property mapped to `Int32Filter`, comparisons are lifted exactly as the compiler lifts `entity.Score == value`.
+
+Predicates are composed per request. The per-property work that does not depend on the request (splicing accessors into operators, building sort delegates, unary predicates such as `isNull`) happens once, when the filter is constructed.
+
+## The generator pipeline
+
+`FilterGenerator.cs` registers two `ForAttributeWithMetadataName` pipelines:
+
+1. **`[GenerateFilter<TEntity>]` branch.** Extracts a `FilterClassModel`, reports per-class diagnostics, and emits one source file per class. A collected view drives the assembly-wide `services.AddFiltering()` extension, the per-enum profiles, and `FilteringProfiles.g.cs`, which holds a runtime `FilterProfile<T>` instance for every custom profile your filters reference.
+2. **`[FilterProfile<T>]` branch.** Extracts profile models and reports per-profile diagnostics such as `FN0009`, `FN0014`, `FN1001`, and `FN1007`.
+
+Cross-pipeline diagnostics, `FN1003 ProfileUnused` and `FN1004 OperatorUnused`, join both outputs.
+
+Your own code runs as written. A `[FilterOperator]` member is referenced directly from the generated profile instance, and a `[PropertyMap]` method is called once when the filter is constructed. The analyzer still inspects those lambdas for diagnostics, but nothing is copied or rewritten.
 
 ## What the consumer sees
 
-From the consumer's perspective, the flow per request is:
+- Declare a `[GenerateFilter<TEntity>]` partial. The generator emits the schema into `obj/`.
+- The generated `services.AddFiltering()` registers every filter class as a singleton `IFilterDefinition<T>`.
+- A controller resolves `IFilterDefinition<T>` and calls `Apply(...)` or the async EF helper `ApplyPagedAsync(...)`.
+- `Apply` runs `Validate(request)` first and throws `FilterValidationException` with a structured result on failure.
+- On success it calls `ApplyFilter` and then `ApplySorting`.
 
-- Declare a `[GenerateFilter<TEntity>]` partial → the generator emits the implementation into `obj/`.
-- The generated `services.AddFiltering()` extension registers every filter class as a singleton `IFilterDefinition<T>`.
-- A controller or handler resolves `IFilterDefinition<T>` and calls `Apply(...)` (sync) or `ApplyPagedAsync(...)` (async EF helper).
-- `Apply` runs `Validate(request)` first; on failure it throws `FilterValidationException` with a structured `FilterValidationResult`.
-- On success, `Apply` invokes `ApplyFilter(queryable, where)` then `ApplySorting(queryable, sort, page, pageSize)` — both typed, both translatable.
-- `ApplyPagedAsync` adds `CountAsync` + `ToListAsync` and packages into a `PageResult<T>`.
+Configuration mistakes that the analyzer cannot see, for example a duplicate wire key in a hand-built schema, throw `FilterConfigurationException` when the filter is constructed. With the singleton registration that is the first resolve, not a request in production traffic.
 
 ## See also
 
 - [Profiles and operators](profiles-and-operators.md)
 - [Validation philosophy](validation-philosophy.md)
-- [The FilterRequest JSON shape](filter-request-shape.md)
+- [Building a definition by hand](../guides/hand-built-definitions.md)

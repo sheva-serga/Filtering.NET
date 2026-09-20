@@ -1,12 +1,12 @@
 # Filtering.Net.Generator
 
-Roslyn incremental source generator + 29-rule analyzer for [Filtering.Net](https://www.nuget.org/packages/Filtering.Net/). Emits typed `IFilterDefinition<T>` implementations and a DI extension at compile time. Catches translatable-method mistakes before EF Core sees them.
+Roslyn incremental source generator + 30-rule analyzer for [Filtering.Net](https://www.nuget.org/packages/Filtering.Net/). Emits a typed filter schema per `[GenerateFilter<T>]` class, over the `FilterDefinition<T>` engine in `Filtering.Net`, plus a DI extension. Catches translatable-method mistakes before EF Core sees them.
 
 This package is **analyzer-only** — it has no runtime DLL. Install it alongside `Filtering.Net`.
 
 ## What it solves
 
-Hand-rolling `IFilterDefinition<T>` per filter shape is repetitive and error-prone — and the moment you reach for runtime expression construction, EF Core's translatability rules become a runtime surprise. This generator turns a declarative `[GenerateFilter<T>]` partial into a fully-typed predicate set, and the bundled analyzer rejects shapes that would fail at runtime (e.g., a string operator wired to a numeric column, or a custom operator that calls a non-translatable method).
+Hand-rolling `IFilterDefinition<T>` per filter shape is repetitive and error-prone — and the moment you reach for runtime expression construction, EF Core's translatability rules become a runtime surprise. This generator turns a declarative `[GenerateFilter<T>]` partial into a fully-typed filter schema, and the bundled analyzer rejects shapes that would fail at runtime (e.g., a string operator wired to a numeric column, or a custom operator that calls a non-translatable method).
 
 ## Install
 

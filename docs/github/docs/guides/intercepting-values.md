@@ -7,17 +7,17 @@ description: Transform typed values before predicate building.
 
 ## What this does
 
-`[InterceptValue(nameof(SomeProperty))]` decorates a method that runs once per leaf value after deserialization but before predicate building. The interceptor receives an `InterceptContext` (carrying the field name and operator) plus the typed value, and returns the transformed value. Use it to normalize input — lowercase emails, trim whitespace, parse user-friendly date phrases — without leaking that logic into every predicate.
+`[InterceptValue(nameof(SomeProperty))]` decorates a static method that runs once per leaf value, after the JSON value is parsed and before the predicate is built. The interceptor receives an `InterceptContext` carrying the property path, the field name the client used, and the operator. It returns the transformed value. Use it to normalize input without leaking that logic into every predicate.
 
 ## When to use
 
-- **Normalization** — lowercase emails, strip leading/trailing whitespace, collapse internal whitespace.
-- **Aliased input shapes** — accept "today" / "yesterday" strings and convert to `DateTime` cutoffs.
-- **Symmetric SQL** — when the column is stored lowercase, lowercase the value before building the predicate so the SQL stays a clean equality check (rather than the predicate calling `column.ToLower() == value.ToLower()` and losing the index).
+- **Normalization.** Lowercase emails, trim whitespace, collapse internal whitespace.
+- **Aliased input shapes.** Accept "today" or "yesterday" and convert to `DateTime` cutoffs.
+- **Symmetric SQL.** When the column is stored lowercase, lowercase the value so the SQL stays a plain equality check and the index keeps working.
 
 ## Minimal code
 
-Lifted from the sample app's `UserFilter.cs`:
+From the sample app's `UserFilter.cs`:
 
 ```csharp
 [GenerateFilter<User>]
@@ -27,29 +27,30 @@ public partial class UserFilter
         Only = new[] { "eq", "contains", "isNull" })]
     private static partial void MapEmail();
 
-    // [InterceptValue] runs once per leaf value before predicate building.
-    // Must be 'internal' or 'public' — the per-property class is a file-scoped
-    // compilation unit, so a 'private' method is invisible from the emitted code.
     [InterceptValue(nameof(User.Email))]
-    internal static string NormalizeEmail(InterceptContext context, string value) =>
+    private static string NormalizeEmail(InterceptContext context, string value) =>
         value.ToLowerInvariant();
 }
 ```
 
-A request with `{ "field": "email", "op": "eq", "value": "Alice@Example.com" }` ends up running `WHERE email = 'alice@example.com'` — no `LOWER(...)` wrapper, the index works, and you don't have to hand-normalize at every call site.
+A request with `{ "field": "email", "op": "eq", "value": "Alice@Example.com" }` runs `WHERE email = 'alice@example.com'`.
 
 ## Variations
 
-- Per-operator branching — `InterceptContext.Operator` carries the operator name. An interceptor can transform the value differently for `eq` versus `contains` (e.g. trim whitespace for both, but also lowercase for `eq`).
-- Raw JSON mode — `[InterceptValue(nameof(...), Raw = true)]` makes the method receive the raw `JsonElement` and return the typed value, replacing the built-in deserialization. Useful for accepting user-friendly date strings ("today") that the JSON deserializer wouldn't otherwise parse.
-- Array-shaped operators — for operators with an array value (`in`), declare a sibling interceptor with a `string[]` (or appropriate array) parameter; the generator wires it to the array shape.
+- **Per-operator branching.** `InterceptContext.Operator` carries the operator name, so one interceptor can treat `eq` and `contains` differently.
+- **Array values.** An interceptor whose value parameter is an array, for example `string[]`, applies to array operators such as `in`.
+- **Raw JSON mode.** `[InterceptValue(nameof(...), Raw = true)]` makes the method receive the raw `JsonElement` and return the typed value, replacing the built-in parsing for scalar operators.
+- **Rejecting a value.** Throw `FilterValidationException` from the interceptor. Validation reports it as `InterceptorRejected` with your first error message.
 
 ## Pitfalls
 
-- The interceptor method must be `internal` or `public`. The generator emits each property's dispatch logic into a `file`-scoped class (its own compilation unit), so a `private` interceptor is invisible from the emitted code and produces a CS-error at consumer-build time.
-- Only one `[InterceptValue]` per property is allowed. A second one fires `FN0009`.
-- An `[InterceptValue]` whose property name does not match any `[Map]` on the same class raises `FN0013` — orphan interceptors are almost always typos.
+- The method must be `static`. Any accessibility works, including `private`.
+- Only one `[InterceptValue]` per property is allowed. A second one fires `FN0008`.
+- An `[InterceptValue]` whose property name matches no `[Map]` on the same class raises `FN0012`.
+- Interceptors apply to values parsed by the profile. Custom operators with typed values, which are deserialized through the JSON resolver, are not intercepted.
+- Interceptors run during validation as well as during filtering, so keep them cheap and free of side effects.
 
 ## See also
 
 - [Mapping properties](mapping-properties.md)
+- [Nested filters](nested-filters.md). Interceptors on a nested filter keep running on the host.

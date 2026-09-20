@@ -83,7 +83,7 @@ curl -X POST http://localhost:5000/users/search \
      -d '{ "where": { "field": "Name", "op": "ilike", "value": "ali%" } }'
 ```
 
-Filter by nested filter via `[MapNested]` &mdash; `DepartmentFilter`'s mappings are inlined under the `department.` prefix:
+Filter by nested filter via `[MapNested]` &mdash; `DepartmentFilter`'s mappings are reused under the `department.` prefix:
 
 ```sh
 curl -X POST http://localhost:5000/users/search \

@@ -10,7 +10,8 @@ Runtime unit tests for the `Filtering.Net` package. **No source generator** runs
 |--------|-----------|
 | `Attributes/` | Attribute construction + property defaults. |
 | `Requests/` | JSON round-tripping for `FilterRequest`, `FilterNode` polymorphic discriminator, `SortItem`. |
-| `Validation/` | `FilterValidationResult.Combine`, `FilterValidationError` shape, helper methods on `LeafValidation` / `PageValidation`. |
+| `Engine/` | The filter engine through its public API, over in-memory queries: `FilterDefinition` validation paths and codes, predicate composition, sorting and paging, request limits, `FilterProfile` / `FilterOperator`, `FilterProperty` options and interceptors, nested lifting, nullable-column lifting, `FilterRuleBuilder`. `EngineTestModel.cs` holds the shared entities and helpers. |
+| `Validation/` | `FilterValidationResult.Combine`, `FilterValidationError` shape. |
 | `Composition/` | `PredicateBuilder.AndAlso/OrElse/Not` parameter rebinding correctness. |
 | `Profiles/` | Built-in profile `TryGet*` extractor behaviour for valid + invalid JSON. |
 | `Exceptions/` | `FilterValidationException.Result` / `Errors` exposure. |
@@ -27,7 +28,7 @@ Runtime unit tests for the `Filtering.Net` package. **No source generator** runs
 
 - **Anything that spins up the source generator** — that lives in `tests/Filtering.Net.Generator.Tests/`.
 - **Anything that takes an EF Core dependency** — that lives in `tests/Filtering.Net.EntityFrameworkCore.Tests/`.
-- **End-to-end "user declares a filter, request comes in, results come out" tests** — those belong in `Filtering.Net.Generator.Tests/Emission/EndToEndRuntimeTests.cs` because they need the generator to actually run.
+- **End-to-end tests that start from a `[GenerateFilter]` declaration** — those belong in `Filtering.Net.Generator.Tests/Emission/EndToEndRuntimeTests.cs` because they need the generator to run. Tests here build schemas by hand.
 
 ## Run subset
 

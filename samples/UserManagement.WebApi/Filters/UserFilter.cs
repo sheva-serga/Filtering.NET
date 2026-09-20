@@ -28,8 +28,8 @@ public partial class UserFilter
     [Map(nameof(User.DepartmentId), Sortable = true)]
     private static partial void MapDepartmentId();
 
-    // Custom profile + typed-value operator: StringFilterPlus adds 'fuzzy' and 'ilike'. Forces the
-    // generator to emit the IJsonTypeInfoResolver-accepting ctor on this class.
+    // Custom profile + typed-value operator: StringFilterPlus adds 'fuzzy' and 'ilike'. Their values go
+    // through the JSON resolver, so this class also gets the IJsonTypeInfoResolver-accepting ctor.
     [Map(nameof(User.Name), Profile = typeof(StringFilterPlus), Sortable = true)]
     private static partial void MapName();
 
@@ -38,15 +38,15 @@ public partial class UserFilter
         Only = new[] { "eq", "contains", "isNull" })]
     private static partial void MapEmail();
 
-    // [InterceptValue] — runs once per leaf value before predicate building. Must be internal/public.
+    // [InterceptValue] — runs once per leaf value before predicate building.
     [InterceptValue(nameof(User.Email))]
-    internal static string NormalizeEmail(InterceptContext context, string value) => value.ToLowerInvariant();
+    private static string NormalizeEmail(InterceptContext context, string value) => value.ToLowerInvariant();
 
     // Auto-emitted enum profile — generator emits Filtering.Net.Generated.UserStatusFilter.
     [Map(nameof(User.Status), Sortable = true)]
     private static partial void MapStatus();
 
-    // [MapNested] — inlines DepartmentFilter's mappings under the 'department.' prefix.
+    // [MapNested] — reuses DepartmentFilter's mappings under the 'department.' prefix.
     [MapNested(nameof(User.Department))]
     private static partial void MapDepartment();
 }

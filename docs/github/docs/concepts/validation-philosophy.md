@@ -47,8 +47,8 @@ A response payload after a controller maps `invalid.Result` to `BadRequest` look
 - **`PageInvalid`** — `page < 1`.
 - **`PageSizeTooLarge`** — `pageSize > MaxPageSize`.
 - **`PageSizeInvalid`** — `pageSize < 1`.
-- **`NestingTooDeep`** — filter nesting depth exceeds `MaxNestingDepth`.
-- **`TooManyConditions`** — total leaf count exceeds `MaxLeafConditions`.
+- **`NestingTooDeep`** — filter nesting depth exceeds `MaxNestingDepth` (assembly-level `[FilterDefaults]`, default 10).
+- **`TooManyConditions`** — total leaf count exceeds `MaxLeafConditions` (assembly-level `[FilterDefaults]`, default 50).
 - **`GroupEmpty`** — `and: []` or `or: []` with zero children.
 
 ## How to surface this in HTTP APIs

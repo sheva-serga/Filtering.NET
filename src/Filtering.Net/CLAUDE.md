@@ -1,6 +1,6 @@
 # CLAUDE.md — Filtering.Net (runtime)
 
-The runtime contract that source-generated filter classes implement against. No reflection, no expression-tree building at request time — every typed predicate is generator-emitted ahead of time.
+The runtime: request types, profiles, and the filter engine. Generated filter classes derive from `FilterDefinition<TEntity>` and only supply a schema. The engine composes predicates per request from typed, compiler-checked lambdas. No reflection over consumer types, no `MakeGenericMethod`, no `Compile()`.
 
 **Target:** `netstandard2.0`. Polyfilled via `PolySharp`. Ships as the `Filtering.Net` NuGet package.
 
@@ -8,37 +8,33 @@ The runtime contract that source-generated filter classes implement against. No 
 
 | Folder | Contents |
 |--------|----------|
-| `Attributes/` | `[GenerateFilter<T>]`, `[Map]`, `[PropertyMap]`, `[FilterProfile<T>]`, `[FilterOperator]`, `[FilterValidator]`, `[InterceptValue]`, `[FilterDefaults]`, `[PageSettings]`. The generator reads these; consumers stick them on partials. |
-| `Requests/` | `FilterRequest`, `FilterNode` + subtypes (`FilterGroup`, `FilterLeaf`), `SortItem`, `SortDir`, `LogicalOp`, plus the polymorphic `FilterNodeJsonConverter`. |
-| `Validation/` | `FilterValidationResult`, `FilterValidationError`, `FilterValidationCode`, plus runtime helpers: `LeafValidation` (per-leaf error shaping) and `PageValidation` (page/pageSize bounds). Generated code calls these helpers — the call surface is part of the runtime API contract. |
-| `Profiles/` | Built-in profiles: `StringFilter`, `BoolFilter`, `GuidFilter`, `DateTimeFilter`, `Numeric/*`, `Temporal/*`, `Enum/*`. Each exposes `TryGet*` extractors that the generator calls when resolving a property's profile. |
-| `Override/` | DSL types for `[PropertyMap]` overrides: `FilterRule<TEntity, TColumn>`, `FilterRuleBuilder<TEntity, TColumn>`. The generator parses the syntax tree of `For(...).Operator(...)` chains; the runtime types exist so consumer code compiles. |
-| `Composition/` | `PredicateBuilder.AndAlso/OrElse/Not` — the runtime helpers used by emitted `CombineGroup` to glue child predicates together. |
-| `Interception/` | `InterceptContext` passed to `[InterceptValue]`-decorated methods. |
+| `Attributes/` | `[GenerateFilter<T>]`, `[Map]`, `[MapNested]`, `[PropertyMap]`, `[FilterProfile<T>]`, `[FilterOperator]`, `[InterceptValue]`, `[FilterDefaults]`, `[PageSettings]`. The generator reads these; consumers stick them on partials. |
+| `Requests/` | `FilterRequest`, `FilterNode` + subtypes (`FilterGroup`, `FilterLeaf`), `SortItem` (nullable `Dir`), `SortDir`, `LogicalOp`, plus the polymorphic `FilterNodeJsonConverter`. |
+| `Profiles/` | Built-in profile static classes (`StringFilter`, `Numeric/*`, `Temporal/*`, …). Each keeps its `[FilterOperator]` templates and `TryGet*` parsers and exposes a runtime `Profile` built from them. Also `FilterProfile<TColumn>`, `FilterOperator` factories, and the internal `ValueOperator` / `UnaryOperator`. |
+| `Schema/` | `FilterProperty<TEntity>` + `FilterProperty` factories, `FilterPropertyBuilder`, `FilterSchema<TEntity>`, `FilterSchemaBuilder`, `FilterSettings`. `ColumnFilterProperty` is the one concrete property type. |
+| `Engine/` | Internal: `ExpressionSplicer`, `NullableColumnLifter`, `NullableColumnSupport`, `FilterValueHolder`, `BoundOperator`, `FilterTreeValidator`, `FilterPredicateComposer`. |
+| `FilterDefinition.cs` | The engine's public face: implements `IFilterDefinition<TEntity>` over a schema. |
+| `Override/` | `FilterRule` / `FilterRuleBuilder` for `[PropertyMap]`. The builder is real: the generated filter calls the consumer's method once at construction. |
+| `Validation/` | `FilterValidationResult`, `FilterValidationError`, `FilterValidationCode` (public); `LeafValidation`, `PageValidation` (internal error shaping). |
+| `Composition/` | `PredicateBuilder.AndAlso/OrElse/Not`, used by `FilterPredicateComposer`. |
+| `Interception/` | `InterceptContext` passed to `[InterceptValue]` methods. |
 | `Exceptions/` | `FilteringException` (base), `FilterValidationException`, `FilterDispatchException`, `FilterConfigurationException`. |
-| `IFilterDefinition.cs` | Composite interface every emitted filter class implements: `Validate(FilterRequest)`, `Validate(FilterNode?)`, `Validate(IReadOnlyList<SortItem>?)`, `Validate(int?, int?)`, `ApplyFilter(IQueryable<T>, FilterNode?)`, `ApplySorting(IQueryable<T>, sort, page, pageSize)`. |
-| `FilteringQueryableExtensions.cs` | `IQueryable<T>.Apply(IFilterDefinition<T>, FilterRequest)` — the synchronous `validate-then-filter-then-sort-then-page` orchestrator. EF async sibling lives in `Filtering.Net.EntityFrameworkCore`. |
+| `FilteringQueryableExtensions.cs` | `IQueryable<T>.Apply(IFilterDefinition<T>, FilterRequest)`: validate, filter, sort, page. |
+
+## How a predicate is built
+
+1. At property construction each allowed operator is *bound*: its column parameter is replaced by the property's accessor body. Unary operators are finished at this point.
+2. Per request the parsed value is wrapped in `FilterValueHolder<T>` and spliced in as a member access on a constant. Query providers parameterize that shape; a bare `ConstantExpression` would be inlined into SQL.
+3. `MapNullable` properties go through `NullableColumnLifter`, which rebuilds comparisons as lifted comparisons (`liftToNull: false`) and re-targets `values.Contains(column)` to the nullable array form. That reproduces what the C# compiler emits for `entity.NullableColumn == value`.
 
 ## Editing rules
 
-- **Public API contract.** Anything `public` is consumed by either the generator's emitted code or external consumers. Renames and signature changes require updating `Emission/Templates/*.scriban` and re-blessing snapshots.
-- **`LeafValidation` / `PageValidation` helper additions** — when adding a new validation shape, prefer extending these helper classes (and emitting a one-line forwarder) over inlining new logic into the template. Reduces emitted code per filter class and centralises the rule.
-- **Built-in profile extractors** are called by name from the generator (`ProfileExtractorEmitter.EmitScalarCall` / `EmitArrayCall`). Adding an operator to a built-in profile means adding the `TryGet*` method here AND wiring it into `BuiltInProfileCatalog.cs` in the generator.
-- **`netstandard2.0` constraint** keeps this assembly loadable inside the analyzer process and on every consumer TFM. Don't take dependencies on `net*`-only APIs without checking PolySharp can polyfill them.
-
-## Profile system
-
-A *profile* is a static class decorated with `[FilterProfile<T>]` that names a set of operators. Built-in profiles ship here (`StringFilter`, etc.). Consumers can declare their own with `BasedOn = typeof(StringFilter)` to inherit operators and add `[FilterOperator("name")]` extensions; the generator inlines those custom operator bodies into the per-property `Build` method.
-
-The `[Map(..., Profile = typeof(MyProfile))]` attribute selects which profile a property uses. When `Profile` is omitted, the resolver in the generator (`ProfileResolver`) picks a built-in by CLR type — `string` → `StringFilter`, `int`/`long`/… → `Numeric/*`, `DateTime` → `DateTimeFilter`, enums → an auto-emitted per-enum profile.
+- **Public API contract.** Generated code calls `FilterProperty.Map/MapNullable/MapRule`, `FilterPropertyBuilder`, `FilterSchemaBuilder`, `FilterSchema.LiftInto`, `FilterProfile.Create/Extend`, `FilterOperator.*`, and each built-in's `Profile`. Renames require updating `Emission/` in the generator and re-blessing snapshots.
+- **Validation paths, codes, and messages are pinned** by end-to-end tests. Change them deliberately.
+- **Adding an operator to a built-in profile** means adding the `[FilterOperator]` template and listing it in that class's `Profile` initializer. `FilterProfileTests` fails if the two drift.
+- **Value extraction rule.** Operators on built-in and auto-emitted enum profiles parse through `TryGetValue` / `TryGetArray`. Value operators declared on user profiles, and every `[PropertyMap]` value operator, deserialize through System.Text.Json with the definition's resolver.
+- **`netstandard2.0` constraint** keeps this assembly loadable on every consumer TFM. Check PolySharp before using newer APIs.
 
 ## Tests for this assembly
 
-`tests/Filtering.Net.Tests/` covers:
-- Validation primitives (`Validation/`)
-- Request JSON round-tripping (`Requests/`)
-- `PredicateBuilder` composition (`Composition/`)
-- Profile extractor behaviours (`Profiles/`)
-- The `Apply` extension's orchestration of validate → filter → sort → page (`FilteringQueryableExtensionsTests.cs`)
-
-These do NOT exercise the source generator end-to-end — that's covered in `tests/Filtering.Net.Generator.Tests/Emission/`.
+`tests/Filtering.Net.Tests/`: `Engine/` covers the definition, properties, profiles, nullable lifting, and the rule builder through the public API with in-memory queries. The other folders cover request JSON, validation result types, `PredicateBuilder`, and profile parsers. Generator end-to-end coverage lives in `tests/Filtering.Net.Generator.Tests/Emission/`.

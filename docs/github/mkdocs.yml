@@ -79,13 +79,14 @@ nav:
       - Intercepting values: guides/intercepting-values.md
       - Filtering enums: guides/filtering-enums.md
       - Navigation paths and aliases: guides/navigation-paths.md
-      - Nested filter inlining: guides/nested-filters.md
+      - Nested filters: guides/nested-filters.md
       - Page settings: guides/page-settings.md
       - DI integration: guides/di-integration.md
       - Async paged queries: guides/async-paged-queries.md
       - Handling validation errors: guides/handling-validation-errors.md
       - Trim / AOT-clean setup: guides/aot-clean-setup.md
       - Testing filter classes: guides/testing-filter-classes.md
+      - Building a definition by hand: guides/hand-built-definitions.md
   - Diagnostics catalogue: diagnostics/index.md
   - Sample app: sample-app.md
   - FAQ: faq.md
