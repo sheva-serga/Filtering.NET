@@ -1,3 +1,5 @@
+using System.Linq.Expressions;
+
 using AwesomeAssertions;
 
 using Xunit;
@@ -31,6 +33,34 @@ public class NullableColumnTests
     {
         // Arrange
         var definition = StandardDefinition();
+
+        // Act
+        var filteredNames = definition.ApplyFilter(People(), Leaf("Score", "in", "[10, 20]")).Names();
+
+        // Assert
+        filteredNames.Should().Equal("Alice", "Carol");
+    }
+
+    [Fact]
+    public void ApplyFilter_InBoundToSpanContains_SkipsNullRowsWithoutThrowing()
+    {
+        // Arrange — compilers with first-class spans bind "values.Contains(column)" to
+        // MemoryExtensions.Contains(ReadOnlySpan<T>, T) through an implicit array-to-span conversion.
+        // This project's language version does not, so the tree is built by hand.
+        var columnParameter = Expression.Parameter(typeof(int), "column");
+        var valuesParameter = Expression.Parameter(typeof(int[]), "values");
+        var arrayToSpan = typeof(ReadOnlySpan<int>).GetMethod("op_Implicit", [typeof(int[])])!;
+        var spanContains = typeof(MemoryExtensions).GetMethods()
+            .Single(method => method.Name == nameof(MemoryExtensions.Contains)
+                && method.GetParameters().Length == 2
+                && method.GetParameters()[0].ParameterType.Name == "ReadOnlySpan`1")
+            .MakeGenericMethod(typeof(int));
+        var spanBoundIn = Expression.Lambda<Func<int, int[], bool>>(
+            Expression.Call(spanContains, Expression.Call(arrayToSpan, valuesParameter), columnParameter),
+            columnParameter,
+            valuesParameter);
+        var profile = FilterProfile<int>.Create("SpanInt", FilterOperator.Value("in", spanBoundIn, Int32Filter.TryGetArray));
+        var definition = Definition(properties: [FilterProperty.MapNullable<Person, int>("Score", person => person.Score, profile).Build()]);
 
         // Act
         var filteredNames = definition.ApplyFilter(People(), Leaf("Score", "in", "[10, 20]")).Names();

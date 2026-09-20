@@ -77,7 +77,7 @@ internal static class ProfileBridgeBuilder
 
     private static string BuildFactoryCall(string operatorName, OperatorPredicateSignature predicateSignature, string memberAccess)
     {
-        var quotedName = "\"" + operatorName + "\"";
+        var quotedName = "\"" + EmissionNames.EscapeStringLiteral(operatorName) + "\"";
         if (predicateSignature.ValueType is not null)
         {
             // Value operators declared on user profiles always take the typed-value (JSON resolver) path.

@@ -9,10 +9,6 @@ namespace Filtering.Net;
 // column itself.
 internal sealed class NullableColumnLifter : ExpressionVisitor
 {
-    private static readonly MethodInfo EnumerableContainsDefinition =
-        ((MethodCallExpression)((Expression<Func<int[], int, bool>>)((values, column) => values.Contains(column))).Body)
-        .Method.GetGenericMethodDefinition();
-
     private static readonly Dictionary<Type, Type> WellKnownNullableTypes = new()
     {
         [typeof(bool)] = typeof(bool?),
@@ -89,18 +85,31 @@ internal sealed class NullableColumnLifter : ExpressionVisitor
 
     protected override Expression VisitMethodCall(MethodCallExpression node)
     {
-        if (_valueParameter is not null
-            && node.Method.IsGenericMethod
-            && node.Method.GetGenericMethodDefinition() == EnumerableContainsDefinition
-            && StripConversion(node.Arguments[0]) == _valueParameter
-            && node.Arguments[1] == _columnParameter
-            && _valueParameter.Type.IsArray
-            && _valueParameter.Type.GetElementType() == _nullableSupport.ColumnType)
+        if (IsValueArrayContainsColumn(node))
         {
-            NullableArrayValueParameter ??= Expression.Parameter(_nullableSupport.NullableArrayType, _valueParameter.Name);
+            NullableArrayValueParameter ??= Expression.Parameter(_nullableSupport.NullableArrayType, _valueParameter!.Name);
             return Expression.Call(_nullableSupport.NullableContainsMethod, NullableArrayValueParameter, _nullableAccessorBody);
         }
         return base.VisitMethodCall(node);
+    }
+
+    // Matches "values.Contains(column)" however the consumer's compiler bound it: Enumerable.Contains over
+    // the array, or MemoryExtensions.Contains over an implicit span conversion (first-class spans).
+    private bool IsValueArrayContainsColumn(MethodCallExpression node)
+    {
+        if (_valueParameter is null || !_valueParameter.Type.IsArray) return false;
+        if (_valueParameter.Type.GetElementType() != _nullableSupport.ColumnType) return false;
+        if (!node.Method.IsStatic || node.Method.Name != nameof(Enumerable.Contains)) return false;
+        if (node.Method.DeclaringType != typeof(Enumerable) && node.Method.DeclaringType?.FullName != "System.MemoryExtensions") return false;
+        if (node.Arguments.Count < 2 || node.Arguments[1] != _columnParameter) return false;
+        if (StripConversion(node.Arguments[0]) != _valueParameter) return false;
+
+        // A trailing comparer argument is only safe to drop when it is the default (null) comparer.
+        for (var argumentIndex = 2; argumentIndex < node.Arguments.Count; argumentIndex++)
+        {
+            if (node.Arguments[argumentIndex] is not (ConstantExpression { Value: null } or DefaultExpression)) return false;
+        }
+        return true;
     }
 
     private Expression? TryLiftColumnOperand(Expression operand)
@@ -130,8 +139,13 @@ internal sealed class NullableColumnLifter : ExpressionVisitor
         return WellKnownNullableTypes.TryGetValue(valueType, out var nullableType) ? nullableType : null;
     }
 
-    private static Expression StripConversion(Expression expression) =>
-        expression is UnaryExpression { NodeType: ExpressionType.Convert } conversion ? conversion.Operand : expression;
+    // Array-to-span conversions appear either as a Convert node or as a call to the span's op_Implicit.
+    private static Expression StripConversion(Expression expression) => expression switch
+    {
+        UnaryExpression { NodeType: ExpressionType.Convert } conversion => conversion.Operand,
+        MethodCallExpression { Method.Name: "op_Implicit", Arguments.Count: 1 } implicitConversion => implicitConversion.Arguments[0],
+        _ => expression,
+    };
 
     private static bool IsNullableValueType(Type type) => Nullable.GetUnderlyingType(type) is not null;
 
