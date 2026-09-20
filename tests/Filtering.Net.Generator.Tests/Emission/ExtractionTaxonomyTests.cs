@@ -350,15 +350,12 @@ public class ExtractionTaxonomyTests
         }
         """;
 
-    // PropertyMapOverrideExtractor does not yet recognize the unary `(column => predicate)` lambda
-    // shape on `.Operator(...)` chain calls, and FilterRuleBuilder lacks a unary
-    // `Operator(string, Expression<Func<TValue, bool>>)` overload. This test pins the intended
-    // behavior for a future follow-up that adds end-to-end unary PropertyMap override support.
-    [Fact(Skip = "PropertyMap override unary lambda shape not yet supported by extractor")]
+    // A rule with only unary operators has no typed value, so the class gets no resolver constructor.
+    [Fact]
     public void Row9_PropertyMapOverrideUnary_NoExtractionAppliesColumnOnlyPredicate()
     {
         // Arrange
-        var (assembly, filter, resolver) = LoadAndActivateWithResolver(Row9Source);
+        var (assembly, filter) = LoadAndActivate(Row9Source);
         var queryable = BuildQueryable(assembly,
             new() { ["FirstName"] = null },
             new() { ["FirstName"] = "Alice" });
@@ -369,8 +366,7 @@ public class ExtractionTaxonomyTests
         // Assert
         results.Should().ContainSingle();
         GetProp<string?>(results[0], "FirstName").Should().BeNull();
-        // Unary path: resolver is never queried for a value type.
-        resolver.RequestedTypes.Should().BeEmpty();
+        filter.GetType().GetConstructors().Should().ContainSingle(constructor => constructor.GetParameters().Length == 0);
     }
 
     // =========================================================================

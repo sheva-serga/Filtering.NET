@@ -256,8 +256,8 @@ public class MapNestedEmissionTests
         return Verify(driver).UseDirectory("Snapshots");
     }
 
-    [Fact(Skip = "PropertyMap splicing through MapNested is a vNext follow-up; resolver does not propagate PropertyOverrideModel today")]
-    public Task NestedWithPropertyMap_InlinesOverrideUnderPrefix()
+    [Fact]
+    public Task NestedWithPropertyMap_LiftsOverrideUnderPrefix()
     {
         // Arrange
         var consumerSource = """
@@ -272,7 +272,7 @@ public class MapNestedEmissionTests
                 [PropertyMap(nameof(Department.Tags))]
                 private static FilterRule<Department, string> MapTags(FilterRuleBuilder<Department, string> builder) =>
                     builder.For(d => d.Tags.FirstOrDefault() ?? "")
-                        .Operator("anyEq", (tags, v) => tags == v);
+                        .Operator("anyEq", (string tags, string v) => tags == v);
             }
             [GenerateFilter<User>]
             public partial class UserFilter

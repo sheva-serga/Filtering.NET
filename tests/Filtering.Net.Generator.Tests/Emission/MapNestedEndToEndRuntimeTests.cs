@@ -125,6 +125,53 @@ public class MapNestedEndToEndRuntimeTests
         }
         """;
 
+    private const string NestedPropertyMapSource = """
+        using Filtering.Net;
+        namespace Sample;
+        public class Department { public string Email { get; set; } = ""; }
+        public class User { public Department Department { get; set; } = new(); }
+        [GenerateFilter<Department>] public partial class DepartmentFilter
+        {
+            [PropertyMap("Domain")]
+            private static FilterRule<Department, string> MapDomain(FilterRuleBuilder<Department, string> builder) =>
+                builder.For(department => department.Email.Substring(department.Email.IndexOf('@') + 1))
+                       .Operator<string>("eq", (domain, value) => domain == value);
+        }
+        [GenerateFilter<User>]
+        public partial class UserFilter
+        {
+            [MapNested(nameof(User.Department))] private static partial void MapDept();
+        }
+        """;
+
+    [Fact]
+    public void Filter_SourcePropertyMapRule_RunsThroughNestedLiftWithHostResolver()
+    {
+        // Arrange
+        var assembly = RuntimeLoader.LoadGeneratedAssembly(NestedPropertyMapSource);
+        var userFilterType = assembly.GetType("Sample.UserFilter")!;
+        var userType = assembly.GetType("Sample.User")!;
+        var departmentType = assembly.GetType("Sample.Department")!;
+        var resolverConstructor = userFilterType.GetConstructor([typeof(System.Text.Json.Serialization.Metadata.IJsonTypeInfoResolver)])!;
+        var instance = resolverConstructor.Invoke([new System.Text.Json.Serialization.Metadata.DefaultJsonTypeInfoResolver()]);
+        var users = new[]
+        {
+            CreateUserWithDepartmentEmail(userType, departmentType, "alice@corp.com"),
+            CreateUserWithDepartmentEmail(userType, departmentType, "bob@example.org"),
+        };
+        var typedQueryable = BuildTypedQueryable(userType, users);
+        var applyFilterMethod = userFilterType.GetMethod("ApplyFilter")!;
+        var leaf = new FilterLeaf("department.domain", "eq", JsonDocument.Parse("\"corp.com\"").RootElement);
+
+        // Act
+        var filteredQuery = applyFilterMethod.Invoke(instance, [typedQueryable, (object?)leaf])!;
+        var matchCount = 0;
+        foreach (var _ in (System.Collections.IEnumerable)filteredQuery) matchCount++;
+
+        // Assert
+        matchCount.Should().Be(1);
+    }
+
     [Fact]
     public void Filter_DepartmentName_Eq_ReturnsMatchingUsers()
     {

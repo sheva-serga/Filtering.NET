@@ -104,19 +104,27 @@ internal static class PropertyMapOverrideExtractor
             Location: LocationInfo.FromLocation(chainInvocation.Invocation.GetLocation()));
     }
 
-    // Operator<TArgument> carries the value type as its type argument; the unary overload has none.
-    // Without a semantic model the lambda's declared parameter type is the best available answer.
+    // The lambda's arity decides unary vs value, because it is reliable even when the call fails to
+    // bind (an untyped two-parameter lambda cannot infer TArgument). The type then comes from the
+    // bound Operator<TArgument> when available, else from the lambda's declared parameter type.
     private static string? ResolveValueClrType(InvocationExpressionSyntax invocation, ExpressionSyntax predicate, SemanticModel? semanticModel)
     {
-        if (semanticModel?.GetSymbolInfo(invocation).Symbol is IMethodSymbol operatorMethod)
+        var boundTypeArguments = semanticModel?.GetSymbolInfo(invocation).Symbol is IMethodSymbol operatorMethod
+            ? operatorMethod.TypeArguments
+            : default;
+
+        if (predicate is ParenthesizedLambdaExpressionSyntax { ParameterList.Parameters.Count: 2 } valueLambda)
         {
-            return operatorMethod.TypeArguments.Length == 1 ? TypeNameFormatter.Format(operatorMethod.TypeArguments[0]) : null;
+            if (!boundTypeArguments.IsDefaultOrEmpty) return TypeNameFormatter.Format(boundTypeArguments[0]);
+            var declaredValueType = valueLambda.ParameterList.Parameters[1].Type;
+            if (declaredValueType is null) return "object";
+            return semanticModel?.GetTypeInfo(declaredValueType).Type is { } resolvedValueType
+                ? TypeNameFormatter.Format(resolvedValueType)
+                : declaredValueType.ToString();
         }
-        if (predicate is ParenthesizedLambdaExpressionSyntax { ParameterList.Parameters.Count: 2 } lambda)
-        {
-            return lambda.ParameterList.Parameters[1].Type?.ToString() ?? "object";
-        }
-        return null;
+        if (predicate is LambdaExpressionSyntax) return null;
+
+        return boundTypeArguments.IsDefaultOrEmpty ? null : TypeNameFormatter.Format(boundTypeArguments[0]);
     }
 
     private sealed record ChainInvocation(string MethodName, InvocationExpressionSyntax Invocation);

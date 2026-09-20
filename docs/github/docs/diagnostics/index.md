@@ -1,11 +1,11 @@
 ---
 title: Diagnostics catalogue
-description: 29 analyzer rules — 21 errors (FN0001–FN0021) and 8 warnings (FN1001–FN1008).
+description: 30 analyzer rules — 22 errors (FN0001–FN0022) and 8 warnings (FN1001–FN1008).
 ---
 
 # Diagnostics catalogue
 
-Filtering.Net ships 29 compile-time analyzer rules — 21 errors (`FN0001`–`FN0021`) and 8 warnings (`FN1001`–`FN1008`). Both `dotnet build` and the IDE surface them; the rule's `helpLinkUri` brings you back to this page.
+Filtering.Net ships 30 compile-time analyzer rules — 22 errors (`FN0001`–`FN0022`) and 8 warnings (`FN1001`–`FN1008`). Both `dotnet build` and the IDE surface them; the rule's `helpLinkUri` brings you back to this page.
 
 ## Errors
 
@@ -32,6 +32,7 @@ Filtering.Net ships 29 compile-time analyzer rules — 21 errors (`FN0001`–`FN
 | FN0019 | NestedTargetNotFound | Auto-resolve finds zero `[GenerateFilter<TNav>]` candidates for the navigation target type. |
 | FN0020 | NestedNavigationInvalid | Named property doesn't exist, isn't a reference type, or is a primitive/value type. |
 | FN0021 | NestedCollectionUnsupported | Named navigation is a collection type; collection navigations are deferred to a future version. |
+| FN0022 | FilterClassHasBaseType | The `[GenerateFilter]` partial declares a base class. The generated part derives from `FilterDefinition<TEntity>`, so the class cannot have another base. |
 
 ## Warnings
 
