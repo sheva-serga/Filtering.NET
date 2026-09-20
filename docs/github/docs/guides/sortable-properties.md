@@ -17,18 +17,11 @@ Any property your UI exposes as a sortable column. The `sort` field of a request
 
 ```csharp
 [GenerateFilter<User>]
-public partial class UserFilter
-{
-    [Map(nameof(User.Id), Sortable = true)]
-    private static partial void MapId();
-
-    // DefaultSortDirection.Desc — a SortItem with no Direction lands newest-first.
-    [Map(nameof(User.CreatedAt), Sortable = true, DefaultSortDirection = SortDir.Desc)]
-    private static partial void MapCreatedAt();
-
-    [Map(nameof(User.Age), Sortable = true, DefaultSortDirection = SortDir.Desc)]
-    private static partial void MapAge();
-}
+[Map(nameof(User.Id), Sortable = true)]
+// DefaultSortDirection.Desc — a SortItem with no Direction lands newest-first.
+[Map(nameof(User.CreatedAt), Sortable = true, DefaultSortDirection = SortDir.Desc)]
+[Map(nameof(User.Age), Sortable = true, DefaultSortDirection = SortDir.Desc)]
+public partial class UserFilter { }
 ```
 
 A consumer requesting `{ "sort": [{ "field": "createdAt" }, { "field": "id", "direction": "asc" }] }` gets `OrderByDescending(u => u.CreatedAt).ThenBy(u => u.Id)`.

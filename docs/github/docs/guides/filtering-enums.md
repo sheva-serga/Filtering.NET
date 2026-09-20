@@ -34,13 +34,10 @@ public sealed class User
 }
 
 [GenerateFilter<User>]
-public partial class UserFilter
-{
-    // No Profile = typeof(...) — the generator auto-emits Filtering.Net.Generated.UserStatusFilter
-    // and wires it to this property automatically.
-    [Map(nameof(User.Status), Sortable = true)]
-    private static partial void MapStatus();
-}
+// No Profile = typeof(...) — the generator auto-emits Filtering.Net.Generated.UserStatusFilter
+// and wires it to this property automatically.
+[Map(nameof(User.Status), Sortable = true)]
+public partial class UserFilter { }
 ```
 
 A request leaf:

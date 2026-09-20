@@ -21,12 +21,9 @@ From the sample app's `UserFilter.cs`:
 
 ```csharp
 [GenerateFilter<User>]
+[Map(nameof(User.Email), Profile = typeof(StringFilter), Sortable = true, Only = new[] { "eq", "contains", "isNull" })]
 public partial class UserFilter
 {
-    [Map(nameof(User.Email), Profile = typeof(StringFilter), Sortable = true,
-        Only = new[] { "eq", "contains", "isNull" })]
-    private static partial void MapEmail();
-
     [InterceptValue(nameof(User.Email))]
     private static string NormalizeEmail(InterceptContext context, string value) =>
         value.ToLowerInvariant();
@@ -45,8 +42,8 @@ A request with `{ "field": "email", "op": "eq", "value": "Alice@Example.com" }` 
 ## Pitfalls
 
 - The method must be `static`. Any accessibility works, including `private`.
-- Only one `[InterceptValue]` per property is allowed. A second one fires `FN0008`.
-- An `[InterceptValue]` whose property name matches no `[Map]` on the same class raises `FN0012`.
+- Only one `[InterceptValue]` per property is allowed. A second one fires `FN0007`.
+- An `[InterceptValue]` whose property name matches no `[Map]` on the same class raises `FN0011`.
 - Interceptors apply to values parsed by the profile. Custom operators with typed values, which are deserialized through the JSON resolver, are not intercepted.
 - Interceptors run during validation as well as during filtering, so keep them cheap and free of side effects.
 

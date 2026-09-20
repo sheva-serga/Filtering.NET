@@ -5,7 +5,7 @@ description: Common gotchas and questions.
 
 # FAQ
 
-## Why is FN0014 firing on my string properties?
+## Why is FN0012 firing on my string properties?
 
 Declaring any custom `string` profile (e.g., a `[FilterProfile<string>(BasedOn = typeof(StringFilter))]`) makes profile resolution for `string` properties ambiguous: both the built-in `StringFilter` and your custom profile match. The generator refuses to guess. Fix it by specifying `Profile = typeof(...)` on every `string`-typed `[Map]`. The sample app's `UserFilter` does exactly this on `MapName`, `MapEmail`, and `MapDepartmentName`. See FN0014 in the [diagnostics catalogue](diagnostics/index.md) and [Built-in profiles](guides/built-in-profiles.md).
 
@@ -14,8 +14,9 @@ Declaring any custom `string` profile (e.g., a `[FilterProfile<string>(BasedOn =
 Use a dotted path on `[Map]` plus an `Alias` for the public-facing field name:
 
 ```csharp
+[GenerateFilter<User>]
 [Map("Department.Name", Alias = "departmentName")]
-public partial void MapDepartmentName(IPropertyMap<User, string> map);
+public partial class UserFilter { }
 ```
 
 Callers send `{ "field": "departmentName", ... }`. See [Navigation paths and aliases](guides/navigation-paths.md).
@@ -49,8 +50,9 @@ At runtime, per request, from typed pieces that were compiled ahead of time. The
 Use the `Except` argument on `[Map]`:
 
 ```csharp
+[GenerateFilter<User>]
 [Map(nameof(User.Email), Except = new[] { "in" })]
-public partial void MapEmail(IPropertyMap<User, string> map);
+public partial class UserFilter { }
 ```
 
 See [Restricting operators](guides/restricting-operators.md).

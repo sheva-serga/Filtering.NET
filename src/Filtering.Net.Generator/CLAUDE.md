@@ -30,7 +30,7 @@ Cross-pipeline diagnostics (`FN1003 ProfileUnused`, `FN1004 OperatorUnused`) joi
 - **`PropertyMappingExtractor`** resolves the profile, the allowed operators, `IsNullableValueType` (chooses `Map` vs `MapNullable`), and the chain of `ProfileBridgeModel`s the property's profile needs.
 - **`ProfileBridgeBuilder`** reads operator shapes from the member's declared type (`Expression<Func<TColumn, bool>>` or `Expression<Func<TColumn, TValue, bool>>`), not from syntax. Value operators on user profiles always use the typed-value (JSON resolver) factory. Built-in and enum profiles are referenced through their own `Profile` accessor and get no bridge.
 - **`PropertyMapOverrideExtractor`** reads `.Operator(...)` calls only to learn operator names and value types, for FN1008 and for typed-value detection. Arity of the lambda decides unary vs value, because an untyped two-parameter lambda may fail to bind.
-- **`NestedFilterResolver`** still merges the nested filter's mappings into the host model. That merged list exists for diagnostics (FN0001 duplicates, cycles) and typed-value propagation. Emission uses only the host's own properties (`SourceFilterClassFqn is null`) plus `NestedMappings[*].ResolvedTargetClassFqn`; the actual lifting happens at runtime through `FilterSchemaBuilder.AddNested`. The DFS keeps a path of `(class, nesting key, bounded?)` steps: a nesting with `MaxDepth > 0` stops contributing once it was entered that many times on the path, and re-entering a class is FN0016 only when no nesting since its previous visit is bounded. This mirrors `FilterNestingContext` in the runtime; the nesting key is `<declaring class FQN>.<method name>` on both sides.
+- **`NestedFilterResolver`** still merges the nested filter's mappings into the host model. That merged list exists for diagnostics (FN0001 duplicates, cycles) and typed-value propagation. Emission uses only the host's own properties (`SourceFilterClassFqn is null`) plus `NestedMappings[*].ResolvedTargetClassFqn`; the actual lifting happens at runtime through `FilterSchemaBuilder.AddNested`. The DFS keeps a path of `(class, nesting key, bounded?)` steps: a nesting with `MaxDepth > 0` stops contributing once it was entered that many times on the path, and re-entering a class is FN0015 only when no nesting since its previous visit is bounded. This mirrors `FilterNestingContext` in the runtime; the nesting key is `<declaring class FQN>.<method name>` on both sides.
 - **`HasAnyTypedValueProperty`** gates the resolver-accepting constructor pair. It is true when the class, or any filter it nests (including that filter's `[PropertyMap]` rules), has a typed-value operator.
 
 ## Emission contract
@@ -38,7 +38,7 @@ Cross-pipeline diagnostics (`FN1003 ProfileUnused`, `FN1004 OperatorUnused`) joi
 ```
 SourceEmitter.EmitForClass(FilterClassModel)
   → BuildView()                                 one string per schema entry, formatted in C#
-  → ScribanRuntime.Render("FilterClass", view)  base class, ctor(s), marker bodies, CreateSchema
+  → ScribanRuntime.Render("FilterClass", view)  base class, ctor(s), CreateSchema
 ```
 
 Templates only loop and branch. Scriban re-indents multi-line values to the column of the tag, so continuation indents in C# are relative, not absolute. Emitted files use `#nullable enable annotations` so consumer nullability mismatches never become warnings in generated code.

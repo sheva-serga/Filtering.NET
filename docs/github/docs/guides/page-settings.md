@@ -18,16 +18,9 @@ Every filter class that backs a paged endpoint. Pinning a sensible default lets 
 ```csharp
 [GenerateFilter<User>]
 [PageSettings(DefaultPageSize = 25, MaxPageSize = 200)]
-public partial class UserFilter
-{
-    [Map(nameof(User.Id), Sortable = true)]
-    private static partial void MapId();
-
-    [Map(nameof(User.Name), Profile = typeof(StringFilter), Sortable = true)]
-    private static partial void MapName();
-
-    // ... more [Map] methods
-}
+[Map(nameof(User.Id), Sortable = true)]
+[Map(nameof(User.Name), Profile = typeof(StringFilter), Sortable = true)]
+public partial class UserFilter { }
 ```
 
 A request with `"pageSize": 50` runs as-is. A request with no `pageSize` resolves to 25. A request with `"pageSize": 5000` fails validation before any SQL is executed.

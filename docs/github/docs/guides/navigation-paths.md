@@ -19,12 +19,9 @@ Lifted from `samples/UserManagement.WebApi/Filters/UserFilter.cs`:
 
 ```csharp
 [GenerateFilter<User>]
-public partial class UserFilter
-{
-    // Exposes Department.Name as 'departmentName' in the JSON request.
-    [Map("Department.Name", Profile = typeof(StringFilter), Alias = "departmentName", Sortable = true)]
-    private static partial void MapDepartmentName();
-}
+// Exposes Department.Name as 'departmentName' in the JSON request.
+[Map("Department.Name", Profile = typeof(StringFilter), Alias = "departmentName", Sortable = true)]
+public partial class UserFilter { }
 ```
 
 Sample request leaf:
@@ -44,8 +41,8 @@ EF Core translates the predicate into a SQL join through the `Department` naviga
 ## Pitfalls
 
 - Paths through a nullable navigation produce `FN1006` (potential null-propagation surprise). The generated predicate uses C# `?.` semantics, but providers translate that with their own null-handling — review the generated SQL or supply a custom mapping with explicit null guards if the default behaviour is wrong for your domain.
-- Aliases must be unique across the filter class — a duplicate fires `FN0011` (case-insensitive comparison).
-- The path must resolve against the entity model. A typo (`"Departement.Name"`) fires `FN0004`.
+- Aliases must be unique across the filter class — a duplicate fires `FN0009` (case-insensitive comparison).
+- The path must resolve against the entity model. A typo (`"Departement.Name"`) fires `FN0003`.
 - The leaf type at the end of the path (`Department.Name` is a `string`) is what the profile must accept. The same profile-resolution rules apply to navigation paths as to top-level properties.
 
 ## See also

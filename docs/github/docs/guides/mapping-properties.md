@@ -7,7 +7,7 @@ description: Use [Map] to expose a property as filterable.
 
 ## What this does
 
-Placing `[Map(nameof(Entity.Property))]` on a `private static partial void` method inside a `[GenerateFilter<TEntity>]` partial exposes that property as filterable. The source generator emits the dispatch and predicate code (per-leaf validation, JSON value extraction, typed `Where` predicate) for each `[Map]`-decorated method at compile time.
+Placing `[Map(nameof(Entity.Property))]` on a `[GenerateFilter<TEntity>]` partial class exposes that property as filterable. Add one `[Map]` per property. The source generator emits the dispatch and predicate code (per-leaf validation, JSON value extraction, typed `Where` predicate) for each `[Map]`-decorated method at compile time.
 
 ## When to use
 
@@ -25,16 +25,14 @@ public sealed class User
 }
 
 [GenerateFilter<User>]
-public partial class UserFilter
-{
-    [Map(nameof(User.Id),       Sortable = true)] private static partial void MapId();
-    [Map(nameof(User.Name),     Sortable = true)] private static partial void MapName();
-    [Map(nameof(User.Age),      Sortable = true)] private static partial void MapAge();
-    [Map(nameof(User.IsActive))]                  private static partial void MapIsActive();
-}
+[Map(nameof(User.Id),       Sortable = true)]
+[Map(nameof(User.Name),     Sortable = true)]
+[Map(nameof(User.Age),      Sortable = true)]
+[Map(nameof(User.IsActive))]
+public partial class UserFilter { }
 ```
 
-The method body is empty — the generator never invokes it; it only reads the attribute. The method is purely a declaration site for the metadata.
+The class body can stay empty. It only needs members when you add an `[InterceptValue]` method or a `[PropertyMap]` rule.
 
 ## Variations
 
@@ -49,11 +47,11 @@ Navigation paths use dotted strings: `[Map("Department.Name", Alias = "departmen
 
 ## Pitfalls
 
-- The `[Map]`-decorated method must be declared `partial`, otherwise `FN0007` fires.
-- A property may be carried by either `[Map]` or `[PropertyMap]`, never both — `FN0003` flags the conflict.
-- Two `[Map]` methods that point at the same property name (or the same alias) collide with `FN0001`.
-- The string passed to `[Map(...)]` must resolve to a real property on the entity, otherwise `FN0004` fires.
-- Aliases must be unique across the whole filter class (case-insensitive), or `FN0011` fires.
+- The filter class must be `partial` and must not declare a base class (`FN0021`): the generated part derives from `FilterDefinition<TEntity>`.
+- A property may be carried by either `[Map]` or `[PropertyMap]`, never both — `FN0002` flags the conflict.
+- Two `[Map]` attributes that point at the same property name (or the same alias) collide with `FN0001`.
+- The string passed to `[Map(...)]` must resolve to a real property on the entity, otherwise `FN0003` fires.
+- Aliases must be unique across the whole filter class (case-insensitive), or `FN0009` fires.
 
 ## See also
 

@@ -20,9 +20,10 @@ Lifted from the sample app's `UserFilter.cs`:
 
 ```csharp
 // Operator allow-list via Only — emails accept only equality, substring, and null-check.
+[GenerateFilter<User>]
 [Map(nameof(User.Email), Profile = typeof(StringFilter), Sortable = true,
     Only = new[] { "eq", "contains", "isNull" })]
-private static partial void MapEmail();
+public partial class UserFilter { }
 ```
 
 A request that sends `{ "field": "email", "op": "startsWith", "value": "..." }` fails validation with an "operator not allowed" error — even though `StringFilter` declares `startsWith`, this property does not allow it.

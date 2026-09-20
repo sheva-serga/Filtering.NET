@@ -33,9 +33,7 @@ public sealed class User
 [Map(nameof(User.Name),     Sortable = true)]
 [Map(nameof(User.Age),      Sortable = true)]
 [Map(nameof(User.IsActive))]
-public partial class UserFilter
-{
-}
+public partial class UserFilter { }
 ```
 
 Apply a request to an `IQueryable<User>`:

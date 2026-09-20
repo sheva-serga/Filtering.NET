@@ -47,7 +47,7 @@ internal static class ProfileExtractor
         // extensions like npgsql's TrigramsAreSimilar that aren't in the static allow-list.
         var efIsReferenced = IsEntityFrameworkCoreReferenced(context.SemanticModel.Compilation);
 
-        // FN0012: BasedOn must itself carry [FilterProfile].
+        // FN0010: BasedOn must itself carry [FilterProfile].
         var profileAttribute = context.Attributes.FirstOrDefault();
         var hasBasedOn = profileAttribute is not null && HasBasedOnNamedArg(profileAttribute);
         if (profileAttribute is not null)
@@ -63,7 +63,7 @@ internal static class ProfileExtractor
             var operatorAttribute = FindFilterOperatorAttribute(member.GetAttributes());
             if (operatorAttribute is null) continue;
 
-            // FN0010: [FilterOperator] must be on a public static member.
+            // FN0008: [FilterOperator] must be on a public static member.
             if (member.DeclaredAccessibility != Accessibility.Public || !member.IsStatic)
             {
                 diagnostics.Add(DiagnosticInfo.From(
@@ -100,7 +100,7 @@ internal static class ProfileExtractor
             ScanOperatorBody(member, diagnostics, cancellationToken, efIsReferenced);
         }
 
-        // FN0015: standalone profiles (no BasedOn) must own their extractor methods;
+        // FN0013: standalone profiles (no BasedOn) must own their extractor methods;
         // profiles with BasedOn delegate to the base, which is checked separately.
         if (!hasBasedOn && operatorNames.Count > 0)
         {

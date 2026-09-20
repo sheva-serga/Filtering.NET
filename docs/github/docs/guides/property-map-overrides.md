@@ -24,11 +24,9 @@ To add one operator to a CLR type's normal surface, prefer a `[FilterProfile<T>]
 
 ```csharp
 [GenerateFilter<Article>]
+[Map(nameof(Article.Id), Sortable = true)]
 public partial class ArticleFilter
 {
-    [Map(nameof(Article.Id), Sortable = true)]
-    private static partial void MapId();
-
     [PropertyMap(nameof(Article.Tags))]
     private static FilterRule<Article, List<string>> MapTags(
         FilterRuleBuilder<Article, List<string>> builder) =>

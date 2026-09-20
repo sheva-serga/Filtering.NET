@@ -1,6 +1,6 @@
 # CLAUDE.md — Filtering.Net solution
 
-Filter / sort / page library for `IQueryable<T>` and EF Core. Consumers declare `[GenerateFilter<TEntity>]` partials with `[Map]`-decorated methods. An incremental Roslyn generator emits a typed *schema* per class plus DI wiring; the generic engine `FilterDefinition<TEntity>` in the runtime does all validation, predicate composition, and sorting.
+Filter / sort / page library for `IQueryable<T>` and EF Core. Consumers declare `[GenerateFilter<TEntity>]` partial classes and put one `[Map]` attribute per property on the class. An incremental Roslyn generator emits a typed *schema* per class plus DI wiring; the generic engine `FilterDefinition<TEntity>` in the runtime does all validation, predicate composition, and sorting.
 
 ## Solution layout
 
@@ -39,7 +39,7 @@ dotnet test tests/Filtering.Net.Generator.Tests --filter "FullyQualifiedName~Com
 - **Pipeline branches** in `FilterGenerator.cs`: branch 1 walks `[GenerateFilter<TEntity>]` partials → emits filter classes, `FilteringProfiles.g.cs` (runtime instances of user profiles), enum profiles, and the DI extension; branch 2 walks `[FilterProfile<T>]` classes → emits per-profile diagnostics. Cross-pipeline diagnostics (FN1003 / FN1004) join both `.Collect()` outputs.
 - **Model extraction** is in `ModelExtraction/` and produces `EquatableList<T>`-based records so the Roslyn cache can deduplicate compilations cheaply.
 - **Emission** uses Scriban templates source-embedded into the analyzer DLL (`PackageScribanIncludeSource`). Each emitter exposes `BuildView(model) → record` plus `Emit(model) → string` that delegates to `ScribanRuntime.Render`. `SourceEmitter.cs` builds the schema entries for `FilterClass.scriban`.
-- **Analyzer rules** are catalogued in `Diagnostics/DiagnosticDescriptors.cs`. Errors are `FN0001`–`FN0023`, warnings are `FN1001`–`FN1008`. Every descriptor's `helpLinkUri` points at the single catalogue page on the mkdocs-material site (`https://sheva-serga.github.io/Filtering.NET/diagnostics/`); add a new rule by registering its descriptor here and appending a row to `docs/github/docs/diagnostics/index.md`.
+- **Analyzer rules** are catalogued in `Diagnostics/DiagnosticDescriptors.cs`. Errors are `FN0001`–`FN0022`, warnings are `FN1001`–`FN1008`. Every descriptor's `helpLinkUri` points at the single catalogue page on the mkdocs-material site (`https://sheva-serga.github.io/Filtering.NET/diagnostics/`); add a new rule by registering its descriptor here and appending a row to `docs/github/docs/diagnostics/index.md`.
 
 ## Snapshot-test workflow
 

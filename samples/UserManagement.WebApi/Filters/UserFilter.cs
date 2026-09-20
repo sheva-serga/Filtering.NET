@@ -5,7 +5,7 @@ using UserManagement.WebApi.Models;
 namespace UserManagement.WebApi.Filters;
 
 // Feature catalogue: each grouping below demonstrates one Filtering.Net capability.
-// String maps pass Profile = typeof(...) explicitly because StringFilterPlus makes string ambiguous (FN0014).
+// String maps pass Profile = typeof(...) explicitly because StringFilterPlus makes string ambiguous (FN0012).
 [GenerateFilter<User>]
 // Built-in primitive profiles (Int32, Bool, DateTime, Guid).
 [Map(nameof(User.Id), Sortable = true)]
@@ -29,5 +29,4 @@ public partial class UserFilter
     // [InterceptValue] — runs once per leaf value before predicate building.
     [InterceptValue(nameof(User.Email))]
     private static string NormalizeEmail(InterceptContext context, string value) => value.ToLowerInvariant();
-
 }

@@ -45,7 +45,7 @@ internal static class FilterClassExtractor
         var (defaultPageSize, maxPageSize) = ResolvePageSettings(classSymbol, context.SemanticModel.Compilation.Assembly);
         var (maxNestingDepth, maxLeafConditions) = ResolveRequestLimits(context.SemanticModel.Compilation.Assembly);
 
-        // FN0022: the generated part declares FilterDefinition<TEntity> as the base class.
+        // FN0021: the generated part declares FilterDefinition<TEntity> as the base class.
         if (classSymbol.BaseType is { SpecialType: not SpecialType.System_Object } declaredBaseType)
         {
             diagnostics.Add(DiagnosticInfo.From(
@@ -59,7 +59,7 @@ internal static class FilterClassExtractor
         var compilation = context.SemanticModel.Compilation;
 
         // Feed virtual enum profiles so the index can detect collisions between hand-written
-        // [FilterProfile<MyEnum>] and auto-emitted Filtering.Net.Generated.<EnumName>Filter (FN0014).
+        // [FilterProfile<MyEnum>] and auto-emitted Filtering.Net.Generated.<EnumName>Filter (FN0012).
         var virtualEnumProfiles = EnumTypeCollector.Collect(compilation);
         var profileIndex = ProfileIndexBuilder.Build(compilation, virtualEnumProfiles);
 

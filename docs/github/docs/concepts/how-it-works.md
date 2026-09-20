@@ -50,7 +50,7 @@ Predicates are composed per request. The per-property work that does not depend 
 `FilterGenerator.cs` registers two `ForAttributeWithMetadataName` pipelines:
 
 1. **`[GenerateFilter<TEntity>]` branch.** Extracts a `FilterClassModel`, reports per-class diagnostics, and emits one source file per class. A collected view drives the assembly-wide `services.AddFiltering()` extension, the per-enum profiles, and `FilteringProfiles.g.cs`, which holds a runtime `FilterProfile<T>` instance for every custom profile your filters reference.
-2. **`[FilterProfile<T>]` branch.** Extracts profile models and reports per-profile diagnostics such as `FN0009`, `FN0014`, `FN1001`, and `FN1007`.
+2. **`[FilterProfile<T>]` branch.** Extracts profile models and reports per-profile diagnostics such as `FN0008`, `FN0013`, `FN1001`, and `FN1007`.
 
 Cross-pipeline diagnostics, `FN1003 ProfileUnused` and `FN1004 OperatorUnused`, join both outputs.
 

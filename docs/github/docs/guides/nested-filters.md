@@ -21,25 +21,21 @@ Everything the source filter configured comes along: `Sortable`, `Alias`, `Only`
 
 ```csharp
 [GenerateFilter<Department>]
-public partial class DepartmentFilter
-{
-    [Map(nameof(Department.Id), Sortable = true)]   private static partial void MapId();
-    [Map(nameof(Department.Name), Sortable = true)] private static partial void MapName();
-}
+[Map(nameof(Department.Id), Sortable = true)]
+[Map(nameof(Department.Name), Sortable = true)]
+public partial class DepartmentFilter { }
 
 [GenerateFilter<User>]
-public partial class UserFilter
-{
-    [Map(nameof(User.Name))]                        private static partial void MapName();
-    [MapNested(nameof(User.Department))]            private static partial void MapDepartment();
-}
+[Map(nameof(User.Name))]
+[MapNested(nameof(User.Department))]
+public partial class UserFilter { }
 ```
 
 Wire fields exposed by `UserFilter`: `name`, `department.id`, `department.name`. Wire keys are matched case-insensitively.
 
 ## Auto-resolve vs explicit
 
-- `[MapNested(nameof(User.Department))]` resolves the unique `[GenerateFilter<Department>]` partial in the compilation. Two candidates raise `FN0018`.
+- `[MapNested(nameof(User.Department))]` resolves the unique `[GenerateFilter<Department>]` partial in the compilation. Two candidates raise `FN0017`.
 - `[MapNested<DepartmentFilter>(nameof(User.Department))]` names the filter class. Use it when several filter classes target the same entity.
 
 ## Configuration knobs
@@ -56,18 +52,13 @@ If `DepartmentFilter` itself has `[MapNested(nameof(Department.Company))]`, then
 
 ## Self-referencing and circular models
 
-Entity models are often circular: `Employee.Manager` points at another `Employee`, or `User.Department` and `Department.Head` point at each other. Nesting such a graph without a limit would never end, so an unbounded cycle is the compile error `FN0016 NestedCycle`. Give at least one nesting in the cycle a `MaxDepth` and the cycle becomes legal:
+Entity models are often circular: `Employee.Manager` points at another `Employee`, or `User.Department` and `Department.Head` point at each other. Nesting such a graph without a limit would never end, so an unbounded cycle is the compile error `FN0015 NestedCycle`. Give at least one nesting in the cycle a `MaxDepth` and the cycle becomes legal:
 
 ```csharp
 [GenerateFilter<Employee>]
-public partial class EmployeeFilter
-{
-    [Map(nameof(Employee.Name), Sortable = true)]
-    private static partial void MapName();
-
-    [MapNested(nameof(Employee.Manager), MaxDepth = 2)]
-    private static partial void MapManager();
-}
+[Map(nameof(Employee.Name), Sortable = true)]
+[MapNested(nameof(Employee.Manager), MaxDepth = 2)]
+public partial class EmployeeFilter { }
 ```
 
 This exposes `name`, `manager.name`, and `manager.manager.name`. A request for `manager.manager.manager.name` fails validation with `UnknownField`. On EF Core each level becomes one self-join.
@@ -89,12 +80,12 @@ If the nested filter, or anything it nests, has an operator that takes a typed v
 
 ## Limitations
 
-- A negative `MaxDepth` is the compile error `FN0023`.
-- The target filter class must live in the same compilation. Otherwise `FN0017 NestedCrossAssembly` fires.
-- Collection navigations such as `User.Posts` are not supported and raise `FN0021 NestedCollectionUnsupported`.
+- A negative `MaxDepth` is the compile error `FN0022`.
+- The target filter class must live in the same compilation. Otherwise `FN0016 NestedCrossAssembly` fires.
+- Collection navigations such as `User.Posts` are not supported and raise `FN0020 NestedCollectionUnsupported`.
 - The same path produced by `[Map]`, `[PropertyMap]`, and `[MapNested]` together raises `FN0001 DuplicateMapping`, reporting every conflicting site.
 
 ## See also
 
 - [Navigation paths and aliases](navigation-paths.md) for the per-column form.
-- [Diagnostics catalogue](../diagnostics/index.md), rules `FN0016` to `FN0021`.
+- [Diagnostics catalogue](../diagnostics/index.md), rules `FN0015` to `FN0020`, and `FN0022`.

@@ -187,7 +187,7 @@ internal static class PropertyMappingExtractor
         var onlySet = ToStringSet(onlyOperators);
         var exceptSet = ToStringSet(exceptOperators);
 
-        // FN0006: any name in Only/Except that isn't on the profile is an error.
+        // FN0005: any name in Only/Except that isn't on the profile is an error.
         if (onlySet is not null)
         {
             foreach (var operatorName in onlySet)

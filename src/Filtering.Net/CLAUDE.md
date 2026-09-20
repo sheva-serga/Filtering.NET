@@ -29,7 +29,7 @@ The runtime: request types, profiles, and the filter engine. Generated filter cl
 
 ## Circular nesting
 
-`FilterNestingContext` is the path of nestings a schema is being built through. `AddNested` enters a nesting only while its `MaxDepth` is not used up on that path, and throws `FilterConfigurationException` when an unbounded nesting repeats with no bounded nesting in between. `NestedFilterResolver` in the generator applies the same two rules at compile time (FN0016); keep them in step.
+`FilterNestingContext` is the path of nestings a schema is being built through. `AddNested` enters a nesting only while its `MaxDepth` is not used up on that path, and throws `FilterConfigurationException` when an unbounded nesting repeats with no bounded nesting in between. `NestedFilterResolver` in the generator applies the same two rules at compile time (FN0015); keep them in step.
 
 ## Editing rules
 

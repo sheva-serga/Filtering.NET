@@ -5,7 +5,7 @@ description: Declare a [GenerateFilter<T>] partial class.
 
 # Your first filter
 
-A *filter class* is a partial class decorated with `[GenerateFilter<TEntity>]`. The source generator walks its `[Map]`-decorated partial methods and emits an `IFilterDefinition<TEntity>` implementation alongside it.
+A *filter class* is a partial class decorated with `[GenerateFilter<TEntity>]`. The source generator reads the `[Map]` attributes on the class and emits the schema that the `FilterDefinition<TEntity>` engine runs on, so the class implements `IFilterDefinition<TEntity>`.
 
 ## Declare your entity
 
@@ -23,17 +23,15 @@ public sealed class User
 
 ## Declare a filter partial
 
-In the same project (it doesn't need to be the same file), declare a `partial class` with `[GenerateFilter<User>]` and one `[Map]`-decorated partial method per filterable property:
+In the same project (it doesn't need to be the same file), declare a `partial class` with `[GenerateFilter<User>]` and one `[Map]` attribute per filterable property:
 
 ```csharp
 [GenerateFilter<User>]
-public partial class UserFilter
-{
-    [Map(nameof(User.Id),       Sortable = true)] private static partial void MapId();
-    [Map(nameof(User.Name),     Sortable = true)] private static partial void MapName();
-    [Map(nameof(User.Age),      Sortable = true)] private static partial void MapAge();
-    [Map(nameof(User.IsActive))]                  private static partial void MapIsActive();
-}
+[Map(nameof(User.Id),       Sortable = true)]
+[Map(nameof(User.Name),     Sortable = true)]
+[Map(nameof(User.Age),      Sortable = true)]
+[Map(nameof(User.IsActive))]
+public partial class UserFilter { }
 ```
 
 The `[Map]` methods are `static partial` placeholders the generator reads — they have no body and are never called at runtime. Use `nameof(...)` to keep them refactor-safe. `Sortable = true` opts the property into the `sort` array of an incoming request.
@@ -51,7 +49,7 @@ For the partial above, the generator emits a sibling source file containing:
 Cross-link to [How it works](../concepts/how-it-works.md) for the compile-time pipeline that drives this emission.
 
 !!! note
-    The `[Map]` methods are `private static partial void` by convention. The generator only reads their attributes — they're never invoked, so visibility and return type don't affect runtime behaviour.
+    The class must be `partial` and must not declare a base class. The generated part derives from `FilterDefinition<User>`, which is where `Validate`, `ApplyFilter`, and `ApplySorting` are implemented.
 
 ## See also
 
