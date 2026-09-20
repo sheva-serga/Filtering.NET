@@ -29,12 +29,12 @@ public sealed class User
 }
 
 [GenerateFilter<User>]
+[Map(nameof(User.Id),       Sortable = true)]
+[Map(nameof(User.Name),     Sortable = true)]
+[Map(nameof(User.Age),      Sortable = true)]
+[Map(nameof(User.IsActive))]
 public partial class UserFilter
 {
-    [Map(nameof(User.Id),       Sortable = true)] private static partial void MapId();
-    [Map(nameof(User.Name),     Sortable = true)] private static partial void MapName();
-    [Map(nameof(User.Age),      Sortable = true)] private static partial void MapAge();
-    [Map(nameof(User.IsActive))]                  private static partial void MapIsActive();
 }
 ```
 

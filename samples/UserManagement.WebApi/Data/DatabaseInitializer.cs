@@ -1,4 +1,3 @@
-using Microsoft.EntityFrameworkCore;
 using UserManagement.WebApi.Models;
 
 namespace UserManagement.WebApi.Data;

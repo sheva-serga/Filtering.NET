@@ -4,8 +4,6 @@ using AwesomeAssertions;
 
 using Xunit;
 
-using static Filtering.Net.Tests.Engine.EngineTestData;
-
 namespace Filtering.Net.Tests.Engine;
 
 public class FilterNestingTests

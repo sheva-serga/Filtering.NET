@@ -68,35 +68,35 @@ internal static class FilterClassExtractor
         var interceptors = new List<InterceptorModel>();
         var overrides = new List<PropertyOverrideModel>();
 
-        var mappedPropertyFirstMethodName = new Dictionary<string, string>(StringComparer.Ordinal);
         var mappedPropertyFirstLocation = new Dictionary<string, Location?>(StringComparer.Ordinal);
         var interceptedPropertyFirstLocation = new Dictionary<string, Location?>(StringComparer.Ordinal);
         var propertyMapFirstLocation = new Dictionary<string, Location?>(StringComparer.Ordinal);
 
+        // [Map] is declared on the class, once per property.
+        foreach (var classAttribute in classSymbol.GetAttributes())
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (classAttribute.AttributeClass?.ToDisplayString() != MapAttributeFullName) continue;
+            ExtractMapAttribute(
+                classSymbol,
+                entityType,
+                classAttribute,
+                compilation,
+                profileIndex,
+                diagnostics,
+                properties,
+                mappedPropertyFirstLocation);
+        }
+
+        // [InterceptValue] and [PropertyMap] stay on methods because those methods have bodies.
         foreach (var member in classSymbol.GetMembers())
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (member is not IMethodSymbol methodSymbol) continue;
 
             var memberAttributes = methodSymbol.GetAttributes();
-            var mapAttribute = FindAttribute(memberAttributes, MapAttributeFullName);
             var interceptAttribute = FindAttribute(memberAttributes, InterceptValueAttributeFullName);
             var propertyMapAttribute = FindAttribute(memberAttributes, PropertyMapAttributeFullName);
-
-            if (mapAttribute is not null)
-            {
-                ExtractMapMethod(
-                    methodSymbol,
-                    classSymbol,
-                    entityType,
-                    mapAttribute,
-                    compilation,
-                    profileIndex,
-                    diagnostics,
-                    properties,
-                    mappedPropertyFirstMethodName,
-                    mappedPropertyFirstLocation);
-            }
 
             if (interceptAttribute is not null)
             {
@@ -124,7 +124,7 @@ internal static class FilterClassExtractor
         // FN0002: same property name appearing in both [Map] and [PropertyMap].
         // Primary squiggle on the [PropertyMap] site (more naturally available — it's the override
         // shadowing the regular [Map]); additional points at the colliding [Map] method.
-        foreach (var sharedPropertyName in mappedPropertyFirstMethodName.Keys.Intersect(propertyMapFirstLocation.Keys, StringComparer.Ordinal))
+        foreach (var sharedPropertyName in mappedPropertyFirstLocation.Keys.Intersect(propertyMapFirstLocation.Keys, StringComparer.Ordinal))
         {
             propertyMapFirstLocation.TryGetValue(sharedPropertyName, out var propertyMapLocation);
             mappedPropertyFirstLocation.TryGetValue(sharedPropertyName, out var mapLocation);
@@ -144,7 +144,7 @@ internal static class FilterClassExtractor
 
         foreach (var interceptedEntry in interceptedPropertyFirstLocation)
         {
-            if (!mappedPropertyFirstMethodName.ContainsKey(interceptedEntry.Key))
+            if (!mappedPropertyFirstLocation.ContainsKey(interceptedEntry.Key))
             {
                 diagnostics.Add(DiagnosticInfo.From(
                     DiagnosticDescriptors.InterceptorWithoutMap,
@@ -185,8 +185,7 @@ internal static class FilterClassExtractor
             Diagnostics: new EquatableList<DiagnosticInfo>(diagnostics));
     }
 
-    private static void ExtractMapMethod(
-        IMethodSymbol methodSymbol,
+    private static void ExtractMapAttribute(
         INamedTypeSymbol classSymbol,
         INamedTypeSymbol entityType,
         AttributeData mapAttribute,
@@ -194,82 +193,34 @@ internal static class FilterClassExtractor
         ProfileIndex profileIndex,
         List<DiagnosticInfo> diagnostics,
         List<PropertyMappingModel> properties,
-        Dictionary<string, string> mappedPropertyFirstMethodName,
         Dictionary<string, Location?> mappedPropertyFirstLocation)
     {
-        if (!IsPartial(methodSymbol))
-        {
-            diagnostics.Add(DiagnosticInfo.From(
-                DiagnosticDescriptors.MissingPartial,
-                methodSymbol.Locations.FirstOrDefault(),
-                methodSymbol.Name));
-        }
-
-        var extractionResult = PropertyMappingExtractor.Extract(methodSymbol, entityType, mapAttribute, compilation, profileIndex);
+        var extractionResult = PropertyMappingExtractor.Extract(entityType, mapAttribute, compilation, profileIndex);
         diagnostics.AddRange(extractionResult.Diagnostics);
 
-        if (extractionResult.Model is null)
-        {
-            // Record the attempted name so a second [Map] for the same name fires FN0001.
-            var attemptedName = ReadConstructorString(mapAttribute, position: 0);
-            if (!string.IsNullOrEmpty(attemptedName))
-            {
-                EmitDuplicateMapDiagnosticIfNeeded(
-                    methodSymbol,
-                    classSymbol,
-                    attemptedName!,
-                    mappedPropertyFirstMethodName,
-                    mappedPropertyFirstLocation,
-                    diagnostics);
-            }
-            return;
-        }
+        // A failed extraction still claims its name so a second [Map] for the same name fires FN0001.
+        var propertyName = extractionResult.Model?.PropertyName ?? ReadConstructorString(mapAttribute, position: 0);
+        if (string.IsNullOrEmpty(propertyName)) return;
 
-        if (mappedPropertyFirstMethodName.ContainsKey(extractionResult.Model.PropertyName))
+        var attributeLocation = mapAttribute.ApplicationSyntaxReference?.GetSyntax().GetLocation();
+        if (mappedPropertyFirstLocation.TryGetValue(propertyName!, out var previousLocation))
         {
-            EmitDuplicateMapDiagnosticIfNeeded(
-                methodSymbol,
-                classSymbol,
-                extractionResult.Model.PropertyName,
-                mappedPropertyFirstMethodName,
-                mappedPropertyFirstLocation,
-                diagnostics);
-            return;
-        }
-
-        mappedPropertyFirstMethodName[extractionResult.Model.PropertyName] = methodSymbol.Name;
-        mappedPropertyFirstLocation[extractionResult.Model.PropertyName] = methodSymbol.Locations.FirstOrDefault();
-        properties.Add(extractionResult.Model);
-    }
-
-    private static void EmitDuplicateMapDiagnosticIfNeeded(
-        IMethodSymbol methodSymbol,
-        INamedTypeSymbol classSymbol,
-        string propertyName,
-        Dictionary<string, string> mappedPropertyFirstMethodName,
-        Dictionary<string, Location?> mappedPropertyFirstLocation,
-        List<DiagnosticInfo> diagnostics)
-    {
-        var location = methodSymbol.Locations.FirstOrDefault();
-        if (mappedPropertyFirstMethodName.TryGetValue(propertyName, out var previousMethodName))
-        {
-            mappedPropertyFirstLocation.TryGetValue(propertyName, out var previousLocation);
             var hostFqn = classSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat).Replace("global::", "");
-            var sources = "[Map] " + previousMethodName + ", [Map] " + methodSymbol.Name;
             var additionalLocations = previousLocation is not null
                 ? new[] { previousLocation }
                 : Array.Empty<Location>();
             diagnostics.Add(DiagnosticInfo.From(
                 DiagnosticDescriptors.DuplicateMapping,
-                location,
+                attributeLocation,
                 additionalLocations,
-                propertyName,
+                propertyName!,
                 hostFqn,
-                sources));
+                "[Map] " + propertyName + ", [Map] " + propertyName));
             return;
         }
-        mappedPropertyFirstMethodName[propertyName] = methodSymbol.Name;
-        mappedPropertyFirstLocation[propertyName] = location;
+
+        mappedPropertyFirstLocation[propertyName!] = attributeLocation;
+        if (extractionResult.Model is not null) properties.Add(extractionResult.Model);
     }
 
     private static void DetectAliasCollisions(
@@ -499,22 +450,6 @@ internal static class FilterClassExtractor
             if (attributeData.AttributeClass?.ToDisplayString() == fullName) return attributeData;
         }
         return null;
-    }
-
-    private static bool IsPartial(IMethodSymbol methodSymbol)
-    {
-        // Roslyn exposes both partial halves via the same symbol; either half may carry the modifier.
-        foreach (var syntaxReference in methodSymbol.DeclaringSyntaxReferences)
-        {
-            if (syntaxReference.GetSyntax() is MethodDeclarationSyntax methodDeclaration)
-            {
-                if (methodDeclaration.Modifiers.Any(SyntaxKind.PartialKeyword))
-                {
-                    return true;
-                }
-            }
-        }
-        return false;
     }
 
     private static string? ReadConstructorString(AttributeData attributeData, int position)

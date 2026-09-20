@@ -2,7 +2,7 @@ namespace Filtering.Net;
 
 /// <summary>Inlines another <c>[GenerateFilter&lt;TNav&gt;]</c> partial's mappings into this filter under a dotted prefix.</summary>
 /// <param name="navigationPropertyName">Name of the navigation property to inline. Use <c>nameof(Entity.Navigation)</c>.</param>
-[AttributeUsage(AttributeTargets.Method, AllowMultiple = false, Inherited = false)]
+[AttributeUsage(AttributeTargets.Class, AllowMultiple = true, Inherited = false)]
 public sealed class MapNestedAttribute(string navigationPropertyName) : Attribute
 {
     /// <summary>Name of the navigation property whose target filter is inlined.</summary>
@@ -27,7 +27,7 @@ public sealed class MapNestedAttribute(string navigationPropertyName) : Attribut
 /// <summary>Generic-arity overload of <see cref="MapNestedAttribute"/> that pins the inlined filter class explicitly. Use to disambiguate when multiple filter classes target the same navigation entity.</summary>
 /// <typeparam name="TFilter">The concrete filter class (decorated with <c>[GenerateFilter&lt;TEntity&gt;]</c>) whose mappings are inlined.</typeparam>
 /// <param name="navigationPropertyName">Name of the navigation property to inline. Use <c>nameof(Entity.Navigation)</c>.</param>
-[AttributeUsage(AttributeTargets.Method, AllowMultiple = false, Inherited = false)]
+[AttributeUsage(AttributeTargets.Class, AllowMultiple = true, Inherited = false)]
 public sealed class MapNestedAttribute<TFilter>(string navigationPropertyName) : Attribute
 {
     /// <inheritdoc cref="MapNestedAttribute.NavigationPropertyName"/>

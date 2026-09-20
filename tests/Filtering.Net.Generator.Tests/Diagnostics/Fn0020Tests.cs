@@ -7,20 +7,20 @@ namespace Filtering.Net.Generator.Tests.Diagnostics;
 public class Fn0020Tests
 {
     [Fact]
-    public void NavigationDoesNotExistOnHostEntity_FiresFN0020()
+    public void NavigationIsCollection_FiresFN0020()
     {
         // Arrange
         var source = """
+            using System.Collections.Generic;
             using Filtering.Net;
             namespace TestNs;
-            public class Department { public string Name { get; set; } = ""; }
-            public class User { public string Email { get; set; } = ""; }
-            [GenerateFilter<Department>] public partial class DepartmentFilter { }
+            public class Post { public string Title { get; set; } = ""; }
+            public class User { public List<Post> Posts { get; set; } = new(); }
+            [GenerateFilter<Post>] public partial class PostFilter { }
             [GenerateFilter<User>]
+            [MapNested(nameof(User.Posts))]
             public partial class UserFilter
             {
-                [MapNested("Department")]
-                private static partial void MapDepartment();
             }
             """;
 
@@ -32,7 +32,7 @@ public class Fn0020Tests
     }
 
     [Fact]
-    public void ValidReferenceNavigation_DoesNotFireFN0020()
+    public void SingleReferenceNavigation_DoesNotFireFN0020()
     {
         // Arrange
         var source = """
@@ -42,10 +42,9 @@ public class Fn0020Tests
             public class User { public Department Department { get; set; } = new(); }
             [GenerateFilter<Department>] public partial class DepartmentFilter { }
             [GenerateFilter<User>]
+            [MapNested(nameof(User.Department))]
             public partial class UserFilter
             {
-                [MapNested(nameof(User.Department))]
-                private static partial void MapDepartment();
             }
             """;
 
@@ -57,19 +56,20 @@ public class Fn0020Tests
     }
 
     [Fact]
-    public void NestedNavigationInvalid_PrimitiveNav_ReportsNavigationPropertyAsAdditionalLocation()
+    public void NestedCollectionUnsupported_ReportsCollectionNavigationAsAdditionalLocation()
     {
-        // Arrange — Email is a primitive (string) so the navigation exists but isn't a reference type;
-        // the property declaration is the lone additional location.
+        // Arrange
         var source = """
+            using System.Collections.Generic;
             using Filtering.Net;
             namespace TestNs;
-            public class User { public string Email { get; set; } = ""; }
+            public class Post { public string Title { get; set; } = ""; }
+            public class User { public List<Post> Posts { get; set; } = new(); }
+            [GenerateFilter<Post>] public partial class PostFilter { }
             [GenerateFilter<User>]
+            [MapNested(nameof(User.Posts))]
             public partial class UserFilter
             {
-                [MapNested(nameof(User.Email))]
-                private static partial void MapEmail();
             }
             """;
 

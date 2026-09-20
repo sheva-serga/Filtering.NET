@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-
 namespace Filtering.Net.Generator;
 
 internal sealed record TypedValueTypeReference(

@@ -3,15 +3,19 @@ namespace Filtering.Net.Generator.Tests.Diagnostics;
 public class Fn0011Tests
 {
     [Fact]
-    public void BasedOnReferencesNonProfile_FiresFN0011()
+    public void InterceptValueWithoutMap_FiresFN0011()
     {
         // Arrange
         var source = """
             using Filtering.Net;
             namespace TestNs;
-            public class NotAProfile { }
-            [FilterProfile<string>(BasedOn = typeof(NotAProfile))]
-            public static class CustomProfile { }
+            public class User { public string Name { get; set; } = ""; }
+            [GenerateFilter<User>]
+            public partial class UserFilter
+            {
+                [InterceptValue(nameof(User.Name))]
+                private static string TrimName(string value) => value.Trim();
+            }
             """;
 
         // Act
@@ -20,53 +24,24 @@ public class Fn0011Tests
     }
 
     [Fact]
-    public void BasedOnReferencesAnotherProfile_DoesNotFireFN0011()
+    public void InterceptValueWithMatchingMap_DoesNotFireFN0011()
     {
         // Arrange
         var source = """
             using Filtering.Net;
             namespace TestNs;
-            [FilterProfile<string>]
-            public static class BaseProfile { }
-            [FilterProfile<string>(BasedOn = typeof(BaseProfile))]
-            public static class DerivedProfile { }
+            public class User { public string Name { get; set; } = ""; }
+            [GenerateFilter<User>]
+            [Map(nameof(User.Name))]
+            public partial class UserFilter
+            {
+                [InterceptValue(nameof(User.Name))]
+                private static string TrimName(string value) => value.Trim();
+            }
             """;
 
         // Act
         // Assert
         DiagnosticTestHelpers.AssertNoDiagnostic(source, "FN0011");
-    }
-
-    [Fact]
-    public void NoBasedOn_DoesNotFireFN0011()
-    {
-        // Arrange
-        var source = """
-            using Filtering.Net;
-            namespace TestNs;
-            [FilterProfile<string>]
-            public static class StandaloneProfile { }
-            """;
-
-        // Act
-        // Assert
-        DiagnosticTestHelpers.AssertNoDiagnostic(source, "FN0011");
-    }
-
-    [Fact]
-    public void InvalidBaseProfile_ReportsBasedOnTypeAsAdditionalLocation()
-    {
-        // Arrange
-        var source = """
-            using Filtering.Net;
-            namespace TestNs;
-            public class NotAProfile { }
-            [FilterProfile<string>(BasedOn = typeof(NotAProfile))]
-            public static class CustomProfile { }
-            """;
-
-        // Act
-        // Assert
-        DiagnosticTestHelpers.AssertDiagnosticHasAdditionalLocations(source, "FN0011", expectedAdditionalCount: 1);
     }
 }

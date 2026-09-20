@@ -7,19 +7,19 @@ namespace Filtering.Net.Generator.Tests.Diagnostics;
 public class Fn0019Tests
 {
     [Fact]
-    public void AutoResolve_NoCandidateFilters_FiresFN0019()
+    public void NavigationDoesNotExistOnHostEntity_FiresFN0019()
     {
         // Arrange
         var source = """
             using Filtering.Net;
             namespace TestNs;
             public class Department { public string Name { get; set; } = ""; }
-            public class User { public Department Department { get; set; } = new(); }
+            public class User { public string Email { get; set; } = ""; }
+            [GenerateFilter<Department>] public partial class DepartmentFilter { }
             [GenerateFilter<User>]
+            [MapNested("Department")]
             public partial class UserFilter
             {
-                [MapNested(nameof(User.Department))]
-                private static partial void MapDepartment();
             }
             """;
 
@@ -31,7 +31,7 @@ public class Fn0019Tests
     }
 
     [Fact]
-    public void AutoResolve_HasCandidate_DoesNotFireFN0019()
+    public void ValidReferenceNavigation_DoesNotFireFN0019()
     {
         // Arrange
         var source = """
@@ -41,10 +41,9 @@ public class Fn0019Tests
             public class User { public Department Department { get; set; } = new(); }
             [GenerateFilter<Department>] public partial class DepartmentFilter { }
             [GenerateFilter<User>]
+            [MapNested(nameof(User.Department))]
             public partial class UserFilter
             {
-                [MapNested(nameof(User.Department))]
-                private static partial void MapDepartment();
             }
             """;
 
@@ -56,20 +55,18 @@ public class Fn0019Tests
     }
 
     [Fact]
-    public void NestedTargetNotFound_ReportsNavigationPropertyAsAdditionalLocation()
+    public void NestedNavigationInvalid_PrimitiveNav_ReportsNavigationPropertyAsAdditionalLocation()
     {
-        // Arrange — Department has no [GenerateFilter<>] partner so resolution finds zero candidates;
-        // the navigation property declaration is the lone additional location.
+        // Arrange — Email is a primitive (string) so the navigation exists but isn't a reference type;
+        // the property declaration is the lone additional location.
         var source = """
             using Filtering.Net;
             namespace TestNs;
-            public class Department { public string Name { get; set; } = ""; }
-            public class User { public Department Department { get; set; } = new(); }
+            public class User { public string Email { get; set; } = ""; }
             [GenerateFilter<User>]
+            [MapNested(nameof(User.Email))]
             public partial class UserFilter
             {
-                [MapNested(nameof(User.Department))]
-                private static partial void MapDepartment();
             }
             """;
 

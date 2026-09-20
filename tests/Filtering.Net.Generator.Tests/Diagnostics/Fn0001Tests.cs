@@ -14,12 +14,10 @@ public class Fn0001Tests
             namespace TestNs;
             public class User { public string Name { get; set; } = ""; }
             [GenerateFilter<User>]
+            [Map(nameof(User.Name))]
+            [Map(nameof(User.Name))]
             public partial class UserFilter
             {
-                [Map(nameof(User.Name))]
-                private static partial void MapNameFirst();
-                [Map(nameof(User.Name))]
-                private static partial void MapNameSecond();
             }
             """;
 
@@ -39,12 +37,10 @@ public class Fn0001Tests
             namespace TestNs;
             public class User { public string Name { get; set; } = ""; public int Age { get; set; } }
             [GenerateFilter<User>]
+            [Map(nameof(User.Name))]
+            [Map(nameof(User.Age))]
             public partial class UserFilter
             {
-                [Map(nameof(User.Name))]
-                private static partial void MapName();
-                [Map(nameof(User.Age))]
-                private static partial void MapAge();
             }
             """;
 
@@ -64,21 +60,19 @@ public class Fn0001Tests
             namespace TestNs;
             public class Department { public int Id { get; set; } }
             public class User { public Department Department { get; set; } = new(); }
+            [Map(nameof(Department.Id))]
             [GenerateFilter<Department>] public partial class DepartmentFilter
             {
-                [Map(nameof(Department.Id))] private static partial void MapId();
             }
+            [Map(nameof(Department.Id))]
             [GenerateFilter<Department>] public partial class AdminDepartmentFilter
             {
-                [Map(nameof(Department.Id))] private static partial void MapId();
             }
             [GenerateFilter<User>]
+            [MapNested<DepartmentFilter>(nameof(User.Department))]
+            [MapNested<AdminDepartmentFilter>(nameof(User.Department))]
             public partial class UserFilter
             {
-                [MapNested<DepartmentFilter>(nameof(User.Department))]
-                private static partial void MapDepartment();
-                [MapNested<AdminDepartmentFilter>(nameof(User.Department))]
-                private static partial void MapDepartmentForAdmins();
             }
             """;
 
@@ -100,15 +94,15 @@ public class Fn0001Tests
             namespace TestNs;
             public class Department { public string Name { get; set; } = ""; }
             public class User { public Department Department { get; set; } = new(); }
+            [Map(nameof(Department.Name))]
             [GenerateFilter<Department>] public partial class DepartmentFilter
             {
-                [Map(nameof(Department.Name))] private static partial void MapName();
             }
             [GenerateFilter<User>]
+            [Map("Department.Name")]
+            [MapNested(nameof(User.Department))]
             public partial class UserFilter
             {
-                [Map("Department.Name")] private static partial void MapDeptName();
-                [MapNested(nameof(User.Department))] private static partial void MapDept();
             }
             """;
 
@@ -129,19 +123,19 @@ public class Fn0001Tests
             public class Department { public int Id { get; set; } }
             public class Office { public int Id { get; set; } }
             public class User { public Department Department { get; set; } = new(); public Office Office { get; set; } = new(); }
+            [Map(nameof(Department.Id))]
             [GenerateFilter<Department>] public partial class DepartmentFilter
             {
-                [Map(nameof(Department.Id))] private static partial void MapId();
             }
+            [Map(nameof(Office.Id))]
             [GenerateFilter<Office>] public partial class OfficeFilter
             {
-                [Map(nameof(Office.Id))] private static partial void MapId();
             }
             [GenerateFilter<User>]
+            [MapNested(nameof(User.Department))]
+            [MapNested(nameof(User.Office), Prefix = "department")]
             public partial class UserFilter
             {
-                [MapNested(nameof(User.Department))] private static partial void MapDept();
-                [MapNested(nameof(User.Office), Prefix = "department")] private static partial void MapOff();
             }
             """;
 
@@ -161,14 +155,14 @@ public class Fn0001Tests
             namespace TestNs;
             public class Department { public int Id { get; set; } }
             public class User { public Department Department { get; set; } = new(); }
+            [Map(nameof(Department.Id))]
             [GenerateFilter<Department>] public partial class DepartmentFilter
             {
-                [Map(nameof(Department.Id))] private static partial void MapId();
             }
             [GenerateFilter<User>]
+            [MapNested(nameof(User.Department))]
             public partial class UserFilter
             {
-                [MapNested(nameof(User.Department))] private static partial void MapDept();
             }
             """;
 
@@ -188,12 +182,10 @@ public class Fn0001Tests
             namespace TestNs;
             public class User { public string Name { get; set; } = ""; }
             [GenerateFilter<User>]
+            [Map(nameof(User.Name), Sortable = true)]
+            [Map(nameof(User.Name), Sortable = true)]
             public partial class UserFilter
             {
-                [Map(nameof(User.Name), Sortable = true)]
-                private static partial void MapNameOne();
-                [Map(nameof(User.Name), Sortable = true)]
-                private static partial void MapNameTwo();
             }
             """;
 
@@ -215,12 +207,10 @@ public class Fn0001Tests
             namespace TestNs;
             public class User { public string Name { get; set; } = ""; }
             [GenerateFilter<User>]
+            [Map(nameof(User.Name))]
+            [Map(nameof(User.Name))]
             public partial class UserFilter
             {
-                [Map(nameof(User.Name))]
-                private static partial void MapNameFirst();
-                [Map(nameof(User.Name))]
-                private static partial void MapNameSecond();
             }
             """;
 

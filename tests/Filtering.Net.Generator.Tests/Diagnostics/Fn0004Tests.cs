@@ -12,10 +12,9 @@ public class Fn0004Tests
             namespace TestNs;
             public class User { public string Name { get; set; } = ""; }
             [GenerateFilter<User>]
+            [Map(nameof(User.Name), Profile = typeof(Int32Filter))]
             public partial class UserFilter
             {
-                [Map(nameof(User.Name), Profile = typeof(Int32Filter))]
-                private static partial void MapName();
             }
             """;
 
@@ -35,10 +34,9 @@ public class Fn0004Tests
             namespace TestNs;
             public class User { public string Name { get; set; } = ""; }
             [GenerateFilter<User>]
+            [Map(nameof(User.Name), Profile = typeof(StringFilter))]
             public partial class UserFilter
             {
-                [Map(nameof(User.Name), Profile = typeof(StringFilter))]
-                private static partial void MapName();
             }
             """;
 
@@ -64,10 +62,9 @@ public class Fn0004Tests
             namespace TestNs;
             public class User { public string Name { get; set; } = ""; }
             [GenerateFilter<User>]
+            [Map(nameof(User.Name), Profile = typeof(Int32Filter))]
             public partial class UserFilter
             {
-                [Map(nameof(User.Name), Profile = typeof(Int32Filter))]
-                private static partial void MapName();
             }
             """;
 

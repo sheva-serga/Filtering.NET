@@ -28,10 +28,9 @@ public class CustomProfileEmissionTests
                 public static Expression<Func<string, string, bool>> Fuzzy => (column, value) => column.Contains(value);
             }
             [GenerateFilter<User>]
+            [Map(nameof(User.Name), Profile = typeof(FuzzyStringFilter))]
             public partial class UserFilter
             {
-                [Map(nameof(User.Name), Profile = typeof(FuzzyStringFilter))]
-                private static partial void MapName();
             }
             """;
         var driver = GeneratorRunner.RunDriver(consumerSource);
@@ -61,10 +60,9 @@ public class CustomProfileEmissionTests
                     => (date, days) => date >= DateTime.UtcNow.AddDays(-days);
             }
             [GenerateFilter<Audit>]
+            [Map(nameof(Audit.CreatedAt), Profile = typeof(RecencyFilter), Sortable = true)]
             public partial class AuditFilter
             {
-                [Map(nameof(Audit.CreatedAt), Profile = typeof(RecencyFilter), Sortable = true)]
-                private static partial void MapCreatedAt();
             }
             """;
         var driver = GeneratorRunner.RunDriver(consumerSource);
@@ -96,10 +94,9 @@ public class CustomProfileEmissionTests
         public sealed class User { public string Email { get; set; } = string.Empty; }
 
         [GenerateFilter<User>]
+        [Map(nameof(User.Email), Profile = typeof(StringWithRegexProfile), Only = new[] { "regex" })]
         public partial class UserFilter
         {
-            [Map(nameof(User.Email), Profile = typeof(StringWithRegexProfile), Only = new[] { "regex" })]
-            private static partial void MapEmail();
         }
         """;
 

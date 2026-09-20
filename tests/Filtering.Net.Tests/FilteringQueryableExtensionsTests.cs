@@ -1,4 +1,5 @@
 using AwesomeAssertions;
+
 using Xunit;
 
 namespace Filtering.Net.Tests;

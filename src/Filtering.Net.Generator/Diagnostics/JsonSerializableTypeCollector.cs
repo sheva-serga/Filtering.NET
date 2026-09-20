@@ -1,5 +1,3 @@
-using System.Collections.Generic;
-
 using Microsoft.CodeAnalysis;
 
 namespace Filtering.Net.Generator;

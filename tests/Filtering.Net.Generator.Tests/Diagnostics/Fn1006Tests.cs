@@ -13,10 +13,9 @@ public class Fn1006Tests
             public class Department { public string Name { get; set; } = ""; }
             public class User { public Department? Department { get; set; } }
             [GenerateFilter<User>]
+            [Map("Department.Name")]
             public partial class UserFilter
             {
-                [Map("Department.Name")]
-                private static partial void MapDeptName();
             }
             """;
 
@@ -37,10 +36,9 @@ public class Fn1006Tests
             public class Department { public string Name { get; set; } = ""; }
             public class User { public Department Department { get; set; } = new(); }
             [GenerateFilter<User>]
+            [Map("Department.Name")]
             public partial class UserFilter
             {
-                [Map("Department.Name")]
-                private static partial void MapDeptName();
             }
             """;
 
@@ -60,10 +58,9 @@ public class Fn1006Tests
             namespace TestNs;
             public class User { public string Name { get; set; } = ""; }
             [GenerateFilter<User>]
+            [Map(nameof(User.Name))]
             public partial class UserFilter
             {
-                [Map(nameof(User.Name))]
-                private static partial void MapName();
             }
             """;
 

@@ -1,6 +1,4 @@
 using System.Collections.Immutable;
-using System.Linq;
-using System.Threading;
 
 namespace Filtering.Net.Generator.Tests.Resolution;
 

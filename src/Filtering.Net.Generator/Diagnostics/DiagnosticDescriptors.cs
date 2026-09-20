@@ -9,7 +9,7 @@ internal static class DiagnosticDescriptors
     // Single help-link target — every rule's "More info" goes to the catalogue table.
     private const string HelpLink = "https://sheva-serga.github.io/Filtering.NET/diagnostics/";
 
-    // ---------- Errors (FN0001 - FN0023) ----------
+    // ---------- Errors (FN0001 - FN0022) ----------
 
     public static readonly DiagnosticDescriptor DuplicateMapping = new(
         id: "FN0001",
@@ -57,17 +57,8 @@ internal static class DiagnosticDescriptors
         isEnabledByDefault: true,
         helpLinkUri: HelpLink);
 
-    public static readonly DiagnosticDescriptor MissingPartial = new(
-        id: "FN0006",
-        title: "[Map] method must be partial",
-        messageFormat: "Method '{0}' has [Map] but is not declared 'partial'. The source generator can only emit the implementation for partial methods.",
-        category: Category,
-        defaultSeverity: DiagnosticSeverity.Error,
-        isEnabledByDefault: true,
-        helpLinkUri: HelpLink);
-
     public static readonly DiagnosticDescriptor NoInferableProfile = new(
-        id: "FN0007",
+        id: "FN0006",
         title: "No inferable profile for property type",
         messageFormat: "Property '{0}' has CLR type '{1}' which has no built-in primitive profile. Specify Profile = typeof(...) explicitly.",
         category: Category,
@@ -76,7 +67,7 @@ internal static class DiagnosticDescriptors
         helpLinkUri: HelpLink);
 
     public static readonly DiagnosticDescriptor DuplicateInterceptor = new(
-        id: "FN0008",
+        id: "FN0007",
         title: "Duplicate value interceptor",
         messageFormat: "Property '{0}' has multiple [InterceptValue] declarations.",
         category: Category,
@@ -85,7 +76,7 @@ internal static class DiagnosticDescriptors
         helpLinkUri: HelpLink);
 
     public static readonly DiagnosticDescriptor NonStaticOperator = new(
-        id: "FN0009",
+        id: "FN0008",
         title: "[FilterOperator] member must be public static",
         messageFormat: "Member '{0}' has [FilterOperator] but is not public static.",
         category: Category,
@@ -94,7 +85,7 @@ internal static class DiagnosticDescriptors
         helpLinkUri: HelpLink);
 
     public static readonly DiagnosticDescriptor AliasCollision = new(
-        id: "FN0010",
+        id: "FN0009",
         title: "Alias collides with existing property or alias",
         messageFormat: "Alias '{0}' collides with another property or alias on entity '{1}' (case-insensitive).",
         category: Category,
@@ -103,7 +94,7 @@ internal static class DiagnosticDescriptors
         helpLinkUri: HelpLink);
 
     public static readonly DiagnosticDescriptor InvalidBaseProfile = new(
-        id: "FN0011",
+        id: "FN0010",
         title: "[FilterProfile.BasedOn] references a non-profile type",
         messageFormat: "[FilterProfile(BasedOn = typeof({0}))] references a type that is not marked with [FilterProfile].",
         category: Category,
@@ -112,7 +103,7 @@ internal static class DiagnosticDescriptors
         helpLinkUri: HelpLink);
 
     public static readonly DiagnosticDescriptor InterceptorWithoutMap = new(
-        id: "FN0012",
+        id: "FN0011",
         title: "Interceptor declared without matching [Map]",
         messageFormat: "Property '{0}' has [InterceptValue] but no [Map] declaration. Add a [Map] for this property.",
         category: Category,
@@ -121,7 +112,7 @@ internal static class DiagnosticDescriptors
         helpLinkUri: HelpLink);
 
     public static readonly DiagnosticDescriptor AmbiguousProfile = new(
-        id: "FN0013",
+        id: "FN0012",
         title: "Multiple filter profiles match property type",
         messageFormat: "Property '{0}' has CLR type '{1}' which is matched by multiple profiles ({2}). Use [Map(typeof(...))] on the property to pick one.",
         category: Category,
@@ -130,7 +121,7 @@ internal static class DiagnosticDescriptors
         helpLinkUri: HelpLink);
 
     public static readonly DiagnosticDescriptor ProfileMissingExtractor = new(
-        id: "FN0014",
+        id: "FN0013",
         title: "Standalone filter profile is missing a required extractor method",
         messageFormat: "Profile '{0}' has no [FilterProfile.BasedOn] and is missing required extractor method(s): {1}. Either declare these public static methods on the profile or set BasedOn = typeof(...) to inherit them from a profile that does.",
         category: Category,
@@ -139,7 +130,7 @@ internal static class DiagnosticDescriptors
         helpLinkUri: HelpLink);
 
     public static readonly DiagnosticDescriptor DuplicateOperatorOnProfile = new(
-        id: "FN0015",
+        id: "FN0014",
         title: "Duplicate operator declaration on profile",
         messageFormat: "Operator '{0}' is declared more than once on profile '{1}'. Each operator name must appear at most once per profile.",
         category: Category,
@@ -148,7 +139,7 @@ internal static class DiagnosticDescriptors
         helpLinkUri: HelpLink);
 
     public static readonly DiagnosticDescriptor NestedCycle = new(
-        id: "FN0016",
+        id: "FN0015",
         title: "Cycle in [MapNested] graph",
         messageFormat: "Cycle detected in [MapNested] graph involving filter classes: {0}. Set MaxDepth on at least one [MapNested] in the cycle to allow it.",
         category: Category,
@@ -158,7 +149,7 @@ internal static class DiagnosticDescriptors
         helpLinkUri: HelpLink);
 
     public static readonly DiagnosticDescriptor NestedCrossAssembly = new(
-        id: "FN0017",
+        id: "FN0016",
         title: "[MapNested<T>] references a filter class outside the current compilation",
         messageFormat: "[MapNested<{0}>] references a filter class declared in another assembly. Cross-assembly nesting is not supported in v1.",
         category: Category,
@@ -167,7 +158,7 @@ internal static class DiagnosticDescriptors
         helpLinkUri: HelpLink);
 
     public static readonly DiagnosticDescriptor NestedAmbiguous = new(
-        id: "FN0018",
+        id: "FN0017",
         title: "Auto-resolve [MapNested] is ambiguous",
         messageFormat: "[MapNested(nameof({0}))] is ambiguous: {1} candidate filter classes target '{2}'. Use the generic form [MapNested<TFilter>] to pick one.",
         category: Category,
@@ -176,7 +167,7 @@ internal static class DiagnosticDescriptors
         helpLinkUri: HelpLink);
 
     public static readonly DiagnosticDescriptor NestedTargetNotFound = new(
-        id: "FN0019",
+        id: "FN0018",
         title: "[MapNested] target filter class not found",
         messageFormat: "[MapNested(nameof({0}))] cannot resolve a filter class for '{1}': no [GenerateFilter<{1}>] partial in this compilation.",
         category: Category,
@@ -185,7 +176,7 @@ internal static class DiagnosticDescriptors
         helpLinkUri: HelpLink);
 
     public static readonly DiagnosticDescriptor NestedNavigationInvalid = new(
-        id: "FN0020",
+        id: "FN0019",
         title: "[MapNested] navigation property is not a single-target reference navigation",
         messageFormat: "[MapNested(nameof({0}))] target property does not exist on '{1}', is a primitive/value type, or is not a single-target reference navigation.",
         category: Category,
@@ -194,7 +185,7 @@ internal static class DiagnosticDescriptors
         helpLinkUri: HelpLink);
 
     public static readonly DiagnosticDescriptor NestedCollectionUnsupported = new(
-        id: "FN0021",
+        id: "FN0020",
         title: "[MapNested] on collection navigation is not supported in v1",
         messageFormat: "[MapNested(nameof({0}))] target is a collection navigation; collection navigations require Any/All quantifier semantics and are deferred to a future version.",
         category: Category,
@@ -203,7 +194,7 @@ internal static class DiagnosticDescriptors
         helpLinkUri: HelpLink);
 
     public static readonly DiagnosticDescriptor FilterClassHasBaseType = new(
-        id: "FN0022",
+        id: "FN0021",
         title: "[GenerateFilter] class declares a base class",
         messageFormat: "Filter class '{0}' derives from '{1}'. The generated part derives from FilterDefinition<TEntity>, so the class cannot declare another base class.",
         category: Category,
@@ -212,7 +203,7 @@ internal static class DiagnosticDescriptors
         helpLinkUri: HelpLink);
 
     public static readonly DiagnosticDescriptor NestedMaxDepthInvalid = new(
-        id: "FN0023",
+        id: "FN0022",
         title: "[MapNested] MaxDepth must not be negative",
         messageFormat: "[MapNested(nameof({0}))] has MaxDepth = {1}. Use a positive value to bound the nesting, or omit it for an unbounded one.",
         category: Category,

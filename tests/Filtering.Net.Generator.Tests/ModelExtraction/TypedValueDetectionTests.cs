@@ -13,10 +13,9 @@ public class TypedValueDetectionTests
             namespace Sample;
             public sealed class User { public string Email { get; set; } = string.Empty; }
             [GenerateFilter<User>]
+            [Map("Email")]
             public partial class UserFilter
             {
-                [Map("Email")]
-                private static partial void MapEmail();
             }
             """);
 
@@ -44,10 +43,9 @@ public class TypedValueDetectionTests
             }
             public sealed class User { public string Email { get; set; } = string.Empty; }
             [GenerateFilter<User>]
+            [Map("Email", Profile = typeof(StringWithRegexProfile))]
             public partial class UserFilter
             {
-                [Map("Email", Profile = typeof(StringWithRegexProfile))]
-                private static partial void MapEmail();
             }
             """);
 
@@ -98,10 +96,9 @@ public class TypedValueDetectionTests
             }
             public sealed class User { public string Email { get; set; } = ""; }
             [GenerateFilter<User>]
+            [Map("Email", Profile = typeof(StringWithEmptyProfile))]
             public partial class UserFilter
             {
-                [Map("Email", Profile = typeof(StringWithEmptyProfile))]
-                private static partial void MapEmail();
             }
             """);
 

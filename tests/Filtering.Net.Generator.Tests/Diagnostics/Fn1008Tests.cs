@@ -1,4 +1,5 @@
 using AwesomeAssertions;
+
 using Microsoft.CodeAnalysis;
 
 namespace Filtering.Net.Generator.Tests.Diagnostics;
@@ -52,10 +53,9 @@ public class Fn1008Tests
             }
             public sealed class User { public string Email { get; set; } = string.Empty; }
             [GenerateFilter<User>]
+            [Map(nameof(User.Email), Profile = typeof(StringWithRegexProfile))]
             public partial class UserFilter
             {
-                [Map(nameof(User.Email), Profile = typeof(StringWithRegexProfile))]
-                private static partial void MapEmail();
             }
             """;
 
@@ -87,10 +87,9 @@ public class Fn1008Tests
             }
             public sealed class User { public string Email { get; set; } = string.Empty; }
             [GenerateFilter<User>]
+            [Map(nameof(User.Email), Profile = typeof(StringWithRegexProfile))]
             public partial class UserFilter
             {
-                [Map(nameof(User.Email), Profile = typeof(StringWithRegexProfile))]
-                private static partial void MapEmail();
             }
             """;
 
@@ -128,10 +127,9 @@ public class Fn1008Tests
             }
             public sealed class User { public string Email { get; set; } = string.Empty; }
             [GenerateFilter<User>]
+            [Map(nameof(User.Email), Profile = typeof(StringWithRegexProfile))]
             public partial class UserFilter
             {
-                [Map(nameof(User.Email), Profile = typeof(StringWithRegexProfile))]
-                private static partial void MapEmail();
             }
             """;
 
@@ -199,10 +197,9 @@ public class Fn1008Tests
             }
             public sealed class User { public string Email { get; set; } = string.Empty; }
             [GenerateFilter<User>]
+            [Map(nameof(User.Email), Profile = typeof(StringWithRegexProfile))]
             public partial class UserFilter
             {
-                [Map(nameof(User.Email), Profile = typeof(StringWithRegexProfile))]
-                private static partial void MapEmail();
             }
             """;
 
@@ -229,10 +226,9 @@ public class Fn1008Tests
             namespace TestNs;
             public sealed class User { public string Email { get; set; } = string.Empty; }
             [GenerateFilter<User>]
+            [Map(nameof(User.Email))]
             public partial class UserFilter
             {
-                [Map(nameof(User.Email))]
-                private static partial void MapEmail();
             }
             """;
 

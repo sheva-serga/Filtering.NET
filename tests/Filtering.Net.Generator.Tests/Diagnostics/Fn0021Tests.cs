@@ -1,85 +1,46 @@
-using AwesomeAssertions;
-
-using Filtering.Net.Generator.Tests.Resolution;
-
 namespace Filtering.Net.Generator.Tests.Diagnostics;
 
 public class Fn0021Tests
 {
     [Fact]
-    public void NavigationIsCollection_FiresFN0021()
+    public void FilterClassWithBaseClass_FiresFN0021()
     {
         // Arrange
         var source = """
-            using System.Collections.Generic;
             using Filtering.Net;
             namespace TestNs;
-            public class Post { public string Title { get; set; } = ""; }
-            public class User { public List<Post> Posts { get; set; } = new(); }
-            [GenerateFilter<Post>] public partial class PostFilter { }
+            public class User { public string Name { get; set; } = ""; }
+            public abstract class FilterBase { }
             [GenerateFilter<User>]
-            public partial class UserFilter
+            [Map(nameof(User.Name))]
+            public partial class UserFilter : FilterBase
             {
-                [MapNested(nameof(User.Posts))]
-                private static partial void MapPosts();
             }
             """;
 
         // Act
-        var result = ResolutionTestHelpers.Resolve(source, "UserFilter");
-
         // Assert
-        result.Diagnostics.Should().Contain(diagnostic => diagnostic.Id == "FN0021");
+        DiagnosticTestHelpers.AssertDiagnostic(source, "FN0021");
     }
 
     [Fact]
-    public void SingleReferenceNavigation_DoesNotFireFN0021()
+    public void FilterClassWithInterfaceOnly_DoesNotFireFN0021()
     {
         // Arrange
         var source = """
             using Filtering.Net;
             namespace TestNs;
-            public class Department { public string Name { get; set; } = ""; }
-            public class User { public Department Department { get; set; } = new(); }
-            [GenerateFilter<Department>] public partial class DepartmentFilter { }
+            public class User { public string Name { get; set; } = ""; }
+            public interface IMarker { }
             [GenerateFilter<User>]
-            public partial class UserFilter
+            [Map(nameof(User.Name))]
+            public partial class UserFilter : IMarker
             {
-                [MapNested(nameof(User.Department))]
-                private static partial void MapDepartment();
             }
             """;
 
         // Act
-        var result = ResolutionTestHelpers.Resolve(source, "UserFilter");
-
         // Assert
-        result.Diagnostics.Should().NotContain(diagnostic => diagnostic.Id == "FN0021");
-    }
-
-    [Fact]
-    public void NestedCollectionUnsupported_ReportsCollectionNavigationAsAdditionalLocation()
-    {
-        // Arrange
-        var source = """
-            using System.Collections.Generic;
-            using Filtering.Net;
-            namespace TestNs;
-            public class Post { public string Title { get; set; } = ""; }
-            public class User { public List<Post> Posts { get; set; } = new(); }
-            [GenerateFilter<Post>] public partial class PostFilter { }
-            [GenerateFilter<User>]
-            public partial class UserFilter
-            {
-                [MapNested(nameof(User.Posts))]
-                private static partial void MapPosts();
-            }
-            """;
-
-        // Act
-        // (no separate act step — AssertDiagnosticHasAdditionalLocations is the verification)
-
-        // Assert
-        DiagnosticTestHelpers.AssertDiagnosticHasAdditionalLocations(source, "FN0021", expectedAdditionalCount: 1);
+        DiagnosticTestHelpers.AssertNoDiagnostic(source, "FN0021");
     }
 }

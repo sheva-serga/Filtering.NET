@@ -14,10 +14,9 @@ public class EnumProfileEmissionTests
             public class User { public UserStatus Status { get; set; } }
 
             [GenerateFilter<User>]
+            [Map(nameof(User.Status))]
             public partial class UserFilter
             {
-                [Map(nameof(User.Status))]
-                private static partial void MapStatus();
             }
             """;
         var generatorRunResult = GeneratorRunner.RunDriver(consumerSource, excludeDiAbstractions: false).GetRunResult();

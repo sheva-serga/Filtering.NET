@@ -13,10 +13,9 @@ public class ValidatePageEmissionTests
             public class User { public string Name { get; set; } = ""; }
             [GenerateFilter<User>]
             [PageSettings(MaxPageSize = 100, DefaultPageSize = 25)]
+            [Map(nameof(User.Name))]
             public partial class UserFilter
             {
-                [Map(nameof(User.Name))]
-                private static partial void MapName();
             }
             """;
         var driver = GeneratorRunner.RunDriver(consumerSource);

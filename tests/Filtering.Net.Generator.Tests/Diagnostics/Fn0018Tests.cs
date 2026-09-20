@@ -7,7 +7,7 @@ namespace Filtering.Net.Generator.Tests.Diagnostics;
 public class Fn0018Tests
 {
     [Fact]
-    public void AutoResolve_TwoCandidateFilters_FiresFN0018()
+    public void AutoResolve_NoCandidateFilters_FiresFN0018()
     {
         // Arrange
         var source = """
@@ -15,13 +15,10 @@ public class Fn0018Tests
             namespace TestNs;
             public class Department { public string Name { get; set; } = ""; }
             public class User { public Department Department { get; set; } = new(); }
-            [GenerateFilter<Department>] public partial class DepartmentFilterA { }
-            [GenerateFilter<Department>] public partial class DepartmentFilterB { }
             [GenerateFilter<User>]
+            [MapNested(nameof(User.Department))]
             public partial class UserFilter
             {
-                [MapNested(nameof(User.Department))]
-                private static partial void MapDepartment();
             }
             """;
 
@@ -33,7 +30,7 @@ public class Fn0018Tests
     }
 
     [Fact]
-    public void Generic_DisambiguatesAmbiguity_DoesNotFireFN0018()
+    public void AutoResolve_HasCandidate_DoesNotFireFN0018()
     {
         // Arrange
         var source = """
@@ -41,13 +38,11 @@ public class Fn0018Tests
             namespace TestNs;
             public class Department { public string Name { get; set; } = ""; }
             public class User { public Department Department { get; set; } = new(); }
-            [GenerateFilter<Department>] public partial class DepartmentFilterA { }
-            [GenerateFilter<Department>] public partial class DepartmentFilterB { }
+            [GenerateFilter<Department>] public partial class DepartmentFilter { }
             [GenerateFilter<User>]
+            [MapNested(nameof(User.Department))]
             public partial class UserFilter
             {
-                [MapNested<DepartmentFilterA>(nameof(User.Department))]
-                private static partial void MapDepartment();
             }
             """;
 
@@ -59,21 +54,19 @@ public class Fn0018Tests
     }
 
     [Fact]
-    public void NestedAmbiguous_ReportsBothCandidateFiltersAsAdditionalLocations()
+    public void NestedTargetNotFound_ReportsNavigationPropertyAsAdditionalLocation()
     {
-        // Arrange
+        // Arrange — Department has no [GenerateFilter<>] partner so resolution finds zero candidates;
+        // the navigation property declaration is the lone additional location.
         var source = """
             using Filtering.Net;
             namespace TestNs;
             public class Department { public string Name { get; set; } = ""; }
             public class User { public Department Department { get; set; } = new(); }
-            [GenerateFilter<Department>] public partial class DepartmentFilterA { }
-            [GenerateFilter<Department>] public partial class DepartmentFilterB { }
             [GenerateFilter<User>]
+            [MapNested(nameof(User.Department))]
             public partial class UserFilter
             {
-                [MapNested(nameof(User.Department))]
-                private static partial void MapDepartment();
             }
             """;
 
@@ -81,6 +74,6 @@ public class Fn0018Tests
         // (no separate act step — AssertDiagnosticHasAdditionalLocations is the verification)
 
         // Assert
-        DiagnosticTestHelpers.AssertDiagnosticHasAdditionalLocations(source, "FN0018", expectedAdditionalCount: 2);
+        DiagnosticTestHelpers.AssertDiagnosticHasAdditionalLocations(source, "FN0018", expectedAdditionalCount: 1);
     }
 }

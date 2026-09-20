@@ -1,5 +1,7 @@
-using AwesomeAssertions;
 using System.Text.Json;
+
+using AwesomeAssertions;
+
 using Xunit;
 
 namespace Filtering.Net.Tests.Requests;

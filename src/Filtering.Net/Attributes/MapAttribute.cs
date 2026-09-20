@@ -2,7 +2,7 @@ namespace Filtering.Net;
 
 /// <summary>Marks a partial method as the configuration for one filterable property on the target entity.</summary>
 /// <param name="propertyName">Name (or dotted nav path) of the property to map.</param>
-[AttributeUsage(AttributeTargets.Method, AllowMultiple = false, Inherited = false)]
+[AttributeUsage(AttributeTargets.Class, AllowMultiple = true, Inherited = false)]
 public sealed class MapAttribute(string propertyName) : Attribute
 {
     /// <summary>The name (or dotted navigation path) of the property to map. Use <c>nameof(Entity.Property)</c>.</summary>

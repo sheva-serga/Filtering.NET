@@ -44,10 +44,9 @@ public class Fn1003Tests
             }
             public class User { public string Name { get; set; } = ""; }
             [GenerateFilter<User>]
+            [Map(nameof(User.Name), Profile = typeof(UsedProfile))]
             public partial class UserFilter
             {
-                [Map(nameof(User.Name), Profile = typeof(UsedProfile))]
-                private static partial void MapName();
             }
             """;
 

@@ -12,15 +12,15 @@ public class MapNestedCompilesTests
             namespace TestNs;
             public class Department { public string Name { get; set; } = ""; }
             public class User { public string Name { get; set; } = ""; public Department Department { get; set; } = new(); }
+            [Map(nameof(Department.Name))]
             [GenerateFilter<Department>] public partial class DepartmentFilter
             {
-                [Map(nameof(Department.Name))] private static partial void MapName();
             }
             [GenerateFilter<User>]
+            [Map(nameof(User.Name))]
+            [MapNested(nameof(User.Department))]
             public partial class UserFilter
             {
-                [Map(nameof(User.Name))] private static partial void MapName();
-                [MapNested(nameof(User.Department))] private static partial void MapDept();
             }
             """;
 
@@ -41,18 +41,18 @@ public class MapNestedCompilesTests
             public class Company { public string Name { get; set; } = ""; }
             public class Department { public Company Company { get; set; } = new(); }
             public class User { public Department Department { get; set; } = new(); }
+            [Map(nameof(Company.Name))]
             [GenerateFilter<Company>] public partial class CompanyFilter
             {
-                [Map(nameof(Company.Name))] private static partial void MapName();
             }
+            [MapNested(nameof(Department.Company))]
             [GenerateFilter<Department>] public partial class DepartmentFilter
             {
-                [MapNested(nameof(Department.Company))] private static partial void MapCompany();
             }
             [GenerateFilter<User>]
+            [MapNested(nameof(User.Department))]
             public partial class UserFilter
             {
-                [MapNested(nameof(User.Department))] private static partial void MapDept();
             }
             """;
 
@@ -72,16 +72,15 @@ public class MapNestedCompilesTests
             namespace TestNs;
             public class Department { public int Id { get; set; } public string Name { get; set; } = ""; }
             public class User { public Department Department { get; set; } = new(); }
+            [Map(nameof(Department.Id))]
+            [Map(nameof(Department.Name))]
             [GenerateFilter<Department>] public partial class DepartmentFilter
             {
-                [Map(nameof(Department.Id))] private static partial void MapId();
-                [Map(nameof(Department.Name))] private static partial void MapName();
             }
             [GenerateFilter<User>]
+            [MapNested(nameof(User.Department), Only = new[] { "Id" })]
             public partial class UserFilter
             {
-                [MapNested(nameof(User.Department), Only = new[] { "Id" })]
-                private static partial void MapDept();
             }
             """;
 
@@ -101,17 +100,16 @@ public class MapNestedCompilesTests
             namespace TestNs;
             public class Department { public int Id { get; set; } public string Name { get; set; } = ""; public string InternalNotes { get; set; } = ""; }
             public class User { public Department Department { get; set; } = new(); }
+            [Map(nameof(Department.Id))]
+            [Map(nameof(Department.Name))]
+            [Map(nameof(Department.InternalNotes))]
             [GenerateFilter<Department>] public partial class DepartmentFilter
             {
-                [Map(nameof(Department.Id))] private static partial void MapId();
-                [Map(nameof(Department.Name))] private static partial void MapName();
-                [Map(nameof(Department.InternalNotes))] private static partial void MapNotes();
             }
             [GenerateFilter<User>]
+            [MapNested(nameof(User.Department), Except = new[] { "InternalNotes" })]
             public partial class UserFilter
             {
-                [MapNested(nameof(User.Department), Except = new[] { "InternalNotes" })]
-                private static partial void MapDept();
             }
             """;
 
@@ -131,15 +129,14 @@ public class MapNestedCompilesTests
             namespace TestNs;
             public class Department { public int Id { get; set; } }
             public class User { public Department Department { get; set; } = new(); }
+            [Map(nameof(Department.Id))]
             [GenerateFilter<Department>] public partial class DepartmentFilter
             {
-                [Map(nameof(Department.Id))] private static partial void MapId();
             }
             [GenerateFilter<User>]
+            [MapNested(nameof(User.Department), Prefix = "dept")]
             public partial class UserFilter
             {
-                [MapNested(nameof(User.Department), Prefix = "dept")]
-                private static partial void MapDept();
             }
             """;
 
@@ -159,16 +156,14 @@ public class MapNestedCompilesTests
             namespace TestNs;
             public class Department { public string Name { get; set; } = ""; }
             public class User { public Department Department { get; set; } = new(); }
+            [Map(nameof(Department.Name), Sortable = true)]
             [GenerateFilter<Department>] public partial class DepartmentFilter
             {
-                [Map(nameof(Department.Name), Sortable = true)]
-                private static partial void MapName();
             }
             [GenerateFilter<User>]
+            [MapNested(nameof(User.Department), DisableSorting = true)]
             public partial class UserFilter
             {
-                [MapNested(nameof(User.Department), DisableSorting = true)]
-                private static partial void MapDept();
             }
             """;
 
@@ -196,15 +191,14 @@ public class MapNestedCompilesTests
             }
             public class Department { public string Name { get; set; } = ""; }
             public class User { public Department Department { get; set; } = new(); }
+            [Map(nameof(Department.Name), Profile = typeof(StringFilterPlus))]
             [GenerateFilter<Department>] public partial class DepartmentFilter
             {
-                [Map(nameof(Department.Name), Profile = typeof(StringFilterPlus))]
-                private static partial void MapName();
             }
             [GenerateFilter<User>]
+            [MapNested(nameof(User.Department))]
             public partial class UserFilter
             {
-                [MapNested(nameof(User.Department))] private static partial void MapDept();
             }
             """;
 
@@ -224,16 +218,16 @@ public class MapNestedCompilesTests
             namespace TestNs;
             public class Department { public string Email { get; set; } = ""; }
             public class User { public Department Department { get; set; } = new(); }
+            [Map(nameof(Department.Email))]
             [GenerateFilter<Department>] public partial class DepartmentFilter
             {
-                [Map(nameof(Department.Email))] private static partial void MapEmail();
                 [InterceptValue(nameof(Department.Email))]
                 internal static string LowercaseEmail(InterceptContext ctx, string value) => value.ToLowerInvariant();
             }
             [GenerateFilter<User>]
+            [MapNested(nameof(User.Department))]
             public partial class UserFilter
             {
-                [MapNested(nameof(User.Department))] private static partial void MapDept();
             }
             """;
 
@@ -253,14 +247,14 @@ public class MapNestedCompilesTests
             namespace TestNs;
             public class Department { public string Name { get; set; } = ""; }
             public class User { public Department? Department { get; set; } }
+            [Map(nameof(Department.Name))]
             [GenerateFilter<Department>] public partial class DepartmentFilter
             {
-                [Map(nameof(Department.Name))] private static partial void MapName();
             }
             [GenerateFilter<User>]
+            [MapNested(nameof(User.Department))]
             public partial class UserFilter
             {
-                [MapNested(nameof(User.Department))] private static partial void MapDept();
             }
             """;
 

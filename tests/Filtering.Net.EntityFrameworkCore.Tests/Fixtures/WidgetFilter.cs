@@ -6,32 +6,13 @@ namespace Filtering.Net.EntityFrameworkCore.Tests.Fixtures;
 /// generator emits the implementation.
 /// </summary>
 [GenerateFilter<WidgetEntity>]
-public partial class WidgetFilter
-{
-    [Map(nameof(WidgetEntity.Id), Sortable = true)]
-    private static partial void MapId();
-
-    [Map(nameof(WidgetEntity.Name), Sortable = true)]
-    private static partial void MapName();
-
-    [Map(nameof(WidgetEntity.Quantity), Sortable = true)]
-    private static partial void MapQuantity();
-
-    [Map(nameof(WidgetEntity.Price), Sortable = true)]
-    private static partial void MapPrice();
-
-    [Map(nameof(WidgetEntity.OptionalCount), Sortable = true)]
-    private static partial void MapOptionalCount();
-
-    [Map(nameof(WidgetEntity.CreatedAt), Sortable = true)]
-    private static partial void MapCreatedAt();
-
-    [Map(nameof(WidgetEntity.IsActive))]
-    private static partial void MapIsActive();
-
-    [Map(nameof(WidgetEntity.Status), Sortable = true)]
-    private static partial void MapStatus();
-
-    [Map(nameof(WidgetEntity.ExternalId))]
-    private static partial void MapExternalId();
-}
+[Map(nameof(WidgetEntity.Id), Sortable = true)]
+[Map(nameof(WidgetEntity.Name), Sortable = true)]
+[Map(nameof(WidgetEntity.Quantity), Sortable = true)]
+[Map(nameof(WidgetEntity.Price), Sortable = true)]
+[Map(nameof(WidgetEntity.OptionalCount), Sortable = true)]
+[Map(nameof(WidgetEntity.CreatedAt), Sortable = true)]
+[Map(nameof(WidgetEntity.IsActive))]
+[Map(nameof(WidgetEntity.Status), Sortable = true)]
+[Map(nameof(WidgetEntity.ExternalId))]
+public partial class WidgetFilter;

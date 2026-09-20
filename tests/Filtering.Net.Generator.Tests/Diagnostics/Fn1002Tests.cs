@@ -13,10 +13,9 @@ public class Fn1002Tests
             namespace TestNs;
             public class Order { public DateTime CreatedAt { get; set; } }
             [GenerateFilter<Order>]
+            [Map(nameof(Order.CreatedAt))]
             public partial class OrderFilter
             {
-                [Map(nameof(Order.CreatedAt))]
-                private static partial void MapCreatedAt();
             }
             """;
 
@@ -36,10 +35,9 @@ public class Fn1002Tests
             namespace TestNs;
             public class User { public int Age { get; set; } }
             [GenerateFilter<User>]
+            [Map(nameof(User.Age))]
             public partial class UserFilter
             {
-                [Map(nameof(User.Age))]
-                private static partial void MapAge();
             }
             """;
 
@@ -60,10 +58,9 @@ public class Fn1002Tests
             namespace TestNs;
             public class User { public string Name { get; set; } = ""; }
             [GenerateFilter<User>]
+            [Map(nameof(User.Name))]
             public partial class UserFilter
             {
-                [Map(nameof(User.Name))]
-                private static partial void MapName();
             }
             """;
 
@@ -83,10 +80,9 @@ public class Fn1002Tests
             namespace TestNs;
             public class User { public int Age { get; set; } }
             [GenerateFilter<User>]
+            [Map(nameof(User.Age), Sortable = true)]
             public partial class UserFilter
             {
-                [Map(nameof(User.Age), Sortable = true)]
-                private static partial void MapAge();
             }
             """;
 

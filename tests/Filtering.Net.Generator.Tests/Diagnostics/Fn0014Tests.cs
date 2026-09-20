@@ -3,64 +3,11 @@ namespace Filtering.Net.Generator.Tests.Diagnostics;
 public class Fn0014Tests
 {
     [Fact]
-    public void StandaloneProfileWithScalarOperator_AndNoTryGetValue_FiresFN0014()
+    public void DuplicateOperatorNameOnProfile_FiresFN0014()
     {
         // Arrange
         var source = """
             using System;
-            using System.Linq.Expressions;
-            using Filtering.Net;
-            namespace TestNs;
-            [FilterProfile<string>]
-            public static class CustomProfile
-            {
-                [FilterOperator("eq")]
-                public static Expression<Func<string, string, bool>> Eq => (column, value) => column == value;
-            }
-            """;
-
-        // Act
-        // Assert
-        DiagnosticTestHelpers.AssertDiagnostic(source, "FN0014");
-    }
-
-    [Fact]
-    public void StandaloneProfileWithInOperator_AndNoTryGetArray_FiresFN0014()
-    {
-        // Arrange
-        var source = """
-            using System;
-            using System.Linq;
-            using System.Linq.Expressions;
-            using System.Text.Json;
-            using Filtering.Net;
-            namespace TestNs;
-            [FilterProfile<string>]
-            public static class CustomProfile
-            {
-                [FilterOperator("in")]
-                public static Expression<Func<string, string[], bool>> In => (column, values) => values.Contains(column);
-
-                public static bool TryGetValue(JsonElement element, out string value, out string error)
-                {
-                    value = ""; error = ""; return true;
-                }
-                // Missing TryGetArray.
-            }
-            """;
-
-        // Act
-        // Assert
-        DiagnosticTestHelpers.AssertDiagnostic(source, "FN0014");
-    }
-
-    [Fact]
-    public void StandaloneProfileWithBothExtractors_DoesNotFireFN0014()
-    {
-        // Arrange
-        var source = """
-            using System;
-            using System.Linq;
             using System.Linq.Expressions;
             using System.Text.Json;
             using Filtering.Net;
@@ -71,17 +18,43 @@ public class Fn0014Tests
                 [FilterOperator("eq")]
                 public static Expression<Func<string, string, bool>> Eq => (column, value) => column == value;
 
-                [FilterOperator("in")]
-                public static Expression<Func<string, string[], bool>> In => (column, values) => values.Contains(column);
+                [FilterOperator("eq")]
+                public static Expression<Func<string, string, bool>> EqAlt => (column, value) => column == value;
 
                 public static bool TryGetValue(JsonElement element, out string value, out string error)
                 {
                     value = ""; error = ""; return true;
                 }
+            }
+            """;
 
-                public static bool TryGetArray(JsonElement element, out string[] values, out string error)
+        // Act
+        // Assert
+        DiagnosticTestHelpers.AssertDiagnostic(source, "FN0014");
+    }
+
+    [Fact]
+    public void UniqueOperatorNamesOnProfile_DoNotFireFN0014()
+    {
+        // Arrange
+        var source = """
+            using System;
+            using System.Linq.Expressions;
+            using System.Text.Json;
+            using Filtering.Net;
+            namespace TestNs;
+            [FilterProfile<string>]
+            public static class CustomProfile
+            {
+                [FilterOperator("eq")]
+                public static Expression<Func<string, string, bool>> Eq => (column, value) => column == value;
+
+                [FilterOperator("ne")]
+                public static Expression<Func<string, string, bool>> Ne => (column, value) => column != value;
+
+                public static bool TryGetValue(JsonElement element, out string value, out string error)
                 {
-                    values = []; error = ""; return true;
+                    value = ""; error = ""; return true;
                 }
             }
             """;
@@ -92,9 +65,10 @@ public class Fn0014Tests
     }
 
     [Fact]
-    public void ProfileWithBasedOn_DoesNotFireFN0014_EvenWithoutOwnExtractors()
+    public void SameOperatorNameOnProfileAndBaseProfile_DoesNotFireFN0014()
     {
-        // Arrange
+        // Arrange — per-profile check; an inheriting profile re-declaring an operator
+        // present on its BasedOn target is intentional override, not a duplicate.
         var source = """
             using System;
             using System.Linq.Expressions;
@@ -103,8 +77,8 @@ public class Fn0014Tests
             [FilterProfile<string>(BasedOn = typeof(StringFilter))]
             public static class DerivedProfile
             {
-                [FilterOperator("fuzzy")]
-                public static Expression<Func<string, string, bool>> Fuzzy => (column, value) => column.Contains(value);
+                [FilterOperator("eq")]
+                public static Expression<Func<string, string, bool>> EqOverride => (column, value) => column == value;
             }
             """;
 
@@ -114,50 +88,12 @@ public class Fn0014Tests
     }
 
     [Fact]
-    public void StandaloneProfileWithOnlyIsNullOperator_DoesNotFireFN0014()
+    public void DuplicateAcrossPropertyAndMethod_FiresFN0014()
     {
-        // Arrange — isNull is None-shape and uses neither TryGetValue nor TryGetArray.
+        // Arrange — [FilterOperator] is allowed on both Property and Method targets;
+        // duplicate detection must work across both forms.
         var source = """
             using System;
-            using System.Linq.Expressions;
-            using Filtering.Net;
-            namespace TestNs;
-            [FilterProfile<string>]
-            public static class IsNullOnlyProfile
-            {
-                [FilterOperator("isNull")]
-                public static Expression<Func<string, bool>> IsNull => column => column == null;
-            }
-            """;
-
-        // Act
-        // Assert
-        DiagnosticTestHelpers.AssertNoDiagnostic(source, "FN0014");
-    }
-
-    [Fact]
-    public void StandaloneProfileWithNoOperators_DoesNotFireFN0014()
-    {
-        // Arrange
-        var source = """
-            using Filtering.Net;
-            namespace TestNs;
-            [FilterProfile<string>]
-            public static class EmptyProfile { }
-            """;
-
-        // Act
-        // Assert
-        DiagnosticTestHelpers.AssertNoDiagnostic(source, "FN0014");
-    }
-
-    [Fact]
-    public void StandaloneProfileWithScalarAndIn_AndOnlyTryGetValue_FiresFN0014ForTryGetArray()
-    {
-        // Arrange
-        var source = """
-            using System;
-            using System.Linq;
             using System.Linq.Expressions;
             using System.Text.Json;
             using Filtering.Net;
@@ -168,8 +104,8 @@ public class Fn0014Tests
                 [FilterOperator("eq")]
                 public static Expression<Func<string, string, bool>> Eq => (column, value) => column == value;
 
-                [FilterOperator("in")]
-                public static Expression<Func<string, string[], bool>> In => (column, values) => values.Contains(column);
+                [FilterOperator("eq")]
+                public static Expression<Func<string, string, bool>> EqMethod() => (column, value) => column == value;
 
                 public static bool TryGetValue(JsonElement element, out string value, out string error)
                 {
@@ -184,9 +120,9 @@ public class Fn0014Tests
     }
 
     [Fact]
-    public void StandaloneProfileWithNonStaticTryGetValue_FiresFN0014()
+    public void DuplicateOperator_ReportsFirstOperatorAsAdditionalLocation()
     {
-        // Arrange — public static is the contract; instance methods don't count.
+        // Arrange
         var source = """
             using System;
             using System.Linq.Expressions;
@@ -194,12 +130,15 @@ public class Fn0014Tests
             using Filtering.Net;
             namespace TestNs;
             [FilterProfile<string>]
-            public class CustomProfile
+            public static class CustomProfile
             {
                 [FilterOperator("eq")]
-                public static Expression<Func<string, string, bool>> Eq => (column, value) => column == value;
+                public static Expression<Func<string, string, bool>> EqFirst => (column, value) => column == value;
 
-                public bool TryGetValue(JsonElement element, out string value, out string error)
+                [FilterOperator("eq")]
+                public static Expression<Func<string, string, bool>> EqSecond => (column, value) => column == value;
+
+                public static bool TryGetValue(JsonElement element, out string value, out string error)
                 {
                     value = ""; error = ""; return true;
                 }
@@ -208,6 +147,6 @@ public class Fn0014Tests
 
         // Act
         // Assert
-        DiagnosticTestHelpers.AssertDiagnostic(source, "FN0014");
+        DiagnosticTestHelpers.AssertDiagnosticHasAdditionalLocations(source, "FN0014", expectedAdditionalCount: 1);
     }
 }

@@ -2,16 +2,11 @@ namespace Filtering.Net;
 
 /// <summary>The filter engine: validates requests and applies them to a query according to a <see cref="FilterSchema{TEntity}"/>. Generated filter classes derive from it; it can also be constructed directly from a hand-built schema.</summary>
 /// <typeparam name="TEntity">The entity type the definition targets.</typeparam>
-public class FilterDefinition<TEntity> : IFilterDefinition<TEntity>
+/// <remarks>Creates a definition over <paramref name="schema"/>.</remarks>
+public class FilterDefinition<TEntity>(FilterSchema<TEntity> schema) : IFilterDefinition<TEntity>
 {
-    /// <summary>Creates a definition over <paramref name="schema"/>.</summary>
-    public FilterDefinition(FilterSchema<TEntity> schema)
-    {
-        Schema = schema ?? throw new ArgumentNullException(nameof(schema));
-    }
-
     /// <summary>The properties, operators, and limits this definition accepts.</summary>
-    public FilterSchema<TEntity> Schema { get; }
+    public FilterSchema<TEntity> Schema { get; } = schema ?? throw new ArgumentNullException(nameof(schema));
 
     /// <inheritdoc />
     public FilterValidationResult Validate(FilterNode? where) => FilterTreeValidator.Validate(Schema, where);

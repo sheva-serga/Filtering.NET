@@ -14,10 +14,9 @@ public class SkeletonEmissionTests
             namespace Sample;
             public class User { public string Name { get; set; } = ""; }
             [GenerateFilter<User>]
+            [Map(nameof(User.Name))]
             public partial class UserFilter
             {
-                [Map(nameof(User.Name))]
-                private static partial void MapName();
             }
             """;
         var driver = GeneratorRunner.RunDriver(consumerSource);
@@ -41,10 +40,9 @@ public class SkeletonEmissionTests
             namespace Sample;
             public class Order { public string Reference { get; set; } = ""; }
             [GenerateFilter<Order>]
+            [Map(nameof(Order.Reference))]
             public partial class OrderFilter
             {
-                [Map(nameof(Order.Reference))]
-                private static partial void MapReference();
             }
             """;
         var driver = GeneratorRunner.RunDriver(consumerSource);
@@ -75,10 +73,9 @@ public class SkeletonEmissionTests
             }
             public class Order { public string Reference { get; set; } = ""; }
             [GenerateFilter<Order>]
+            [Map(nameof(Order.Reference), Profile = typeof(StringFilterPlus), Only = new[] { "fuzzy" })]
             public partial class OrderFilter
             {
-                [Map(nameof(Order.Reference), Profile = typeof(StringFilterPlus), Only = new[] { "fuzzy" })]
-                private static partial void MapReference();
             }
             """;
         var driver = GeneratorRunner.RunDriver(consumerSource);

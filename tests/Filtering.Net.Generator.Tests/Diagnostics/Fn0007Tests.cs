@@ -3,19 +3,21 @@ namespace Filtering.Net.Generator.Tests.Diagnostics;
 public class Fn0007Tests
 {
     [Fact]
-    public void CustomTypePropertyWithoutExplicitProfile_FiresFN0007()
+    public void TwoInterceptorsForSameProperty_FiresFN0007()
     {
         // Arrange
         var source = """
             using Filtering.Net;
             namespace TestNs;
-            public class Money { public decimal Amount { get; set; } public string Currency { get; set; } = ""; }
-            public class Order { public Money Total { get; set; } = new(); }
-            [GenerateFilter<Order>]
-            public partial class OrderFilter
+            public class User { public string Name { get; set; } = ""; }
+            [GenerateFilter<User>]
+            [Map(nameof(User.Name))]
+            public partial class UserFilter
             {
-                [Map(nameof(Order.Total))]
-                private static partial void MapTotal();
+                [InterceptValue(nameof(User.Name))]
+                private static string InterceptOne(string value) => value;
+                [InterceptValue(nameof(User.Name))]
+                private static string InterceptTwo(string value) => value;
             }
             """;
 
@@ -25,7 +27,7 @@ public class Fn0007Tests
     }
 
     [Fact]
-    public void StringPropertyWithoutExplicitProfile_DoesNotFireFN0007()
+    public void SingleInterceptor_DoesNotFireFN0007()
     {
         // Arrange
         var source = """
@@ -33,10 +35,11 @@ public class Fn0007Tests
             namespace TestNs;
             public class User { public string Name { get; set; } = ""; }
             [GenerateFilter<User>]
+            [Map(nameof(User.Name))]
             public partial class UserFilter
             {
-                [Map(nameof(User.Name))]
-                private static partial void MapName();
+                [InterceptValue(nameof(User.Name))]
+                private static string InterceptOne(string value) => value;
             }
             """;
 
@@ -46,25 +49,25 @@ public class Fn0007Tests
     }
 
     [Fact]
-    public void NoInferableProfile_ReportsEntityPropertyAsAdditionalLocation()
+    public void DuplicateInterceptor_ReportsFirstInterceptorAsAdditionalLocation()
     {
         // Arrange
         var source = """
             using Filtering.Net;
             namespace TestNs;
-            public class Money { public decimal Amount { get; set; } public string Currency { get; set; } = ""; }
-            public class Order { public Money Total { get; set; } = new(); }
-            [GenerateFilter<Order>]
-            public partial class OrderFilter
+            public class User { public string Name { get; set; } = ""; }
+            [GenerateFilter<User>]
+            [Map(nameof(User.Name))]
+            public partial class UserFilter
             {
-                [Map(nameof(Order.Total))]
-                private static partial void MapTotal();
+                [InterceptValue(nameof(User.Name))]
+                private static string InterceptOne(string value) => value;
+                [InterceptValue(nameof(User.Name))]
+                private static string InterceptTwo(string value) => value;
             }
             """;
 
         // Act
-        // (no separate act step — AssertDiagnosticHasAdditionalLocations is the verification)
-
         // Assert
         DiagnosticTestHelpers.AssertDiagnosticHasAdditionalLocations(source, "FN0007", expectedAdditionalCount: 1);
     }

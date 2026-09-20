@@ -13,10 +13,9 @@ public class MapNestedExtractorTests
             namespace TestNs;
             public class User { public string Name { get; set; } = ""; }
             [GenerateFilter<User>]
+            [Map(nameof(User.Name))]
             public partial class UserFilter
             {
-                [Map(nameof(User.Name))]
-                private static partial void MapName();
             }
             """;
 
@@ -38,10 +37,9 @@ public class MapNestedExtractorTests
             public class User { public Department Department { get; set; } = new(); }
             [GenerateFilter<Department>] public partial class DepartmentFilter { }
             [GenerateFilter<User>]
+            [MapNested(nameof(User.Department))]
             public partial class UserFilter
             {
-                [MapNested(nameof(User.Department))]
-                private static partial void MapDepartment();
             }
             """;
 
@@ -70,10 +68,9 @@ public class MapNestedExtractorTests
             public class User { public Department Department { get; set; } = new(); }
             [GenerateFilter<Department>] public partial class DepartmentFilter { }
             [GenerateFilter<User>]
+            [MapNested<DepartmentFilter>(nameof(User.Department))]
             public partial class UserFilter
             {
-                [MapNested<DepartmentFilter>(nameof(User.Department))]
-                private static partial void MapDepartment();
             }
             """;
 
@@ -96,14 +93,9 @@ public class MapNestedExtractorTests
             public class User { public Department Department { get; set; } = new(); }
             [GenerateFilter<Department>] public partial class DepartmentFilter { }
             [GenerateFilter<User>]
+            [MapNested(nameof(User.Department), Prefix = "dept", Only = new[] { "id", "name" }, Except = new[] { "internal" }, DisableSorting = true)]
             public partial class UserFilter
             {
-                [MapNested(nameof(User.Department),
-                    Prefix = "dept",
-                    Only = new[] { "id", "name" },
-                    Except = new[] { "internal" },
-                    DisableSorting = true)]
-                private static partial void MapDepartment();
             }
             """;
 

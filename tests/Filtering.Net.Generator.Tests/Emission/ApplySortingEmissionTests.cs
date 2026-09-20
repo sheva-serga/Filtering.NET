@@ -17,13 +17,10 @@ public class ApplySortingEmissionTests
                 public int Age { get; set; }
             }
             [GenerateFilter<User>]
+            [Map(nameof(User.Name), Sortable = true)]
+            [Map(nameof(User.Age), Sortable = true)]
             public partial class UserFilter
             {
-                [Map(nameof(User.Name), Sortable = true)]
-                private static partial void MapName();
-
-                [Map(nameof(User.Age), Sortable = true)]
-                private static partial void MapAge();
             }
             """;
         var driver = GeneratorRunner.RunDriver(consumerSource);

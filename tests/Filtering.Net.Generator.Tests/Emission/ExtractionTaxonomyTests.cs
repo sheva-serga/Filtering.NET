@@ -31,10 +31,9 @@ public class ExtractionTaxonomyTests
         namespace Sample;
         public sealed class User { public string Email { get; set; } = ""; }
         [GenerateFilter<User>]
+        [Map(nameof(User.Email), Only = new[] { "eq" })]
         public partial class UserFilter
         {
-            [Map(nameof(User.Email), Only = new[] { "eq" })]
-            private static partial void MapEmail();
         }
         """;
 
@@ -65,10 +64,9 @@ public class ExtractionTaxonomyTests
         namespace Sample;
         public sealed class User { public int Age { get; set; } }
         [GenerateFilter<User>]
+        [Map(nameof(User.Age), Only = new[] { "in" })]
         public partial class UserFilter
         {
-            [Map(nameof(User.Age), Only = new[] { "in" })]
-            private static partial void MapAge();
         }
         """;
 
@@ -102,10 +100,9 @@ public class ExtractionTaxonomyTests
         namespace Sample;
         public sealed class User { public string Email { get; set; } = ""; }
         [GenerateFilter<User>]
+        [Map(nameof(User.Email), Only = new[] { "isNull" })]
         public partial class UserFilter
         {
-            [Map(nameof(User.Email), Only = new[] { "isNull" })]
-            private static partial void MapEmail();
         }
         """;
 
@@ -137,10 +134,9 @@ public class ExtractionTaxonomyTests
         public static class CustomStringProfile { }
         public sealed class User { public string Email { get; set; } = ""; }
         [GenerateFilter<User>]
+        [Map(nameof(User.Email), Profile = typeof(CustomStringProfile), Only = new[] { "eq" })]
         public partial class UserFilter
         {
-            [Map(nameof(User.Email), Profile = typeof(CustomStringProfile), Only = new[] { "eq" })]
-            private static partial void MapEmail();
         }
         """;
 
@@ -181,10 +177,9 @@ public class ExtractionTaxonomyTests
         }
         public sealed class User { public string Email { get; set; } = ""; }
         [GenerateFilter<User>]
+        [Map(nameof(User.Email), Profile = typeof(StringWithRegexProfile), Only = new[] { "regex" })]
         public partial class UserFilter
         {
-            [Map(nameof(User.Email), Profile = typeof(StringWithRegexProfile), Only = new[] { "regex" })]
-            private static partial void MapEmail();
         }
         """;
 
@@ -226,10 +221,9 @@ public class ExtractionTaxonomyTests
         }
         public sealed class User { public int Age { get; set; } }
         [GenerateFilter<User>]
+        [Map(nameof(User.Age), Profile = typeof(CustomIntProfile), Only = new[] { "inArrays" })]
         public partial class UserFilter
         {
-            [Map(nameof(User.Age), Profile = typeof(CustomIntProfile), Only = new[] { "inArrays" })]
-            private static partial void MapAge();
         }
         """;
 
@@ -270,10 +264,9 @@ public class ExtractionTaxonomyTests
         }
         public sealed class User { public string Name { get; set; } = ""; }
         [GenerateFilter<User>]
+        [Map(nameof(User.Name), Profile = typeof(CustomStringProfile), Only = new[] { "isEmpty" })]
         public partial class UserFilter
         {
-            [Map(nameof(User.Name), Profile = typeof(CustomStringProfile), Only = new[] { "isEmpty" })]
-            private static partial void MapName();
         }
         """;
 

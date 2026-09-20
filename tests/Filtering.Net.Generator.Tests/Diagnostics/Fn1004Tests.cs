@@ -23,10 +23,9 @@ public class Fn1004Tests
             }
             public class User { public string Name { get; set; } = ""; }
             [GenerateFilter<User>]
+            [Map(nameof(User.Name), Profile = typeof(CustomProfile), Only = new[] { "eq" })]
             public partial class UserFilter
             {
-                [Map(nameof(User.Name), Profile = typeof(CustomProfile), Only = new[] { "eq" })]
-                private static partial void MapName();
             }
             """;
 
@@ -57,12 +56,10 @@ public class Fn1004Tests
             }
             public class User { public string Name { get; set; } = ""; public string Other { get; set; } = ""; }
             [GenerateFilter<User>]
+            [Map(nameof(User.Name), Profile = typeof(CustomProfile), Only = new[] { "eq" })]
+            [Map(nameof(User.Other), Profile = typeof(CustomProfile))]
             public partial class UserFilter
             {
-                [Map(nameof(User.Name), Profile = typeof(CustomProfile), Only = new[] { "eq" })]
-                private static partial void MapName();
-                [Map(nameof(User.Other), Profile = typeof(CustomProfile))]
-                private static partial void MapOther();
             }
             """;
 

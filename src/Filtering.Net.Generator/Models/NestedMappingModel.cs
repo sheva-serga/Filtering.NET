@@ -10,8 +10,6 @@ internal sealed record NestedMappingModel(
     EquatableList<string> Except,
     bool DisableSorting,
     LocationInfo? AttributeLocation,
-    LocationInfo? HostMethodLocation,
-    string HostMethodName,
     int MaxDepth = 0,
     string? NestingKey = null,
     string? ResolvedTargetClassFqn = null);

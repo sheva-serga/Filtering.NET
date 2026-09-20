@@ -1,54 +1,37 @@
 namespace Filtering.Net.EntityFrameworkCore.Tests.MapNested;
 
 [GenerateFilter<Employee>]
+[Map(nameof(Employee.Name), Sortable = true)]
+[MapNested(nameof(Employee.Manager), MaxDepth = 2)]
 public partial class EmployeeFilter
 {
-    [Map(nameof(Employee.Name), Sortable = true)]
-    private static partial void MapName();
-
-    [MapNested(nameof(Employee.Manager), MaxDepth = 2)]
-    private static partial void MapManager();
 }
 
 [GenerateFilter<Company>]
+[Map(nameof(Company.Country), Sortable = true)]
 public partial class CompanyFilter
 {
-    [Map(nameof(Company.Country), Sortable = true)]
-    private static partial void MapCountry();
 }
 
 [GenerateFilter<Department>]
+[Map(nameof(Department.Id), Sortable = true)]
+[Map(nameof(Department.Name), Sortable = true)]
+[MapNested(nameof(Department.Company))]
 public partial class DepartmentFilter
 {
-    [Map(nameof(Department.Id), Sortable = true)]
-    private static partial void MapId();
-
-    [Map(nameof(Department.Name), Sortable = true)]
-    private static partial void MapName();
-
-    [MapNested(nameof(Department.Company))]
-    private static partial void MapCompany();
 }
 
 [GenerateFilter<User>]
+[Map(nameof(User.Id), Sortable = true)]
+[Map(nameof(User.Login), Sortable = true)]
+[MapNested(nameof(User.Department))]
 public partial class UserFilter
 {
-    [Map(nameof(User.Id), Sortable = true)]
-    private static partial void MapId();
-
-    [Map(nameof(User.Login), Sortable = true)]
-    private static partial void MapLogin();
-
-    [MapNested(nameof(User.Department))]
-    private static partial void MapDept();
 }
 
 [GenerateFilter<User>]
+[Map(nameof(User.Id), Sortable = true)]
+[MapNested(nameof(User.Department), Only = new[] { "Id" })]
 public partial class UserFilterOnlyRestricted
 {
-    [Map(nameof(User.Id), Sortable = true)]
-    private static partial void MapId();
-
-    [MapNested(nameof(User.Department), Only = new[] { "Id" })]
-    private static partial void MapDept();
 }

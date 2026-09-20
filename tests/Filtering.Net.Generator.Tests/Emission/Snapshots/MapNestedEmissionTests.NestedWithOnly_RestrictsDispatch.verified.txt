@@ -1,7 +1,7 @@
 ﻿{
   Diagnostics: [
     {
-      Location: : (4,50)-(4,66),
+      Location: : (6,50)-(6,66),
       Message: Property 'Id' has CLR type 'int' but is not marked Sortable=true. Did you forget to make it sortable?,
       Severity: Warning,
       WarningLevel: 1,

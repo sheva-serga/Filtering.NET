@@ -25,16 +25,14 @@ public class DiExtensionEmissionTests
             public class User { public string Name { get; set; } = ""; }
             public class Order { public int Id { get; set; } }
             [GenerateFilter<User>]
+            [Map(nameof(User.Name))]
             public partial class UserFilter
             {
-                [Map(nameof(User.Name))]
-                private static partial void MapName();
             }
             [GenerateFilter<Order>]
+            [Map(nameof(Order.Id))]
             public partial class OrderFilter
             {
-                [Map(nameof(Order.Id))]
-                private static partial void MapId();
             }
             """;
         var driver = GeneratorRunner.RunDriver(consumerSource, excludeDiAbstractions: false);
@@ -55,10 +53,9 @@ public class DiExtensionEmissionTests
             namespace Sample;
             public class User { public string Name { get; set; } = ""; }
             [GenerateFilter<User>]
+            [Map(nameof(User.Name))]
             public partial class UserFilter
             {
-                [Map(nameof(User.Name))]
-                private static partial void MapName();
             }
             """;
 
@@ -86,10 +83,9 @@ public class DiExtensionEmissionTests
         }
         public sealed class User { public string Email { get; set; } = string.Empty; }
         [GenerateFilter<User>]
+        [Map(nameof(User.Email), Profile = typeof(StringFilterPlus), Only = new[] { "fuzzy" })]
         public partial class UserFilter
         {
-            [Map(nameof(User.Email), Profile = typeof(StringFilterPlus), Only = new[] { "fuzzy" })]
-            private static partial void MapEmail();
         }
         """;
 

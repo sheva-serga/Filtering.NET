@@ -11,5 +11,4 @@ internal sealed record FilterClassView(
     int MaxNestingDepth,
     int MaxLeafConditions,
     bool ThreadsSerializerOptions,
-    IReadOnlyList<string> ConfigurationMethodNames,
     IReadOnlyList<string> SchemaEntries);

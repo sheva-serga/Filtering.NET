@@ -14,10 +14,9 @@ public class EmittedCodeCompilesTests
             namespace Sample;
             public class User { public string Name { get; set; } = ""; }
             [GenerateFilter<User>]
+            [Map(nameof(User.Name))]
             public partial class UserFilter
             {
-                [Map(nameof(User.Name))]
-                private static partial void MapName();
             }
             """;
 
@@ -37,10 +36,9 @@ public class EmittedCodeCompilesTests
             namespace Sample;
             public class User { public int Age { get; set; } }
             [GenerateFilter<User>]
+            [Map(nameof(User.Age))]
             public partial class UserFilter
             {
-                [Map(nameof(User.Age))]
-                private static partial void MapAge();
             }
             """;
 
@@ -68,10 +66,9 @@ public class EmittedCodeCompilesTests
                 public static Expression<Func<string, string, bool>> Fuzzy => (column, value) => column.Contains(value);
             }
             [GenerateFilter<User>]
+            [Map(nameof(User.Name), Profile = typeof(FuzzyStringFilter))]
             public partial class UserFilter
             {
-                [Map(nameof(User.Name), Profile = typeof(FuzzyStringFilter))]
-                private static partial void MapName();
             }
             """;
 
@@ -100,10 +97,9 @@ public class EmittedCodeCompilesTests
                     => (date, days) => date >= DateTime.UtcNow.AddDays(-days);
             }
             [GenerateFilter<Audit>]
+            [Map(nameof(Audit.CreatedAt), Profile = typeof(RecencyFilter), Sortable = true)]
             public partial class AuditFilter
             {
-                [Map(nameof(Audit.CreatedAt), Profile = typeof(RecencyFilter), Sortable = true)]
-                private static partial void MapCreatedAt();
             }
             """;
 
@@ -130,22 +126,13 @@ public class EmittedCodeCompilesTests
                 public System.DateTime CreatedAt { get; set; }
             }
             [GenerateFilter<User>]
+            [Map(nameof(User.Name))]
+            [Map(nameof(User.Age), Sortable = true)]
+            [Map(nameof(User.Active))]
+            [Map(nameof(User.Id))]
+            [Map(nameof(User.CreatedAt), Sortable = true)]
             public partial class UserFilter
             {
-                [Map(nameof(User.Name))]
-                private static partial void MapName();
-
-                [Map(nameof(User.Age), Sortable = true)]
-                private static partial void MapAge();
-
-                [Map(nameof(User.Active))]
-                private static partial void MapActive();
-
-                [Map(nameof(User.Id))]
-                private static partial void MapId();
-
-                [Map(nameof(User.CreatedAt), Sortable = true)]
-                private static partial void MapCreatedAt();
             }
             """;
 

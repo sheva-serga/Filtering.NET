@@ -13,10 +13,9 @@ public class ApplyFilterEmissionTests
             namespace Sample;
             public class User { public string Name { get; set; } = ""; }
             [GenerateFilter<User>]
+            [Map(nameof(User.Name))]
             public partial class UserFilter
             {
-                [Map(nameof(User.Name))]
-                private static partial void MapName();
             }
             """;
         var driver = GeneratorRunner.RunDriver(consumerSource);
@@ -37,10 +36,9 @@ public class ApplyFilterEmissionTests
             namespace Sample;
             public class User { public int Age { get; set; } }
             [GenerateFilter<User>]
+            [Map(nameof(User.Age))]
             public partial class UserFilter
             {
-                [Map(nameof(User.Age))]
-                private static partial void MapAge();
             }
             """;
         var driver = GeneratorRunner.RunDriver(consumerSource);
@@ -62,10 +60,9 @@ public class ApplyFilterEmissionTests
             public class Department { public string Name { get; set; } = ""; }
             public class User { public Department Department { get; set; } = new(); }
             [GenerateFilter<User>]
+            [Map("Department.Name", Alias = "dept")]
             public partial class UserFilter
             {
-                [Map("Department.Name", Alias = "dept")]
-                private static partial void MapDeptName();
             }
             """;
         var driver = GeneratorRunner.RunDriver(consumerSource);

@@ -14,10 +14,9 @@ public class Fn1005Tests
             namespace TestNs;
             public class User { public string Name { get; set; } = ""; }
             [GenerateFilter<User>]
+            [Map(nameof(User.Name), Except = new[] { "eq", "ne", "contains", "startsWith", "endsWith", "in", "isNull" })]
             public partial class UserFilter
             {
-                [Map(nameof(User.Name), Except = new[] { "eq", "ne", "contains", "startsWith", "endsWith", "in", "isNull" })]
-                private static partial void MapName();
             }
             """;
 
@@ -37,10 +36,9 @@ public class Fn1005Tests
             namespace TestNs;
             public class User { public string Name { get; set; } = ""; }
             [GenerateFilter<User>]
+            [Map(nameof(User.Name), Only = new[] { "eq" })]
             public partial class UserFilter
             {
-                [Map(nameof(User.Name), Only = new[] { "eq" })]
-                private static partial void MapName();
             }
             """;
 

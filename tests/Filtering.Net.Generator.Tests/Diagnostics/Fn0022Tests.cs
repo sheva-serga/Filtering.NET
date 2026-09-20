@@ -2,22 +2,28 @@ namespace Filtering.Net.Generator.Tests.Diagnostics;
 
 public class Fn0022Tests
 {
+    private const string SourceTemplate = """
+        using Filtering.Net;
+        namespace TestNs;
+        public class Department { public string Name { get; set; } = ""; }
+        public class User { public Department Department { get; set; } = new(); }
+        [GenerateFilter<Department>]
+        [Map(nameof(Department.Name))]
+        public partial class DepartmentFilter
+        {
+        }
+        [GenerateFilter<User>]
+        [MapNested(nameof(User.Department), MaxDepth = MAX_DEPTH)]
+        public partial class UserFilter
+        {
+        }
+        """;
+
     [Fact]
-    public void FilterClassWithBaseClass_FiresFN0022()
+    public void NegativeMaxDepth_FiresFN0022()
     {
         // Arrange
-        var source = """
-            using Filtering.Net;
-            namespace TestNs;
-            public class User { public string Name { get; set; } = ""; }
-            public abstract class FilterBase { }
-            [GenerateFilter<User>]
-            public partial class UserFilter : FilterBase
-            {
-                [Map(nameof(User.Name))]
-                private static partial void MapName();
-            }
-            """;
+        var source = SourceTemplate.Replace("MAX_DEPTH", "-1");
 
         // Act
         // Assert
@@ -25,21 +31,10 @@ public class Fn0022Tests
     }
 
     [Fact]
-    public void FilterClassWithInterfaceOnly_DoesNotFireFN0022()
+    public void PositiveMaxDepth_DoesNotFireFN0022()
     {
         // Arrange
-        var source = """
-            using Filtering.Net;
-            namespace TestNs;
-            public class User { public string Name { get; set; } = ""; }
-            public interface IMarker { }
-            [GenerateFilter<User>]
-            public partial class UserFilter : IMarker
-            {
-                [Map(nameof(User.Name))]
-                private static partial void MapName();
-            }
-            """;
+        var source = SourceTemplate.Replace("MAX_DEPTH", "3");
 
         // Act
         // Assert

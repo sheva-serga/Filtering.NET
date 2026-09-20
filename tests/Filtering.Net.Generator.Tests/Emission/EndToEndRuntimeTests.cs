@@ -1,4 +1,3 @@
-using System.Reflection;
 using System.Text.Json;
 
 using AwesomeAssertions;
@@ -18,13 +17,10 @@ public class EndToEndRuntimeTests
         namespace Sample;
         public class User { public string Name { get; set; } = ""; public int Age { get; set; } }
         [GenerateFilter<User>]
+        [Map(nameof(User.Name), Sortable = true)]
+        [Map(nameof(User.Age), Sortable = true)]
         public partial class UserFilter
         {
-            [Map(nameof(User.Name), Sortable = true)]
-            private static partial void MapName();
-
-            [Map(nameof(User.Age), Sortable = true)]
-            private static partial void MapAge();
         }
         """;
 
@@ -189,17 +185,13 @@ public class EndToEndRuntimeTests
         namespace Sample;
         public class User { public string Name { get; set; } = ""; public int Age { get; set; } }
         [GenerateFilter<User>]
+        [Map(nameof(User.Name))]
+        [Map(nameof(User.Age))]
         public partial class UserFilter
         {
-            [Map(nameof(User.Name))]
-            private static partial void MapName();
-
             [InterceptValue(nameof(User.Name))]
             private static string[] TrimNames(InterceptContext context, string[] values) =>
                 values.Select(value => value.Trim()).ToArray();
-
-            [Map(nameof(User.Age))]
-            private static partial void MapAge();
 
             [InterceptValue(nameof(User.Age), Raw = true)]
             private static int ParseAge(InterceptContext context, JsonElement element) =>
@@ -247,10 +239,9 @@ public class EndToEndRuntimeTests
         namespace Sample;
         public class User { public string Email { get; set; } = string.Empty; }
         [GenerateFilter<User>]
+        [Map(nameof(User.Email), Only = new[] { "eq" })]
         public partial class UserFilter
         {
-            [Map(nameof(User.Email), Only = new[] { "eq" })]
-            private static partial void MapEmail();
         }
         """;
 
@@ -269,10 +260,9 @@ public class EndToEndRuntimeTests
         }
         public class User { public string Email { get; set; } = string.Empty; }
         [GenerateFilter<User>]
+        [Map(nameof(User.Email), Profile = typeof(StringFilterPlus), Only = new[] { "fuzzy" })]
         public partial class UserFilter
         {
-            [Map(nameof(User.Email), Profile = typeof(StringFilterPlus), Only = new[] { "fuzzy" })]
-            private static partial void MapEmail();
         }
         """;
 

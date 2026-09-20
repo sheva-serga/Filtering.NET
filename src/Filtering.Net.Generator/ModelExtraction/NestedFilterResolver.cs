@@ -52,7 +52,7 @@ internal static class NestedFilterResolver
                     nested.NavigationPropertyName,
                     nested.MaxDepth.ToString(CultureInfo.InvariantCulture)));
             }
-            var keyedNested = nested with { NestingKey = hostFqn + "." + nested.HostMethodName };
+            var keyedNested = nested with { NestingKey = NestingKeyOf(hostFqn, nested) };
 
             var targetModel = ResolveTargetForNested(nested, hostEntitySymbol, compilation, allHostExtractionResults, newDiagnostics);
             if (targetModel is null)
@@ -151,6 +151,12 @@ internal static class NestedFilterResolver
     // One class on the current expansion path, with the nesting it was reached through.
     private sealed record NestingPathStep(string ClassFqn, string? EnteredThroughNestingKey, bool EnteredThroughBoundedNesting);
 
+    // Identifies one [MapNested] declaration; the same navigation may be nested twice under different prefixes.
+    private static string NestingKeyOf(string declaringClassFqn, NestedMappingModel nested) =>
+        nested.Prefix == nested.NavigationPropertyName
+            ? declaringClassFqn + "." + nested.NavigationPropertyName
+            : declaringClassFqn + "." + nested.NavigationPropertyName + "@" + nested.Prefix;
+
     private static string ClassFqnOf(FilterClassModel model) =>
         string.IsNullOrEmpty(model.Namespace) ? model.ClassName : model.Namespace + "." + model.ClassName;
 
@@ -161,11 +167,11 @@ internal static class NestedFilterResolver
     {
         if (mapping.SourceFilterClassFqn is null)
         {
-            return $"[Map] {mapping.ConfigurationMethodName}";
+            return $"[Map] {mapping.DeclarationName}";
         }
         var sourceShortName = mapping.SourceFilterClassFqn.Substring(
             mapping.SourceFilterClassFqn.LastIndexOf('.') + 1);
-        return $"[MapNested] {mapping.ConfigurationMethodName} (from {sourceShortName})";
+        return $"[MapNested] {mapping.DeclarationName} (from {sourceShortName})";
     }
 
     private static FilterClassModel? ResolveTargetForNested(
@@ -363,7 +369,7 @@ internal static class NestedFilterResolver
                     Sortable = sortable,
                     InliningSiteLocation = originalNested.AttributeLocation,
                     SourceFilterClassFqn = targetClassFqn,
-                    ConfigurationMethodName = originalNested.HostMethodName,
+                    DeclarationName = originalNested.NavigationPropertyName,
                 });
             }
 
@@ -376,7 +382,7 @@ internal static class NestedFilterResolver
 
                 output.AddRange(SpliceMappings(
                     transitiveTarget,
-                    transitive with { NestingKey = targetClassFqn + "." + transitive.HostMethodName },
+                    transitive with { NestingKey = NestingKeyOf(targetClassFqn, transitive) },
                     accumulatedClrPath: accumulatedClrPath + "." + transitive.NavigationPropertyName,
                     accumulatedAliasPath: accumulatedAliasPath + "." + transitive.Prefix,
                     allHostExtractionResults,

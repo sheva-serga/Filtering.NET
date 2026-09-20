@@ -2,7 +2,6 @@ using Filtering.Net;
 using Filtering.Net.EntityFrameworkCore;
 
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
 
 using UserManagement.WebApi.Data;
 using UserManagement.WebApi.Models;

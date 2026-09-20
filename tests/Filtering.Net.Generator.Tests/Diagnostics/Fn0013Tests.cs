@@ -3,63 +3,19 @@ namespace Filtering.Net.Generator.Tests.Diagnostics;
 public class Fn0013Tests
 {
     [Fact]
-    public void TwoProfilesForSameIntType_FiresFN0013()
-    {
-        // Arrange — Filtering.Net already ships [FilterProfile<int>] (Int32Filter); the
-        // hand-written profile below makes int an ambiguous match on a [Map] without an
-        // explicit Profile = typeof(...).
-        var source = """
-            using System;
-            using System.Linq.Expressions;
-            using Filtering.Net;
-            namespace TestNs;
-            [FilterProfile<int>]
-            public static class MyIntFilter
-            {
-                [FilterOperator("eq")]
-                public static Expression<Func<int, int, bool>> Eq => (column, value) => column == value;
-            }
-            public class User { public int Id { get; set; } }
-            [GenerateFilter<User>]
-            public partial class UserFilter
-            {
-                [Map(nameof(User.Id))]
-                private static partial void MapId();
-            }
-            """;
-
-        // Act
-        // Assert
-        DiagnosticTestHelpers.AssertDiagnostic(source, "FN0013");
-    }
-
-    [Fact]
-    public void HandWrittenEnumProfileCollidesWithAutoEmitted_FiresFN0013()
+    public void StandaloneProfileWithScalarOperator_AndNoTryGetValue_FiresFN0013()
     {
         // Arrange
         var source = """
             using System;
             using System.Linq.Expressions;
             using Filtering.Net;
-
             namespace TestNs;
-
-            public enum UserStatus { Active, Closed }
-
-            [FilterProfile<UserStatus>]
-            public static class MyUserStatusFilter
+            [FilterProfile<string>]
+            public static class CustomProfile
             {
                 [FilterOperator("eq")]
-                public static Expression<Func<UserStatus, UserStatus, bool>> Eq => (column, value) => column == value;
-            }
-
-            public class User { public UserStatus Status { get; set; } }
-
-            [GenerateFilter<User>]
-            public partial class UserFilter
-            {
-                [Map(nameof(User.Status))]
-                private static partial void MapStatus();
+                public static Expression<Func<string, string, bool>> Eq => (column, value) => column == value;
             }
             """;
 
@@ -69,44 +25,189 @@ public class Fn0013Tests
     }
 
     [Fact]
-    public void AmbiguousProfile_ReportsAllCandidateProfilesAsAdditionalLocations()
+    public void StandaloneProfileWithInOperator_AndNoTryGetArray_FiresFN0013()
     {
-        // Arrange — two hand-written profiles for the same enum so both candidate locations
-        // resolve from source and the additional-location count is deterministic.
+        // Arrange
+        var source = """
+            using System;
+            using System.Linq;
+            using System.Linq.Expressions;
+            using System.Text.Json;
+            using Filtering.Net;
+            namespace TestNs;
+            [FilterProfile<string>]
+            public static class CustomProfile
+            {
+                [FilterOperator("in")]
+                public static Expression<Func<string, string[], bool>> In => (column, values) => values.Contains(column);
+
+                public static bool TryGetValue(JsonElement element, out string value, out string error)
+                {
+                    value = ""; error = ""; return true;
+                }
+                // Missing TryGetArray.
+            }
+            """;
+
+        // Act
+        // Assert
+        DiagnosticTestHelpers.AssertDiagnostic(source, "FN0013");
+    }
+
+    [Fact]
+    public void StandaloneProfileWithBothExtractors_DoesNotFireFN0013()
+    {
+        // Arrange
+        var source = """
+            using System;
+            using System.Linq;
+            using System.Linq.Expressions;
+            using System.Text.Json;
+            using Filtering.Net;
+            namespace TestNs;
+            [FilterProfile<string>]
+            public static class CustomProfile
+            {
+                [FilterOperator("eq")]
+                public static Expression<Func<string, string, bool>> Eq => (column, value) => column == value;
+
+                [FilterOperator("in")]
+                public static Expression<Func<string, string[], bool>> In => (column, values) => values.Contains(column);
+
+                public static bool TryGetValue(JsonElement element, out string value, out string error)
+                {
+                    value = ""; error = ""; return true;
+                }
+
+                public static bool TryGetArray(JsonElement element, out string[] values, out string error)
+                {
+                    values = []; error = ""; return true;
+                }
+            }
+            """;
+
+        // Act
+        // Assert
+        DiagnosticTestHelpers.AssertNoDiagnostic(source, "FN0013");
+    }
+
+    [Fact]
+    public void ProfileWithBasedOn_DoesNotFireFN0013_EvenWithoutOwnExtractors()
+    {
+        // Arrange
+        var source = """
+            using System;
+            using System.Linq.Expressions;
+            using Filtering.Net;
+            namespace TestNs;
+            [FilterProfile<string>(BasedOn = typeof(StringFilter))]
+            public static class DerivedProfile
+            {
+                [FilterOperator("fuzzy")]
+                public static Expression<Func<string, string, bool>> Fuzzy => (column, value) => column.Contains(value);
+            }
+            """;
+
+        // Act
+        // Assert
+        DiagnosticTestHelpers.AssertNoDiagnostic(source, "FN0013");
+    }
+
+    [Fact]
+    public void StandaloneProfileWithOnlyIsNullOperator_DoesNotFireFN0013()
+    {
+        // Arrange — isNull is None-shape and uses neither TryGetValue nor TryGetArray.
+        var source = """
+            using System;
+            using System.Linq.Expressions;
+            using Filtering.Net;
+            namespace TestNs;
+            [FilterProfile<string>]
+            public static class IsNullOnlyProfile
+            {
+                [FilterOperator("isNull")]
+                public static Expression<Func<string, bool>> IsNull => column => column == null;
+            }
+            """;
+
+        // Act
+        // Assert
+        DiagnosticTestHelpers.AssertNoDiagnostic(source, "FN0013");
+    }
+
+    [Fact]
+    public void StandaloneProfileWithNoOperators_DoesNotFireFN0013()
+    {
+        // Arrange
+        var source = """
+            using Filtering.Net;
+            namespace TestNs;
+            [FilterProfile<string>]
+            public static class EmptyProfile { }
+            """;
+
+        // Act
+        // Assert
+        DiagnosticTestHelpers.AssertNoDiagnostic(source, "FN0013");
+    }
+
+    [Fact]
+    public void StandaloneProfileWithScalarAndIn_AndOnlyTryGetValue_FiresFN0013ForTryGetArray()
+    {
+        // Arrange
+        var source = """
+            using System;
+            using System.Linq;
+            using System.Linq.Expressions;
+            using System.Text.Json;
+            using Filtering.Net;
+            namespace TestNs;
+            [FilterProfile<string>]
+            public static class CustomProfile
+            {
+                [FilterOperator("eq")]
+                public static Expression<Func<string, string, bool>> Eq => (column, value) => column == value;
+
+                [FilterOperator("in")]
+                public static Expression<Func<string, string[], bool>> In => (column, values) => values.Contains(column);
+
+                public static bool TryGetValue(JsonElement element, out string value, out string error)
+                {
+                    value = ""; error = ""; return true;
+                }
+            }
+            """;
+
+        // Act
+        // Assert
+        DiagnosticTestHelpers.AssertDiagnostic(source, "FN0013");
+    }
+
+    [Fact]
+    public void StandaloneProfileWithNonStaticTryGetValue_FiresFN0013()
+    {
+        // Arrange — public static is the contract; instance methods don't count.
         var source = """
             using System;
             using System.Linq.Expressions;
             using System.Text.Json;
             using Filtering.Net;
             namespace TestNs;
-            public enum Priority { Low, High }
-            [FilterProfile<Priority>]
-            public static class PriorityFilterA
+            [FilterProfile<string>]
+            public class CustomProfile
             {
                 [FilterOperator("eq")]
-                public static Expression<Func<Priority, Priority, bool>> Eq => (column, value) => column == value;
-                public static bool TryGetValue(JsonElement element, out Priority value, out string error)
-                { value = Priority.Low; error = ""; return true; }
-            }
-            [FilterProfile<Priority>]
-            public static class PriorityFilterB
-            {
-                [FilterOperator("eq")]
-                public static Expression<Func<Priority, Priority, bool>> Eq => (column, value) => column == value;
-                public static bool TryGetValue(JsonElement element, out Priority value, out string error)
-                { value = Priority.Low; error = ""; return true; }
-            }
-            public class Ticket { public Priority Priority { get; set; } }
-            [GenerateFilter<Ticket>]
-            public partial class TicketFilter
-            {
-                [Map(nameof(Ticket.Priority))]
-                private static partial void MapPriority();
+                public static Expression<Func<string, string, bool>> Eq => (column, value) => column == value;
+
+                public bool TryGetValue(JsonElement element, out string value, out string error)
+                {
+                    value = ""; error = ""; return true;
+                }
             }
             """;
 
         // Act
         // Assert
-        DiagnosticTestHelpers.AssertDiagnosticHasAdditionalLocations(source, "FN0013", expectedAdditionalCount: 2);
+        DiagnosticTestHelpers.AssertDiagnostic(source, "FN0013");
     }
 }

@@ -1,5 +1,7 @@
-using AwesomeAssertions;
 using System.Linq.Expressions;
+
+using AwesomeAssertions;
+
 using Xunit;
 
 namespace Filtering.Net.Tests.Composition;

@@ -1,4 +1,5 @@
 using AwesomeAssertions;
+
 using Microsoft.CodeAnalysis;
 
 namespace Filtering.Net.Generator.Tests.Diagnostics;

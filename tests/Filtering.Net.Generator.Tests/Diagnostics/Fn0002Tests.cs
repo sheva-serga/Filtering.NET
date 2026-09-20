@@ -12,10 +12,9 @@ public class Fn0002Tests
             namespace TestNs;
             public class User { public string Name { get; set; } = ""; }
             [GenerateFilter<User>]
+            [Map(nameof(User.Name))]
             public partial class UserFilter
             {
-                [Map(nameof(User.Name))]
-                private static partial void MapName();
                 [PropertyMap(nameof(User.Name))]
                 private static void OverrideName(FilterRuleBuilder<User, string> rule) { }
             }
@@ -37,10 +36,9 @@ public class Fn0002Tests
             namespace TestNs;
             public class User { public string Name { get; set; } = ""; }
             [GenerateFilter<User>]
+            [Map(nameof(User.Name))]
             public partial class UserFilter
             {
-                [Map(nameof(User.Name))]
-                private static partial void MapName();
             }
             """;
 
@@ -60,10 +58,9 @@ public class Fn0002Tests
             namespace TestNs;
             public class User { public string Name { get; set; } = ""; }
             [GenerateFilter<User>]
+            [Map(nameof(User.Name))]
             public partial class UserFilter
             {
-                [Map(nameof(User.Name))]
-                private static partial void MapName();
                 [PropertyMap(nameof(User.Name))]
                 private static void OverrideName(FilterRuleBuilder<User, string> rule) { }
             }

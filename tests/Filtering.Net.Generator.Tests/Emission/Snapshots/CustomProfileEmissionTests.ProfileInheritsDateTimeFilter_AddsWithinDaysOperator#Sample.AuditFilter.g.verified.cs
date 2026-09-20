@@ -22,8 +22,6 @@ namespace Sample
             return new global::System.Text.Json.JsonSerializerOptions { TypeInfoResolver = typeInfoResolver };
         }
 
-        private static partial void MapCreatedAt() { }
-
         /// <summary>Builds the schema of this filter: one entry per mapping declared on the class.</summary>
         internal static global::Filtering.Net.FilterSchema<global::Sample.Audit> CreateSchema(global::System.Text.Json.JsonSerializerOptions? serializerOptions, global::Filtering.Net.FilterNestingContext nestingContext) =>
             new global::Filtering.Net.FilterSchemaBuilder<global::Sample.Audit>(

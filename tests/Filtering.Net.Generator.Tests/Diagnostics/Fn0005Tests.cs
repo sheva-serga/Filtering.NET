@@ -12,10 +12,9 @@ public class Fn0005Tests
             namespace TestNs;
             public class User { public string Name { get; set; } = ""; }
             [GenerateFilter<User>]
+            [Map(nameof(User.Name), Only = new[] { "eq", "iAmNotARealOp" })]
             public partial class UserFilter
             {
-                [Map(nameof(User.Name), Only = new[] { "eq", "iAmNotARealOp" })]
-                private static partial void MapName();
             }
             """;
 
@@ -35,10 +34,9 @@ public class Fn0005Tests
             namespace TestNs;
             public class User { public string Name { get; set; } = ""; }
             [GenerateFilter<User>]
+            [Map(nameof(User.Name), Except = new[] { "iAmNotARealOp" })]
             public partial class UserFilter
             {
-                [Map(nameof(User.Name), Except = new[] { "iAmNotARealOp" })]
-                private static partial void MapName();
             }
             """;
 
@@ -58,10 +56,9 @@ public class Fn0005Tests
             namespace TestNs;
             public class User { public string Name { get; set; } = ""; }
             [GenerateFilter<User>]
+            [Map(nameof(User.Name), Only = new[] { "eq", "ne" })]
             public partial class UserFilter
             {
-                [Map(nameof(User.Name), Only = new[] { "eq", "ne" })]
-                private static partial void MapName();
             }
             """;
 

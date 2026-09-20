@@ -256,28 +256,28 @@ internal static class ProfileExtractor
         switch (invocationTarget)
         {
             case MemberAccessExpressionSyntax memberAccess:
-            {
-                var fullRendering = memberAccess.ToString();
-                if (EfTranslatableMethods.Contains(fullRendering))
                 {
-                    return (fullRendering, IsAllowed: true);
+                    var fullRendering = memberAccess.ToString();
+                    if (EfTranslatableMethods.Contains(fullRendering))
+                    {
+                        return (fullRendering, IsAllowed: true);
+                    }
+                    if (efIsReferenced && IsEfFunctionsAccess(memberAccess))
+                    {
+                        return (fullRendering, IsAllowed: true);
+                    }
+                    var rightMostName = memberAccess.Name.Identifier.Text;
+                    if (EfTranslatableMethods.Contains(rightMostName))
+                    {
+                        return (rightMostName, IsAllowed: true);
+                    }
+                    return (fullRendering, IsAllowed: false);
                 }
-                if (efIsReferenced && IsEfFunctionsAccess(memberAccess))
-                {
-                    return (fullRendering, IsAllowed: true);
-                }
-                var rightMostName = memberAccess.Name.Identifier.Text;
-                if (EfTranslatableMethods.Contains(rightMostName))
-                {
-                    return (rightMostName, IsAllowed: true);
-                }
-                return (fullRendering, IsAllowed: false);
-            }
             case IdentifierNameSyntax identifier:
-            {
-                var name = identifier.Identifier.Text;
-                return (name, EfTranslatableMethods.Contains(name));
-            }
+                {
+                    var name = identifier.Identifier.Text;
+                    return (name, EfTranslatableMethods.Contains(name));
+                }
             default:
                 return (DisplayName: null, IsAllowed: true);
         }

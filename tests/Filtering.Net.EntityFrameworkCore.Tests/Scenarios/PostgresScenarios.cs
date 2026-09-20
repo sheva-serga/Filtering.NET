@@ -1,6 +1,6 @@
-using Filtering.Net.EntityFrameworkCore.Tests.Fixtures;
-
 using AwesomeAssertions;
+
+using Filtering.Net.EntityFrameworkCore.Tests.Fixtures;
 
 using Microsoft.EntityFrameworkCore;
 

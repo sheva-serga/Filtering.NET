@@ -26,10 +26,9 @@ public sealed class User
 }
 
 [GenerateFilter<User>]
+[Map(nameof(User.Email), Profile = typeof(StringWithPrefixProfile), Only = new[] { "prefixMatch" })]
 public partial class UserFilter
 {
-    [Map(nameof(User.Email), Profile = typeof(StringWithPrefixProfile), Only = new[] { "prefixMatch" })]
-    private static partial void MapEmail();
 }
 
 [JsonSerializable(typeof(PrefixFilterValue))]

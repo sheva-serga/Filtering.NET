@@ -9,10 +9,6 @@ namespace TestNs
         public EmployeeFilter()
             : base(CreateSchema(serializerOptions: null, global::Filtering.Net.FilterNestingContext.Root)) { }
 
-        private static partial void MapName() { }
-
-        private static partial void MapManager() { }
-
         /// <summary>Builds the schema of this filter: one entry per mapping declared on the class.</summary>
         internal static global::Filtering.Net.FilterSchema<global::TestNs.Employee> CreateSchema(global::System.Text.Json.JsonSerializerOptions? serializerOptions, global::Filtering.Net.FilterNestingContext nestingContext) =>
             new global::Filtering.Net.FilterSchemaBuilder<global::TestNs.Employee>(
@@ -20,7 +16,7 @@ namespace TestNs
                     serializerOptions)
                 .Add(global::Filtering.Net.FilterProperty.Map("Name", (global::TestNs.Employee entity) => entity.Name, global::Filtering.Net.StringFilter.Profile)
                     .Build())
-                .AddNested(nestingContext, "TestNs.EmployeeFilter.MapManager", maxDepth: 2,
+                .AddNested(nestingContext, "TestNs.EmployeeFilter.Manager", maxDepth: 2,
                     nestedContext => global::TestNs.EmployeeFilter.CreateSchema(serializerOptions, nestedContext),
                     (global::TestNs.Employee entity) => entity.Manager, "Manager", only: null, except: null, disableSorting: false)
                 .Build();

@@ -17,9 +17,9 @@ public static class FilteringEntityFrameworkExtensions
         FilterRequest request,
         CancellationToken cancellationToken = default)
     {
-        if (query is null) throw new ArgumentNullException(nameof(query));
-        if (definition is null) throw new ArgumentNullException(nameof(definition));
-        if (request is null) throw new ArgumentNullException(nameof(request));
+        ArgumentNullException.ThrowIfNull(query);
+        ArgumentNullException.ThrowIfNull(definition);
+        ArgumentNullException.ThrowIfNull(request);
 
         var validationResult = definition.Validate(request);
         if (!validationResult.IsValid)

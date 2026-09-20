@@ -13,10 +13,9 @@ public class ExtractionTests
             namespace TestNs;
             public class User { public string Name { get; set; } = ""; }
             [GenerateFilter<User>]
+            [Map(nameof(User.Name))]
             public partial class UserFilter
             {
-                [Map(nameof(User.Name))]
-                private static partial void MapName();
             }
             """;
 
@@ -37,12 +36,10 @@ public class ExtractionTests
             namespace TestNs;
             public class User { public string Name { get; set; } = ""; }
             [GenerateFilter<User>]
+            [Map(nameof(User.Name))]
+            [Map(nameof(User.Name))]
             public partial class UserFilter
             {
-                [Map(nameof(User.Name))]
-                private static partial void MapName1();
-                [Map(nameof(User.Name))]
-                private static partial void MapName2();
             }
             """;
 
@@ -62,10 +59,9 @@ public class ExtractionTests
             namespace TestNs;
             public class User { public string Name { get; set; } = ""; }
             [GenerateFilter<User>]
+            [Map("Nonexistent")]
             public partial class UserFilter
             {
-                [Map("Nonexistent")]
-                private static partial void MapBad();
             }
             """;
 

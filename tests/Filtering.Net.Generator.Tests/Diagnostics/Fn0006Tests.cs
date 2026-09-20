@@ -3,18 +3,18 @@ namespace Filtering.Net.Generator.Tests.Diagnostics;
 public class Fn0006Tests
 {
     [Fact]
-    public void MapMethodWithoutPartial_FiresFN0006()
+    public void CustomTypePropertyWithoutExplicitProfile_FiresFN0006()
     {
         // Arrange
         var source = """
             using Filtering.Net;
             namespace TestNs;
-            public class User { public string Name { get; set; } = ""; }
-            [GenerateFilter<User>]
-            public partial class UserFilter
+            public class Money { public decimal Amount { get; set; } public string Currency { get; set; } = ""; }
+            public class Order { public Money Total { get; set; } = new(); }
+            [GenerateFilter<Order>]
+            [Map(nameof(Order.Total))]
+            public partial class OrderFilter
             {
-                [Map(nameof(User.Name))]
-                private static void MapName() { }
             }
             """;
 
@@ -24,7 +24,7 @@ public class Fn0006Tests
     }
 
     [Fact]
-    public void MapMethodWithPartial_DoesNotFireFN0006()
+    public void StringPropertyWithoutExplicitProfile_DoesNotFireFN0006()
     {
         // Arrange
         var source = """
@@ -32,15 +32,37 @@ public class Fn0006Tests
             namespace TestNs;
             public class User { public string Name { get; set; } = ""; }
             [GenerateFilter<User>]
+            [Map(nameof(User.Name))]
             public partial class UserFilter
             {
-                [Map(nameof(User.Name))]
-                private static partial void MapName();
             }
             """;
 
         // Act
         // Assert
         DiagnosticTestHelpers.AssertNoDiagnostic(source, "FN0006");
+    }
+
+    [Fact]
+    public void NoInferableProfile_ReportsEntityPropertyAsAdditionalLocation()
+    {
+        // Arrange
+        var source = """
+            using Filtering.Net;
+            namespace TestNs;
+            public class Money { public decimal Amount { get; set; } public string Currency { get; set; } = ""; }
+            public class Order { public Money Total { get; set; } = new(); }
+            [GenerateFilter<Order>]
+            [Map(nameof(Order.Total))]
+            public partial class OrderFilter
+            {
+            }
+            """;
+
+        // Act
+        // (no separate act step — AssertDiagnosticHasAdditionalLocations is the verification)
+
+        // Assert
+        DiagnosticTestHelpers.AssertDiagnosticHasAdditionalLocations(source, "FN0006", expectedAdditionalCount: 1);
     }
 }

@@ -3,7 +3,7 @@ using System.Text;
 namespace Filtering.Net.Generator;
 
 // Emits the generated half of a [GenerateFilter<TEntity>] class: the FilterDefinition<TEntity> base,
-// constructors, marker-method bodies, and CreateSchema. All filtering logic lives in the runtime.
+// constructors, and CreateSchema. All filtering logic lives in the runtime.
 internal static class SourceEmitter
 {
     private const string EntityParameterName = "entity";
@@ -18,15 +18,6 @@ internal static class SourceEmitter
     {
         var entityFullName = "global::" + model.FullEntityTypeName;
 
-        // Only the host's own partial methods get implementation parts. Properties spliced in by the
-        // nested resolver carry the inner filter's method names, which are not declared on this host.
-        var configurationMethodNames = model.Properties
-            .Where(property => property.SourceFilterClassFqn is null)
-            .Select(property => property.ConfigurationMethodName)
-            .Concat(model.NestedMappings.Select(nestedMapping => nestedMapping.HostMethodName))
-            .Distinct(StringComparer.Ordinal)
-            .ToList();
-
         return new FilterClassView(
             Namespace: model.Namespace ?? string.Empty,
             HasNamespace: !string.IsNullOrEmpty(model.Namespace),
@@ -37,7 +28,6 @@ internal static class SourceEmitter
             MaxNestingDepth: model.MaxNestingDepth,
             MaxLeafConditions: model.MaxLeafConditions,
             ThreadsSerializerOptions: model.HasAnyTypedValueProperty,
-            ConfigurationMethodNames: configurationMethodNames,
             SchemaEntries: BuildSchemaEntries(model, entityFullName));
     }
 
@@ -117,7 +107,7 @@ internal static class SourceEmitter
         var disableSorting = nestedMapping.DisableSorting ? "true" : "false";
         var maxDepth = Math.Max(0, nestedMapping.MaxDepth).ToString(System.Globalization.CultureInfo.InvariantCulture);
         return new StringBuilder()
-            .Append($".AddNested(nestingContext, {Literal(nestedMapping.NestingKey ?? nestedMapping.HostMethodName)}, maxDepth: {maxDepth},")
+            .Append($".AddNested(nestingContext, {Literal(nestedMapping.NestingKey ?? nestedMapping.NavigationPropertyName)}, maxDepth: {maxDepth},")
             .Append('\n').Append(ContinuationIndent)
             .Append($"nestedContext => global::{nestedMapping.ResolvedTargetClassFqn}.CreateSchema(serializerOptions, nestedContext),")
             .Append('\n').Append(ContinuationIndent)

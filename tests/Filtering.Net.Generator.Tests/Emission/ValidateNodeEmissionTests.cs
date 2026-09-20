@@ -1,4 +1,3 @@
-using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
 
@@ -19,10 +18,9 @@ public class ValidateNodeEmissionTests
             namespace Sample;
             public class User { public int Age { get; set; } }
             [GenerateFilter<User>]
+            [Map(nameof(User.Age))]
             public partial class UserFilter
             {
-                [Map(nameof(User.Age))]
-                private static partial void MapAge();
             }
             """;
         var driver = GeneratorRunner.RunDriver(consumerSource);
@@ -43,11 +41,9 @@ public class ValidateNodeEmissionTests
             namespace Sample;
             public class User { public string Email { get; set; } = ""; }
             [GenerateFilter<User>]
+            [Map(nameof(User.Email))]
             public partial class UserFilter
             {
-                [Map(nameof(User.Email))]
-                private static partial void MapEmail();
-
                 [InterceptValue(nameof(User.Email))]
                 private static string InterceptEmail(InterceptContext context, string value)
                     => value.Trim().ToLowerInvariant();
@@ -71,10 +67,9 @@ public class ValidateNodeEmissionTests
             namespace Sample;
             public class User { public string Name { get; set; } = ""; }
             [GenerateFilter<User>]
+            [Map(nameof(User.Name), Alias = "displayName")]
             public partial class UserFilter
             {
-                [Map(nameof(User.Name), Alias = "displayName")]
-                private static partial void MapName();
             }
             """;
         var driver = GeneratorRunner.RunDriver(consumerSource);
@@ -106,10 +101,9 @@ public class ValidateNodeEmissionTests
         public sealed class User { public string Email { get; set; } = string.Empty; }
 
         [GenerateFilter<User>]
+        [Map(nameof(User.Email), Profile = typeof(StringWithRegexProfile), Only = new[] { "regex" })]
         public partial class UserFilter
         {
-            [Map(nameof(User.Email), Profile = typeof(StringWithRegexProfile), Only = new[] { "regex" })]
-            private static partial void MapEmail();
         }
         """;
 

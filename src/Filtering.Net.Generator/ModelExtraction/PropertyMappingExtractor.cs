@@ -9,7 +9,6 @@ internal static class PropertyMappingExtractor
     private const string SortDirEnumFullName = "Filtering.Net.SortDir";
 
     public static PropertyMappingExtractionResult Extract(
-        IMethodSymbol methodSymbol,
         INamedTypeSymbol entityType,
         AttributeData mapAttribute,
         Compilation compilation,
@@ -17,7 +16,7 @@ internal static class PropertyMappingExtractor
     {
         var diagnostics = new List<DiagnosticInfo>();
 
-        var mapLocation = methodSymbol.Locations.FirstOrDefault();
+        var mapLocation = mapAttribute.ApplicationSyntaxReference?.GetSyntax().GetLocation();
 
         // -------- Constructor arg: PropertyName --------
         var propertyName = ReadConstructorString(mapAttribute, position: 0);
@@ -256,7 +255,7 @@ internal static class PropertyMappingExtractor
             Alias: alias,
             Sortable: sortable,
             DefaultSortDirection: defaultSortDirection,
-            ConfigurationMethodName: methodSymbol.Name,
+            DeclarationName: propertyName!,
             CustomOperators: new EquatableList<CustomOperatorModel>(filteredCustomOperators),
             HasTypedValueOperator: hasTypedValueOperator,
             ProfileBridges: new EquatableList<ProfileBridgeModel>(profileBridges),

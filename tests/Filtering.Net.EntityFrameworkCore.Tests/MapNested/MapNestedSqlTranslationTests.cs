@@ -1,8 +1,8 @@
 using System.Text.Json;
 
-using Filtering.Net.EntityFrameworkCore.Tests.Scenarios;
-
 using AwesomeAssertions;
+
+using Filtering.Net.EntityFrameworkCore.Tests.Scenarios;
 
 using Microsoft.EntityFrameworkCore;
 

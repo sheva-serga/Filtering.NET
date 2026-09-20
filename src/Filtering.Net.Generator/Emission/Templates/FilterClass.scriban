@@ -29,10 +29,6 @@ namespace {{ namespace }}
         public {{ class_name }}()
             : base(CreateSchema(serializerOptions: null, global::Filtering.Net.FilterNestingContext.Root)) { }
 {{- end }}
-{{- for name in configuration_method_names }}
-
-        private static partial void {{ name }}() { }
-{{- end }}
 
         /// <summary>Builds the schema of this filter: one entry per mapping declared on the class.</summary>
         internal static global::Filtering.Net.FilterSchema<{{ entity_full_name }}> CreateSchema(global::System.Text.Json.JsonSerializerOptions? serializerOptions, global::Filtering.Net.FilterNestingContext nestingContext) =>
