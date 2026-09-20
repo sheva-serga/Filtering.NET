@@ -7,12 +7,12 @@ namespace Sample
     {
         /// <summary>Initializes a new instance.</summary>
         public UserFilter()
-            : base(CreateSchema(serializerOptions: null)) { }
+            : base(CreateSchema(serializerOptions: null, global::Filtering.Net.FilterNestingContext.Root)) { }
 
         private static partial void MapEmail() { }
 
         /// <summary>Builds the schema of this filter: one entry per mapping declared on the class.</summary>
-        internal static global::Filtering.Net.FilterSchema<global::Sample.User> CreateSchema(global::System.Text.Json.JsonSerializerOptions? serializerOptions) =>
+        internal static global::Filtering.Net.FilterSchema<global::Sample.User> CreateSchema(global::System.Text.Json.JsonSerializerOptions? serializerOptions, global::Filtering.Net.FilterNestingContext nestingContext) =>
             new global::Filtering.Net.FilterSchemaBuilder<global::Sample.User>(
                     new global::Filtering.Net.FilterSettings(50, 200, 10, 50),
                     serializerOptions)

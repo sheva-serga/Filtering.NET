@@ -7,11 +7,13 @@ public sealed class MapNestedDbContext(DbContextOptions<MapNestedDbContext> opti
     public DbSet<Company> Companies => Set<Company>();
     public DbSet<Department> Departments => Set<Department>();
     public DbSet<User> Users => Set<User>();
+    public DbSet<Employee> Employees => Set<Employee>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<Company>().HasKey(company => company.Id);
         modelBuilder.Entity<Department>().HasKey(department => department.Id);
         modelBuilder.Entity<User>().HasKey(user => user.Id);
+        modelBuilder.Entity<Employee>().HasOne(employee => employee.Manager).WithMany().HasForeignKey(employee => employee.ManagerId);
     }
 }

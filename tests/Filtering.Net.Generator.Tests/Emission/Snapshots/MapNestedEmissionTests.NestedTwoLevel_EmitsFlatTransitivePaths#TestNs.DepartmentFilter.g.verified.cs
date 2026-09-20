@@ -7,17 +7,18 @@ namespace TestNs
     {
         /// <summary>Initializes a new instance.</summary>
         public DepartmentFilter()
-            : base(CreateSchema(serializerOptions: null)) { }
+            : base(CreateSchema(serializerOptions: null, global::Filtering.Net.FilterNestingContext.Root)) { }
 
         private static partial void MapCompany() { }
 
         /// <summary>Builds the schema of this filter: one entry per mapping declared on the class.</summary>
-        internal static global::Filtering.Net.FilterSchema<global::TestNs.Department> CreateSchema(global::System.Text.Json.JsonSerializerOptions? serializerOptions) =>
+        internal static global::Filtering.Net.FilterSchema<global::TestNs.Department> CreateSchema(global::System.Text.Json.JsonSerializerOptions? serializerOptions, global::Filtering.Net.FilterNestingContext nestingContext) =>
             new global::Filtering.Net.FilterSchemaBuilder<global::TestNs.Department>(
                     new global::Filtering.Net.FilterSettings(50, 200, 10, 50),
                     serializerOptions)
-                .AddRange(global::TestNs.CompanyFilter.CreateSchema(serializerOptions)
-                    .LiftInto<global::TestNs.Department>(entity => entity.Company, "Company", only: null, except: null, disableSorting: false))
+                .AddNested(nestingContext, "TestNs.DepartmentFilter.MapCompany", maxDepth: 0,
+                    nestedContext => global::TestNs.CompanyFilter.CreateSchema(serializerOptions, nestedContext),
+                    (global::TestNs.Department entity) => entity.Company, "Company", only: null, except: null, disableSorting: false)
                 .Build();
     }
 }

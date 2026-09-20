@@ -1,11 +1,11 @@
 ---
 title: Diagnostics catalogue
-description: 30 analyzer rules — 22 errors (FN0001–FN0022) and 8 warnings (FN1001–FN1008).
+description: 31 analyzer rules — 23 errors (FN0001–FN0023) and 8 warnings (FN1001–FN1008).
 ---
 
 # Diagnostics catalogue
 
-Filtering.Net ships 30 compile-time analyzer rules — 22 errors (`FN0001`–`FN0022`) and 8 warnings (`FN1001`–`FN1008`). Both `dotnet build` and the IDE surface them; the rule's `helpLinkUri` brings you back to this page.
+Filtering.Net ships 31 compile-time analyzer rules — 23 errors (`FN0001`–`FN0023`) and 8 warnings (`FN1001`–`FN1008`). Both `dotnet build` and the IDE surface them; the rule's `helpLinkUri` brings you back to this page.
 
 ## Errors
 
@@ -33,6 +33,7 @@ Filtering.Net ships 30 compile-time analyzer rules — 22 errors (`FN0001`–`FN
 | FN0020 | NestedNavigationInvalid | Named property doesn't exist, isn't a reference type, or is a primitive/value type. |
 | FN0021 | NestedCollectionUnsupported | Named navigation is a collection type; collection navigations are deferred to a future version. |
 | FN0022 | FilterClassHasBaseType | The `[GenerateFilter]` partial declares a base class. The generated part derives from `FilterDefinition<TEntity>`, so the class cannot have another base. |
+| FN0023 | NestedMaxDepthInvalid | `[MapNested]` declares a negative `MaxDepth`. Use a positive value to bound the nesting, or omit it. |
 
 ## Warnings
 

@@ -72,6 +72,36 @@ public class MapNestedSqlTranslationTests(MapNestedSqliteFixture sqliteFixture)
     }
 
     [Fact]
+    public async Task ApplyFilter_SelfReferencingNestingTwoLevelsDeep_TranslatesToSelfJoins()
+    {
+        // Arrange
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await _sqliteFixture.ResetAsync();
+        await using var dbContext = await _sqliteFixture.CreateContextAsync();
+        var director = new Employee { Id = 1, Name = "Dana" };
+        var manager = new Employee { Id = 2, Name = "Mia", Manager = director };
+        dbContext.Employees.AddRange(
+            director,
+            manager,
+            new Employee { Id = 3, Name = "Eli", Manager = manager },
+            new Employee { Id = 4, Name = "Noa", Manager = director });
+        await dbContext.SaveChangesAsync(cancellationToken);
+        var employeeFilter = new EmployeeFilter();
+        var grandManagerIsDana = FilterRequestBuilder.Leaf("manager.manager.name", "eq", "Dana");
+
+        // Act
+        var filteredQuery = employeeFilter.ApplyFilter(dbContext.Employees.AsQueryable(), grandManagerIsDana);
+        var renderedSql = filteredQuery.ToQueryString();
+        var matchedEmployees = await filteredQuery.ToListAsync(cancellationToken);
+        var beyondDepth = employeeFilter.Validate(FilterRequestBuilder.Leaf("manager.manager.manager.name", "eq", "Dana"));
+
+        // Assert
+        matchedEmployees.Should().ContainSingle().Which.Name.Should().Be("Eli");
+        System.Text.RegularExpressions.Regex.Matches(renderedSql, "JOIN").Count.Should().Be(2, because: "each manager hop is one self-join");
+        beyondDepth.Errors.Should().ContainSingle(error => error.Code == FilterValidationCode.UnknownField);
+    }
+
+    [Fact]
     public void Validate_OnlyRestrictedSource_RejectsExcludedPath()
     {
         // Arrange

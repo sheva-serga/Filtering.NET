@@ -1,5 +1,15 @@
 namespace Filtering.Net.EntityFrameworkCore.Tests.MapNested;
 
+[GenerateFilter<Employee>]
+public partial class EmployeeFilter
+{
+    [Map(nameof(Employee.Name), Sortable = true)]
+    private static partial void MapName();
+
+    [MapNested(nameof(Employee.Manager), MaxDepth = 2)]
+    private static partial void MapManager();
+}
+
 [GenerateFilter<Company>]
 public partial class CompanyFilter
 {

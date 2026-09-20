@@ -34,35 +34,43 @@ internal static class NestedFilterResolver
         // check on the first recursive entry rather than infinite-looping. The parallel location
         // stack mirrors the visited-set so cycle diagnostics can report every [MapNested] site
         // along the path as additionalLocations.
-        var visitedFilterClasses = new HashSet<string>(StringComparer.Ordinal);
+        var nestingPath = new List<NestingPathStep>();
         var nestedSiteStack = new Stack<Location?>();
-        var hostFqn = string.IsNullOrEmpty(hostModel.Namespace)
-            ? hostModel.ClassName
-            : hostModel.Namespace + "." + hostModel.ClassName;
-        visitedFilterClasses.Add(hostFqn);
+        var hostFqn = ClassFqnOf(hostModel);
+        nestingPath.Add(new NestingPathStep(hostFqn, EnteredThroughNestingKey: null, EnteredThroughBoundedNesting: false));
         nestedSiteStack.Push(null);
 
         foreach (var nested in hostModel.NestedMappings)
         {
             cancellationToken.ThrowIfCancellationRequested();
 
+            if (nested.MaxDepth < 0)
+            {
+                newDiagnostics.Add(DiagnosticInfo.From(
+                    DiagnosticDescriptors.NestedMaxDepthInvalid,
+                    nested.AttributeLocation?.ToLocation() ?? Location.None,
+                    nested.NavigationPropertyName,
+                    nested.MaxDepth.ToString(CultureInfo.InvariantCulture)));
+            }
+            var keyedNested = nested with { NestingKey = hostFqn + "." + nested.HostMethodName };
+
             var targetModel = ResolveTargetForNested(nested, hostEntitySymbol, compilation, allHostExtractionResults, newDiagnostics);
             if (targetModel is null)
             {
-                resolvedNestedMappings.Add(nested);
+                resolvedNestedMappings.Add(keyedNested);
                 continue;
             }
-            resolvedNestedMappings.Add(nested with { ResolvedTargetClassFqn = ClassFqnOf(targetModel) });
+            resolvedNestedMappings.Add(keyedNested with { ResolvedTargetClassFqn = ClassFqnOf(targetModel) });
 
             var spliced = SpliceMappings(
                 targetModel,
-                nested,
+                keyedNested,
                 accumulatedClrPath: nested.NavigationPropertyName,
                 accumulatedAliasPath: nested.Prefix,
                 allHostExtractionResults,
                 compilation,
                 newDiagnostics,
-                visitedFilterClasses,
+                nestingPath,
                 nestedSiteStack,
                 typedValueTracker,
                 cancellationToken);
@@ -139,6 +147,9 @@ internal static class NestedFilterResolver
     {
         public bool NestedFilterNeedsSerializerOptions { get; set; }
     }
+
+    // One class on the current expansion path, with the nesting it was reached through.
+    private sealed record NestingPathStep(string ClassFqn, string? EnteredThroughNestingKey, bool EnteredThroughBoundedNesting);
 
     private static string ClassFqnOf(FilterClassModel model) =>
         string.IsNullOrEmpty(model.Namespace) ? model.ClassName : model.Namespace + "." + model.ClassName;
@@ -289,7 +300,7 @@ internal static class NestedFilterResolver
         ImmutableArray<FilterClassModelWithDiagnostics> allHostExtractionResults,
         Compilation compilation,
         List<DiagnosticInfo> diagnosticsSink,
-        HashSet<string> visitedFilterClasses,
+        List<NestingPathStep> nestingPath,
         Stack<Location?> nestedSiteStack,
         TypedValueTracker typedValueTracker,
         CancellationToken cancellationToken)
@@ -298,13 +309,26 @@ internal static class NestedFilterResolver
         var output = new List<PropertyMappingModel>();
         typedValueTracker.NestedFilterNeedsSerializerOptions |= target.HasAnyTypedValueProperty;
 
-        var targetClassFqn = string.IsNullOrEmpty(target.Namespace)
-            ? target.ClassName
-            : target.Namespace + "." + target.ClassName;
+        var targetClassFqn = ClassFqnOf(target);
+        var nestingKey = originalNested.NestingKey!;
+        var isBoundedNesting = originalNested.MaxDepth > 0;
 
-        if (!visitedFilterClasses.Add(targetClassFqn))
+        // Mirrors FilterNestingContext.TryEnter at runtime: a bounded nesting that used up its depth on
+        // this path simply contributes nothing more.
+        if (isBoundedNesting
+            && nestingPath.Count(step => step.EnteredThroughNestingKey == nestingKey) >= originalNested.MaxDepth)
         {
-            var cyclePath = string.Join(" -> ", visitedFilterClasses.Append(targetClassFqn));
+            return output;
+        }
+
+        // Re-entering a class is a real cycle only when no nesting since its last visit is bounded.
+        var previousVisitIndex = nestingPath.FindLastIndex(step => step.ClassFqn == targetClassFqn);
+        var closesUnboundedCycle = previousVisitIndex >= 0
+            && !isBoundedNesting
+            && !nestingPath.Skip(previousVisitIndex + 1).Any(step => step.EnteredThroughBoundedNesting);
+        if (closesUnboundedCycle)
+        {
+            var cyclePath = string.Join(" -> ", nestingPath.Select(step => step.ClassFqn).Append(targetClassFqn));
             // The currently-being-visited [MapNested] is the primary squiggle; every previously-
             // pushed site on the DFS path becomes additional, in declaration order.
             var pathLocations = new List<Location>();
@@ -319,6 +343,7 @@ internal static class NestedFilterResolver
                 cyclePath));
             return output;
         }
+        nestingPath.Add(new NestingPathStep(targetClassFqn, nestingKey, isBoundedNesting));
         nestedSiteStack.Push(originalNested.AttributeLocation?.ToLocation());
 
         try
@@ -351,13 +376,13 @@ internal static class NestedFilterResolver
 
                 output.AddRange(SpliceMappings(
                     transitiveTarget,
-                    transitive,
+                    transitive with { NestingKey = targetClassFqn + "." + transitive.HostMethodName },
                     accumulatedClrPath: accumulatedClrPath + "." + transitive.NavigationPropertyName,
                     accumulatedAliasPath: accumulatedAliasPath + "." + transitive.Prefix,
                     allHostExtractionResults,
                     compilation,
                     diagnosticsSink,
-                    visitedFilterClasses,
+                    nestingPath,
                     nestedSiteStack,
                     typedValueTracker,
                     cancellationToken));
@@ -366,7 +391,7 @@ internal static class NestedFilterResolver
         finally
         {
             // Pop on exit so sibling branches can legitimately re-enter the same target.
-            visitedFilterClasses.Remove(targetClassFqn);
+            nestingPath.RemoveAt(nestingPath.Count - 1);
             nestedSiteStack.Pop();
         }
 

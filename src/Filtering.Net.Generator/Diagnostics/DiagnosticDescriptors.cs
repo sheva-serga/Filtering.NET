@@ -9,7 +9,7 @@ internal static class DiagnosticDescriptors
     // Single help-link target — every rule's "More info" goes to the catalogue table.
     private const string HelpLink = "https://sheva-serga.github.io/Filtering.NET/diagnostics/";
 
-    // ---------- Errors (FN0001 - FN0022) ----------
+    // ---------- Errors (FN0001 - FN0023) ----------
 
     public static readonly DiagnosticDescriptor DuplicateMapping = new(
         id: "FN0001",
@@ -150,11 +150,11 @@ internal static class DiagnosticDescriptors
     public static readonly DiagnosticDescriptor NestedCycle = new(
         id: "FN0016",
         title: "Cycle in [MapNested] graph",
-        messageFormat: "Cycle detected in [MapNested] graph involving filter classes: {0}.",
+        messageFormat: "Cycle detected in [MapNested] graph involving filter classes: {0}. Set MaxDepth on at least one [MapNested] in the cycle to allow it.",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
-        description: "[MapNested] cannot recursively reference a filter class that (transitively) references the host.",
+        description: "A [MapNested] cycle is only allowed when at least one nesting in it declares MaxDepth, which makes the expansion finite.",
         helpLinkUri: HelpLink);
 
     public static readonly DiagnosticDescriptor NestedCrossAssembly = new(
@@ -206,6 +206,15 @@ internal static class DiagnosticDescriptors
         id: "FN0022",
         title: "[GenerateFilter] class declares a base class",
         messageFormat: "Filter class '{0}' derives from '{1}'. The generated part derives from FilterDefinition<TEntity>, so the class cannot declare another base class.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLink);
+
+    public static readonly DiagnosticDescriptor NestedMaxDepthInvalid = new(
+        id: "FN0023",
+        title: "[MapNested] MaxDepth must not be negative",
+        messageFormat: "[MapNested(nameof({0}))] has MaxDepth = {1}. Use a positive value to bound the nesting, or omit it for an unbounded one.",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,

@@ -7,21 +7,22 @@ namespace TestNs
     {
         /// <summary>Initializes a new instance.</summary>
         public UserFilter()
-            : base(CreateSchema(serializerOptions: null)) { }
+            : base(CreateSchema(serializerOptions: null, global::Filtering.Net.FilterNestingContext.Root)) { }
 
         private static partial void MapName() { }
 
         private static partial void MapDept() { }
 
         /// <summary>Builds the schema of this filter: one entry per mapping declared on the class.</summary>
-        internal static global::Filtering.Net.FilterSchema<global::TestNs.User> CreateSchema(global::System.Text.Json.JsonSerializerOptions? serializerOptions) =>
+        internal static global::Filtering.Net.FilterSchema<global::TestNs.User> CreateSchema(global::System.Text.Json.JsonSerializerOptions? serializerOptions, global::Filtering.Net.FilterNestingContext nestingContext) =>
             new global::Filtering.Net.FilterSchemaBuilder<global::TestNs.User>(
                     new global::Filtering.Net.FilterSettings(50, 200, 10, 50),
                     serializerOptions)
                 .Add(global::Filtering.Net.FilterProperty.Map("Name", (global::TestNs.User entity) => entity.Name, global::Filtering.Net.StringFilter.Profile)
                     .Build())
-                .AddRange(global::TestNs.DepartmentFilter.CreateSchema(serializerOptions)
-                    .LiftInto<global::TestNs.User>(entity => entity.Department, "Department", only: null, except: null, disableSorting: false))
+                .AddNested(nestingContext, "TestNs.UserFilter.MapDept", maxDepth: 0,
+                    nestedContext => global::TestNs.DepartmentFilter.CreateSchema(serializerOptions, nestedContext),
+                    (global::TestNs.User entity) => entity.Department, "Department", only: null, except: null, disableSorting: false)
                 .Build();
     }
 }

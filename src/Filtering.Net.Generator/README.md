@@ -1,6 +1,6 @@
 # Filtering.Net.Generator
 
-Roslyn incremental source generator + 30-rule analyzer for [Filtering.Net](https://www.nuget.org/packages/Filtering.Net/). Emits a typed filter schema per `[GenerateFilter<T>]` class, over the `FilterDefinition<T>` engine in `Filtering.Net`, plus a DI extension. Catches translatable-method mistakes before EF Core sees them.
+Roslyn incremental source generator + 31-rule analyzer for [Filtering.Net](https://www.nuget.org/packages/Filtering.Net/). Emits a typed filter schema per `[GenerateFilter<T>]` class, over the `FilterDefinition<T>` engine in `Filtering.Net`, plus a DI extension. Catches translatable-method mistakes before EF Core sees them.
 
 This package is **analyzer-only** — it has no runtime DLL. Install it alongside `Filtering.Net`.
 

@@ -48,6 +48,7 @@ internal static class MapNestedExtractor
                 IReadOnlyList<string> only = Array.Empty<string>();
                 IReadOnlyList<string> except = Array.Empty<string>();
                 var disableSorting = false;
+                var maxDepth = 0;
 
                 foreach (var namedArgument in attributeData.NamedArguments)
                 {
@@ -64,6 +65,9 @@ internal static class MapNestedExtractor
                             break;
                         case "DisableSorting":
                             disableSorting = namedArgument.Value.Value is bool disableSortingValue && disableSortingValue;
+                            break;
+                        case "MaxDepth":
+                            if (namedArgument.Value.Value is int maxDepthValue) maxDepth = maxDepthValue;
                             break;
                     }
                 }
@@ -82,7 +86,8 @@ internal static class MapNestedExtractor
                     DisableSorting: disableSorting,
                     AttributeLocation: LocationInfo.FromLocation(GetAttributeLocation(attributeData)),
                     HostMethodLocation: LocationInfo.FromLocation(methodSymbol.Locations.FirstOrDefault()),
-                    HostMethodName: methodSymbol.Name));
+                    HostMethodName: methodSymbol.Name,
+                    MaxDepth: maxDepth));
             }
         }
 

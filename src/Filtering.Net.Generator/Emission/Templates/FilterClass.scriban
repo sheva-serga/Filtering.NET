@@ -17,7 +17,7 @@ namespace {{ namespace }}
         /// <summary>Initializes a new instance with a caller-supplied <see cref="global::System.Text.Json.Serialization.Metadata.IJsonTypeInfoResolver"/> for typed operator values.</summary>
         /// <param name="typeInfoResolver">The resolver chain (typically a <c>JsonSerializerContext</c> or <c>JsonTypeInfoResolver.Combine(...)</c>).</param>
         public {{ class_name }}(global::System.Text.Json.Serialization.Metadata.IJsonTypeInfoResolver typeInfoResolver)
-            : base(CreateSchema(CreateSerializerOptions(typeInfoResolver))) { }
+            : base(CreateSchema(CreateSerializerOptions(typeInfoResolver), global::Filtering.Net.FilterNestingContext.Root)) { }
 
         private static global::System.Text.Json.JsonSerializerOptions CreateSerializerOptions(global::System.Text.Json.Serialization.Metadata.IJsonTypeInfoResolver typeInfoResolver)
         {
@@ -27,7 +27,7 @@ namespace {{ namespace }}
 {{- else }}
         /// <summary>Initializes a new instance.</summary>
         public {{ class_name }}()
-            : base(CreateSchema(serializerOptions: null)) { }
+            : base(CreateSchema(serializerOptions: null, global::Filtering.Net.FilterNestingContext.Root)) { }
 {{- end }}
 {{- for name in configuration_method_names }}
 
@@ -35,7 +35,7 @@ namespace {{ namespace }}
 {{- end }}
 
         /// <summary>Builds the schema of this filter: one entry per mapping declared on the class.</summary>
-        internal static global::Filtering.Net.FilterSchema<{{ entity_full_name }}> CreateSchema(global::System.Text.Json.JsonSerializerOptions? serializerOptions) =>
+        internal static global::Filtering.Net.FilterSchema<{{ entity_full_name }}> CreateSchema(global::System.Text.Json.JsonSerializerOptions? serializerOptions, global::Filtering.Net.FilterNestingContext nestingContext) =>
             new global::Filtering.Net.FilterSchemaBuilder<{{ entity_full_name }}>(
                     new global::Filtering.Net.FilterSettings({{ default_page_size }}, {{ max_page_size }}, {{ max_nesting_depth }}, {{ max_leaf_conditions }}),
                     serializerOptions)

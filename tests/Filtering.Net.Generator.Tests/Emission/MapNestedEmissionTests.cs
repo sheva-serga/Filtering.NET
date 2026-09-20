@@ -290,6 +290,30 @@ public class MapNestedEmissionTests
     }
 
     [Fact]
+    public Task NestedSelfReferenceWithMaxDepth_EmitsBoundedNesting()
+    {
+        // Arrange
+        var consumerSource = """
+            using Filtering.Net;
+            namespace TestNs;
+            public class Employee { public string Name { get; set; } = ""; public Employee? Manager { get; set; } }
+            [GenerateFilter<Employee>]
+            public partial class EmployeeFilter
+            {
+                [Map(nameof(Employee.Name))] private static partial void MapName();
+                [MapNested(nameof(Employee.Manager), MaxDepth = 2)] private static partial void MapManager();
+            }
+            """;
+        var driver = GeneratorRunner.RunDriver(consumerSource, excludeDiAbstractions: false);
+
+        // Act
+        // (no separate act step — Verifier.Verify is the verification)
+
+        // Assert
+        return Verify(driver).UseDirectory("Snapshots");
+    }
+
+    [Fact]
     public Task NestedWithNullableNav_EmitsSplicedColumns()
     {
         // Arrange — Department is a nullable navigation; FN1006 today fires from

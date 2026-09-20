@@ -111,6 +111,25 @@ public sealed class FilterSchemaBuilder<TEntity>(FilterSettings settings, JsonSe
         return this;
     }
 
+    /// <summary>Adds another filter's properties under a navigation. <paramref name="maxDepth"/> zero means unbounded; a positive value lets the nesting identified by <paramref name="nestingKey"/> be followed that many times along one path, which is what makes circular filter graphs finite.</summary>
+    public FilterSchemaBuilder<TEntity> AddNested<TNested>(
+        FilterNestingContext nestingContext,
+        string nestingKey,
+        int maxDepth,
+        Func<FilterNestingContext, FilterSchema<TNested>> nestedSchemaFactory,
+        Expression<Func<TEntity, TNested>> navigation,
+        string prefix,
+        IReadOnlyCollection<string>? only = null,
+        IReadOnlyCollection<string>? except = null,
+        bool disableSorting = false)
+    {
+        if (nestingContext is null) throw new ArgumentNullException(nameof(nestingContext));
+        if (nestedSchemaFactory is null) throw new ArgumentNullException(nameof(nestedSchemaFactory));
+
+        if (!nestingContext.TryEnter(nestingKey, maxDepth, out var nestedContext)) return this;
+        return AddRange(nestedSchemaFactory(nestedContext).LiftInto(navigation, prefix, only, except, disableSorting));
+    }
+
     /// <summary>Builds the schema. Throws <see cref="FilterConfigurationException"/> for a duplicate wire key, or for a typed-value operator when no serializer options were given.</summary>
     public FilterSchema<TEntity> Build() => new([.. _properties], _settings, serializerOptions);
 }

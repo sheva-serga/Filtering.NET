@@ -17,15 +17,16 @@ The generated half of a filter class is about thirty lines. It declares `FilterD
 ```csharp
 partial class UserFilter : FilterDefinition<User>
 {
-    public UserFilter() : base(CreateSchema(serializerOptions: null)) { }
+    public UserFilter() : base(CreateSchema(serializerOptions: null, FilterNestingContext.Root)) { }
 
-    internal static FilterSchema<User> CreateSchema(JsonSerializerOptions? serializerOptions) =>
+    internal static FilterSchema<User> CreateSchema(JsonSerializerOptions? serializerOptions, FilterNestingContext nestingContext) =>
         new FilterSchemaBuilder<User>(new FilterSettings(50, 200, 10, 50), serializerOptions)
             .Add(FilterProperty.Map("Name", (User entity) => entity.Name, StringFilter.Profile)
                 .Sortable()
                 .Build())
-            .AddRange(DepartmentFilter.CreateSchema(serializerOptions)
-                .LiftInto<User>(entity => entity.Department, "Department"))
+            .AddNested(nestingContext, "UserFilter.MapDepartment", maxDepth: 0,
+                nestedContext => DepartmentFilter.CreateSchema(serializerOptions, nestedContext),
+                (User entity) => entity.Department, "Department")
             .Build();
 }
 ```

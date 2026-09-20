@@ -110,14 +110,18 @@ internal static class SourceEmitter
         return null;
     }
 
+    // The nesting context travels down the chain so MaxDepth can cut circular filter graphs.
     private static string BuildNestedEntry(NestedMappingModel nestedMapping, string entityFullName)
     {
-        var navigation = $"{EntityParameterName} => {EntityParameterName}.{nestedMapping.NavigationPropertyName}";
+        var navigation = $"({entityFullName} {EntityParameterName}) => {EntityParameterName}.{nestedMapping.NavigationPropertyName}";
         var disableSorting = nestedMapping.DisableSorting ? "true" : "false";
+        var maxDepth = Math.Max(0, nestedMapping.MaxDepth).ToString(System.Globalization.CultureInfo.InvariantCulture);
         return new StringBuilder()
-            .Append($".AddRange(global::{nestedMapping.ResolvedTargetClassFqn}.CreateSchema(serializerOptions)")
+            .Append($".AddNested(nestingContext, {Literal(nestedMapping.NestingKey ?? nestedMapping.HostMethodName)}, maxDepth: {maxDepth},")
             .Append('\n').Append(ContinuationIndent)
-            .Append($".LiftInto<{entityFullName}>({navigation}, {Literal(nestedMapping.Prefix)}, only: {PathArray(nestedMapping.Only)}, except: {PathArray(nestedMapping.Except)}, disableSorting: {disableSorting}))")
+            .Append($"nestedContext => global::{nestedMapping.ResolvedTargetClassFqn}.CreateSchema(serializerOptions, nestedContext),")
+            .Append('\n').Append(ContinuationIndent)
+            .Append($"{navigation}, {Literal(nestedMapping.Prefix)}, only: {PathArray(nestedMapping.Only)}, except: {PathArray(nestedMapping.Except)}, disableSorting: {disableSorting})")
             .ToString();
     }
 

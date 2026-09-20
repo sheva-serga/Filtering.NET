@@ -11,7 +11,7 @@ The runtime: request types, profiles, and the filter engine. Generated filter cl
 | `Attributes/` | `[GenerateFilter<T>]`, `[Map]`, `[MapNested]`, `[PropertyMap]`, `[FilterProfile<T>]`, `[FilterOperator]`, `[InterceptValue]`, `[FilterDefaults]`, `[PageSettings]`. The generator reads these; consumers stick them on partials. |
 | `Requests/` | `FilterRequest`, `FilterNode` + subtypes (`FilterGroup`, `FilterLeaf`), `SortItem` (nullable `Dir`), `SortDir`, `LogicalOp`, plus the polymorphic `FilterNodeJsonConverter`. |
 | `Profiles/` | Built-in profile static classes (`StringFilter`, `Numeric/*`, `Temporal/*`, …). Each keeps its `[FilterOperator]` templates and `TryGet*` parsers and exposes a runtime `Profile` built from them. Also `FilterProfile<TColumn>`, `FilterOperator` factories, and the internal `ValueOperator` / `UnaryOperator`. |
-| `Schema/` | `FilterProperty<TEntity>` + `FilterProperty` factories, `FilterPropertyBuilder`, `FilterSchema<TEntity>`, `FilterSchemaBuilder`, `FilterSettings`. `ColumnFilterProperty` is the one concrete property type. |
+| `Schema/` | `FilterProperty<TEntity>` + `FilterProperty` factories, `FilterPropertyBuilder`, `FilterSchema<TEntity>`, `FilterSchemaBuilder` (incl. `AddNested`), `FilterNestingContext`, `FilterSettings`. `ColumnFilterProperty` is the one concrete property type. |
 | `Engine/` | Internal: `ExpressionSplicer`, `NullableColumnLifter`, `NullableColumnSupport`, `FilterValueHolder`, `BoundOperator`, `FilterTreeValidator`, `FilterPredicateComposer`. |
 | `FilterDefinition.cs` | The engine's public face: implements `IFilterDefinition<TEntity>` over a schema. |
 | `Override/` | `FilterRule` / `FilterRuleBuilder` for `[PropertyMap]`. The builder is real: the generated filter calls the consumer's method once at construction. |
@@ -27,9 +27,13 @@ The runtime: request types, profiles, and the filter engine. Generated filter cl
 2. Per request the parsed value is wrapped in `FilterValueHolder<T>` and spliced in as a member access on a constant. Query providers parameterize that shape; a bare `ConstantExpression` would be inlined into SQL.
 3. `MapNullable` properties go through `NullableColumnLifter`, which rebuilds comparisons as lifted comparisons (`liftToNull: false`) and re-targets `values.Contains(column)` to the nullable array form. That reproduces what the C# compiler emits for `entity.NullableColumn == value`.
 
+## Circular nesting
+
+`FilterNestingContext` is the path of nestings a schema is being built through. `AddNested` enters a nesting only while its `MaxDepth` is not used up on that path, and throws `FilterConfigurationException` when an unbounded nesting repeats with no bounded nesting in between. `NestedFilterResolver` in the generator applies the same two rules at compile time (FN0016); keep them in step.
+
 ## Editing rules
 
-- **Public API contract.** Generated code calls `FilterProperty.Map/MapNullable/MapRule`, `FilterPropertyBuilder`, `FilterSchemaBuilder`, `FilterSchema.LiftInto`, `FilterProfile.Create/Extend`, `FilterOperator.*`, and each built-in's `Profile`. Renames require updating `Emission/` in the generator and re-blessing snapshots.
+- **Public API contract.** Generated code calls `FilterProperty.Map/MapNullable/MapRule`, `FilterPropertyBuilder`, `FilterSchemaBuilder` (`Add`, `AddNested`), `FilterNestingContext.Root`, `FilterSchema.LiftInto`, `FilterProfile.Create/Extend`, `FilterOperator.*`, and each built-in's `Profile`. Renames require updating `Emission/` in the generator and re-blessing snapshots.
 - **Validation paths, codes, and messages are pinned** by end-to-end tests. Change them deliberately.
 - **Adding an operator to a built-in profile** means adding the `[FilterOperator]` template and listing it in that class's `Profile` initializer. `FilterProfileTests` fails if the two drift.
 - **Value extraction rule.** Operators on built-in and auto-emitted enum profiles parse through `TryGetValue` / `TryGetArray`. Value operators declared on user profiles, and every `[PropertyMap]` value operator, deserialize through System.Text.Json with the definition's resolver.

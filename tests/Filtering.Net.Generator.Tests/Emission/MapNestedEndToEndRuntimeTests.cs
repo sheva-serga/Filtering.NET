@@ -172,6 +172,56 @@ public class MapNestedEndToEndRuntimeTests
         matchCount.Should().Be(1);
     }
 
+    private const string SelfReferencingSource = """
+        using Filtering.Net;
+        namespace Sample;
+        public class Employee { public string Name { get; set; } = ""; public Employee? Manager { get; set; } }
+        [GenerateFilter<Employee>]
+        public partial class EmployeeFilter
+        {
+            [Map(nameof(Employee.Name), Sortable = true)] private static partial void MapName();
+            [MapNested(nameof(Employee.Manager), MaxDepth = 2)] private static partial void MapManager();
+        }
+        """;
+
+    [Fact]
+    public void Filter_SelfReferencingNestingWithMaxDepth_ExposesExactlyThatManyLevels()
+    {
+        // Arrange
+        var assembly = RuntimeLoader.LoadGeneratedAssembly(SelfReferencingSource);
+        var employeeFilterType = assembly.GetType("Sample.EmployeeFilter")!;
+        var employeeType = assembly.GetType("Sample.Employee")!;
+        var instance = Activator.CreateInstance(employeeFilterType)!;
+        object CreateEmployee(string name, object? manager)
+        {
+            var employee = Activator.CreateInstance(employeeType)!;
+            employeeType.GetProperty("Name")!.SetValue(employee, name);
+            employeeType.GetProperty("Manager")!.SetValue(employee, manager);
+            return employee;
+        }
+        var employees = new[]
+        {
+            CreateEmployee("Eli", CreateEmployee("Mia", CreateEmployee("Dana", null))),
+            CreateEmployee("Noa", CreateEmployee("Max", CreateEmployee("Zed", null))),
+        };
+        var typedQueryable = BuildTypedQueryable(employeeType, employees);
+        var withinDepth = new FilterLeaf("manager.manager.name", "eq", JsonDocument.Parse("\"Dana\"").RootElement);
+        var beyondDepth = new FilterLeaf("manager.manager.manager.name", "eq", JsonDocument.Parse("\"x\"").RootElement);
+        var validateMethod = employeeFilterType.GetMethods()
+            .First(m => m.Name == "Validate" && m.GetParameters().Length == 1 && m.GetParameters()[0].ParameterType == typeof(FilterNode));
+
+        // Act
+        var filteredQuery = employeeFilterType.GetMethod("ApplyFilter")!.Invoke(instance, [typedQueryable, (object?)withinDepth])!;
+        var nameProperty = employeeType.GetProperty("Name")!;
+        var matchedNames = ((System.Collections.IEnumerable)filteredQuery).Cast<object>()
+            .Select(employee => (string)nameProperty.GetValue(employee)!).ToList();
+        var beyondDepthResult = (FilterValidationResult)validateMethod.Invoke(instance, [beyondDepth])!;
+
+        // Assert
+        matchedNames.Should().Equal("Eli");
+        beyondDepthResult.Errors.Should().ContainSingle(error => error.Code == FilterValidationCode.UnknownField);
+    }
+
     [Fact]
     public void Filter_DepartmentName_Eq_ReturnsMatchingUsers()
     {

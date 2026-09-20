@@ -40,6 +40,7 @@ IFilterDefinition<User> userFilter = new FilterDefinition<User>(schema);
 - **Standalone profile.** `FilterProfile<TColumn>.Create(name, operators)`.
 - **Typed operator values.** `FilterOperator.Value(name, predicate)` without a parser deserializes the value through System.Text.Json. Pass `JsonSerializerOptions` with a type-info resolver to `FilterSchemaBuilder`, otherwise `Build()` throws.
 - **Nesting.** `departmentSchema.LiftInto<User>(user => user.Department, "Department")` returns the department properties re-rooted on `User`. Add them with `AddRange`.
+- **Circular nesting.** `FilterSchemaBuilder.AddNested(nestingContext, nestingKey, maxDepth, nestedSchemaFactory, navigation, prefix)` follows a nesting at most `maxDepth` times along one path. Start from `FilterNestingContext.Root` and pass the context the factory receives down to the nested schema. An unbounded cycle throws `FilterConfigurationException` instead of recursing forever.
 - **Custom accessor.** `FilterProperty.MapRule(field, rule)` takes a `FilterRule` built with `FilterRuleBuilder`.
 - **Introspection.** `definition.Schema.Properties` lists every field, alias, operator set, and sortable flag. Use it to feed OpenAPI descriptions or a UI.
 

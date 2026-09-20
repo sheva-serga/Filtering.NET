@@ -1,3 +1,5 @@
+#pragma warning disable IDE0130 // Namespace does not match folder structure
+
 using System.Linq.Expressions;
 
 namespace Filtering.Net;

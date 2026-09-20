@@ -16,7 +16,7 @@ Type-safe, source-generated filter / sort / page library for `IQueryable<T>` and
 - **Structured JSON over string DSLs.** API consumers post a typed `FilterRequest` (groups + leaves) instead of an opaque DSL fragment. No parser, no escape rules, no surprises.
 - **Source-generated schema, generic engine.** The generator emits a small typed schema per filter class: accessor lambdas, profiles, options. One runtime engine composes predicates from it per request. No reflection over your types, no `Compile()`, trim and Native AOT clean.
 - **Validation first.** Every request is validated against the generated definition before EF Core ever sees it. Errors come back as a structured list of `FilterValidationError`s with paths and codes.
-- **EF Core aware.** A 30-rule analyzer catches translatable-method mistakes at compile time. The runtime ships an `ApplyPagedAsync` helper for one-call paging.
+- **EF Core aware.** A 31-rule analyzer catches translatable-method mistakes at compile time. The runtime ships an `ApplyPagedAsync` helper for one-call paging.
 
 ## Install
 

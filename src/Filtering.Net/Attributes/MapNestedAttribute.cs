@@ -19,6 +19,9 @@ public sealed class MapNestedAttribute(string navigationPropertyName) : Attribut
 
     /// <summary>When true, every inlined mapping is demoted to filter-only.</summary>
     public bool DisableSorting { get; init; }
+
+    /// <summary>How many times this nesting may be followed along one path. Zero (the default) means unbounded, which is only legal when the nesting is not part of a cycle. Set it to allow self-referencing or circular filter graphs.</summary>
+    public int MaxDepth { get; init; }
 }
 
 /// <summary>Generic-arity overload of <see cref="MapNestedAttribute"/> that pins the inlined filter class explicitly. Use to disambiguate when multiple filter classes target the same navigation entity.</summary>
@@ -41,4 +44,7 @@ public sealed class MapNestedAttribute<TFilter>(string navigationPropertyName) :
 
     /// <inheritdoc cref="MapNestedAttribute.DisableSorting"/>
     public bool DisableSorting { get; init; }
+
+    /// <summary>How many times this nesting may be followed along one path. Zero (the default) means unbounded, which is only legal when the nesting is not part of a cycle. Set it to allow self-referencing or circular filter graphs.</summary>
+    public int MaxDepth { get; init; }
 }

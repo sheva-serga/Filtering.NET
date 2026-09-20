@@ -48,10 +48,40 @@ Wire fields exposed by `UserFilter`: `name`, `department.id`, `department.name`.
 - `Only = new[] { "Id", "Name" }` keeps only these paths. Paths are relative to the nested filter, in CLR PascalCase.
 - `Except = new[] { "InternalNotes" }` drops these paths.
 - `DisableSorting = true` makes every property that arrives through this nesting non-sortable.
+- `MaxDepth = 2` bounds how often this nesting is followed along one path. See the next section.
 
 ## Transitive nesting
 
-If `DepartmentFilter` itself has `[MapNested(nameof(Department.Company))]`, then `UserFilter` exposes `department.company.*` as well. `Only` and `Except` apply to the nested filter's own mappings. Properties it nests in turn follow their own `[MapNested]` settings. Cycles are caught at compile time as `FN0016 NestedCycle`.
+If `DepartmentFilter` itself has `[MapNested(nameof(Department.Company))]`, then `UserFilter` exposes `department.company.*` as well. `Only` and `Except` apply to the nested filter's own mappings. Properties it nests in turn follow their own `[MapNested]` settings.
+
+## Self-referencing and circular models
+
+Entity models are often circular: `Employee.Manager` points at another `Employee`, or `User.Department` and `Department.Head` point at each other. Nesting such a graph without a limit would never end, so an unbounded cycle is the compile error `FN0016 NestedCycle`. Give at least one nesting in the cycle a `MaxDepth` and the cycle becomes legal:
+
+```csharp
+[GenerateFilter<Employee>]
+public partial class EmployeeFilter
+{
+    [Map(nameof(Employee.Name), Sortable = true)]
+    private static partial void MapName();
+
+    [MapNested(nameof(Employee.Manager), MaxDepth = 2)]
+    private static partial void MapManager();
+}
+```
+
+This exposes `name`, `manager.name`, and `manager.manager.name`. A request for `manager.manager.manager.name` fails validation with `UnknownField`. On EF Core each level becomes one self-join.
+
+`MaxDepth = N` means this particular `[MapNested]` is followed at most N times along any single path. In a cycle across several filters, the expansion stops where the bounded nesting runs out:
+
+```csharp
+// UserFilter:       [MapNested(nameof(User.Department))]
+// DepartmentFilter: [MapNested(nameof(Department.Head), MaxDepth = 1)]
+```
+
+`UserFilter` then exposes `department.*`, `department.head.*`, and `department.head.department.*`, and stops there because `Head` was already followed once.
+
+Keep `MaxDepth` small. Every level adds a join to queries that use it, and the number of exposed fields grows with each level.
 
 ## Typed operator values
 
@@ -59,6 +89,7 @@ If the nested filter, or anything it nests, has an operator that takes a typed v
 
 ## Limitations
 
+- A negative `MaxDepth` is the compile error `FN0023`.
 - The target filter class must live in the same compilation. Otherwise `FN0017 NestedCrossAssembly` fires.
 - Collection navigations such as `User.Posts` are not supported and raise `FN0021 NestedCollectionUnsupported`.
 - The same path produced by `[Map]`, `[PropertyMap]`, and `[MapNested]` together raises `FN0001 DuplicateMapping`, reporting every conflicting site.
