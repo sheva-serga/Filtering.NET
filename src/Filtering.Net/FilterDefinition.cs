@@ -58,7 +58,7 @@ public class FilterDefinition<TEntity> : IFilterDefinition<TEntity>
             {
                 if (!Schema.TryGetProperty(sortItem.Field, out var property) || !property.Sortable)
                     throw new FilterDispatchException($"Unknown sort field '{sortItem.Field}' (validation should have caught this).");
-                orderedQuery = property.ApplySort(query, orderedQuery, sortItem.Dir);
+                orderedQuery = property.ApplySort(query, orderedQuery, sortItem.Dir ?? property.DefaultSortDirection);
             }
             resultQuery = orderedQuery!;
         }

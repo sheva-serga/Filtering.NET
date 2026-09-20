@@ -228,6 +228,21 @@ public class FilterDefinitionTests
     }
 
     [Fact]
+    public void ApplySorting_OmittedDirection_UsesPropertyDefaultDirection()
+    {
+        // Arrange
+        var definition = StandardDefinition();
+
+        // Act
+        var byDefaultDirection = definition.ApplySorting(People(), [new SortItem("Age")]).Names();
+        var byExplicitDirection = definition.ApplySorting(People(), [new SortItem("Age", SortDir.Asc)]).Names();
+
+        // Assert
+        byDefaultDirection.Should().Equal("Carol", "Alice", "Bob");
+        byExplicitDirection.Should().Equal("Bob", "Alice", "Carol");
+    }
+
+    [Fact]
     public void ApplySorting_PageAndPageSize_SkipsAndTakes()
     {
         // Arrange

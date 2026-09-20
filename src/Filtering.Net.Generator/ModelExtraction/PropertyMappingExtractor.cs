@@ -94,7 +94,7 @@ internal static class PropertyMappingExtractor
         INamedTypeSymbol? resolvedProfileSymbol = null;
         if (explicitProfile is not null)
         {
-            resolvedProfile = ProfileResolver.ResolveExplicit(explicitProfile, compilation);
+            resolvedProfile = ProfileResolver.ResolveExplicit(explicitProfile);
             if (resolvedProfile is null)
             {
                 // Explicit profile didn't resolve (no [FilterOperator] members). Bail out cleanly.
@@ -148,7 +148,7 @@ internal static class PropertyMappingExtractor
                 var profileSymbol = compilation.GetTypeByMetadataName(candidateProfileFullName);
                 if (profileSymbol is not null)
                 {
-                    resolvedProfile = ProfileResolver.ResolveExplicit(profileSymbol, compilation);
+                    resolvedProfile = ProfileResolver.ResolveExplicit(profileSymbol);
                     resolvedProfileSymbol = profileSymbol;
                 }
                 else

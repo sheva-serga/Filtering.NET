@@ -43,11 +43,11 @@ public class RequestTypesTests
     }
 
     [Fact]
-    public void SortItem_DefaultsToAsc()
+    public void SortItem_OmittedDirection_IsNullSoThePropertyDefaultApplies()
     {
         // Act + Assert
         var item = new SortItem("name");
         item.Field.Should().Be("name");
-        item.Dir.Should().Be(SortDir.Asc);
+        item.Dir.Should().BeNull();
     }
 }

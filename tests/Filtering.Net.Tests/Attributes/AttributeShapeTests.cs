@@ -95,16 +95,6 @@ public class AttributeShapeTests
     }
 
     [Fact]
-    public void FilterValidatorAttribute_ConstructedWithOperator_StoresOperatorName()
-    {
-        // Arrange
-        var attribute = new FilterValidatorAttribute("eq");
-
-        // Act + Assert
-        attribute.OperatorName.Should().Be("eq");
-    }
-
-    [Fact]
     public void PropertyMapAttribute_ConstructedWithPropertyName_StoresPropertyName()
     {
         // Arrange

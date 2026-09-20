@@ -45,7 +45,7 @@ internal static class ProfileResolver
 
     // Walks the BasedOn chain so a derived profile inherits base operators; same-named derived
     // operators win. Cycle protection: short-circuits when a profile is seen a second time.
-    public static ResolvedProfile? ResolveExplicit(INamedTypeSymbol profileType, Compilation? compilation = null)
+    public static ResolvedProfile? ResolveExplicit(INamedTypeSymbol profileType)
     {
         var visited = new HashSet<string>(StringComparer.Ordinal);
         // Operator name -> declaring profile full name; derived-profile overwrites win.
@@ -56,7 +56,7 @@ internal static class ProfileResolver
         // Insertion order preserves the user's declaration order in the snapshot output.
         var operatorOrder = new List<string>();
 
-        CollectOperatorsRecursive(profileType, compilation, visited, operatorDeclarers, operatorMetadata, operatorOrder);
+        CollectOperatorsRecursive(profileType, visited, operatorDeclarers, operatorMetadata, operatorOrder);
 
         var profileFullName = profileType.ToDisplayString();
         var customOperators = operatorOrder
@@ -68,7 +68,6 @@ internal static class ProfileResolver
 
     private static void CollectOperatorsRecursive(
         INamedTypeSymbol profileType,
-        Compilation? compilation,
         HashSet<string> visited,
         Dictionary<string, string> operatorDeclarers,
         Dictionary<string, CustomOperatorModel> operatorMetadata,
@@ -87,7 +86,7 @@ internal static class ProfileResolver
             {
                 if (namedArgument.Key != "BasedOn") continue;
                 if (namedArgument.Value.Value is not INamedTypeSymbol basedOnType) continue;
-                CollectOperatorsRecursive(basedOnType, compilation, visited, operatorDeclarers, operatorMetadata, operatorOrder);
+                CollectOperatorsRecursive(basedOnType, visited, operatorDeclarers, operatorMetadata, operatorOrder);
             }
         }
 

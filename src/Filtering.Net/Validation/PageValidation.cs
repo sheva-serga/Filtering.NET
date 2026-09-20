@@ -1,9 +1,7 @@
 namespace Filtering.Net;
 
-/// <summary>Centralised page/pageSize bounds-checking called by emitted filter validators.</summary>
-public static class PageValidation
+internal static class PageValidation
 {
-    /// <summary>Returns <see cref="FilterValidationResult.Success"/> when both arguments are null or within bounds; otherwise one error per failing bound.</summary>
     public static FilterValidationResult Validate(int? page, int? pageSize, int maxPageSize)
     {
         if (page is null && pageSize is null) return FilterValidationResult.Success;

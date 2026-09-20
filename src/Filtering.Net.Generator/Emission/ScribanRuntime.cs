@@ -17,7 +17,6 @@ internal static class ScribanRuntime
         var template = Cache.GetOrAdd(templateName, LoadAndParse);
         var scriptObject = new ScriptObject();
         scriptObject.Import(view);
-        scriptObject.Import("to_operator_id", new Func<string, string>(EmissionNames.OperatorIdentifier));
         var context = new TemplateContext();
         context.PushGlobal(scriptObject);
         return template.Render(context);
