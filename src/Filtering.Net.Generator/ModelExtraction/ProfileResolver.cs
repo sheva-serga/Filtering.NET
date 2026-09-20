@@ -1,6 +1,4 @@
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Filtering.Net.Generator;
 
@@ -44,41 +42,6 @@ internal static class ProfileResolver
 
     public static bool IsAutoEmittedEnumProfile(string profileFullName) =>
         profileFullName.StartsWith(AutoEmittedEnumProfileNamespace + ".", StringComparison.Ordinal);
-
-    // Custom user-defined profiles do not own extractors; they delegate to their BasedOn root.
-    public static bool ProfileOwnsExtractor(string profileFullName) =>
-        IsBuiltInProfileName(profileFullName) || IsAutoEmittedEnumProfile(profileFullName);
-
-    // Returns the profile's own full name when it owns an extractor, or when no extractor-owning
-    // ancestor is found (defensive fallback; consumer compile errors surface the misconfiguration).
-    public static string ResolveExtractorProfileFullName(INamedTypeSymbol profileType)
-    {
-        var visited = new HashSet<string>(StringComparer.Ordinal);
-        var current = profileType;
-        while (current is not null)
-        {
-            var fullName = current.ToDisplayString();
-            if (!visited.Add(fullName)) break; // cycle guard
-            if (ProfileOwnsExtractor(fullName)) return fullName;
-
-            INamedTypeSymbol? next = null;
-            foreach (var attributeData in current.GetAttributes())
-            {
-                if (attributeData.AttributeClass?.OriginalDefinition?.ToDisplayString() != FilterProfileAttributeFullName) continue;
-                foreach (var namedArgument in attributeData.NamedArguments)
-                {
-                    if (namedArgument.Key != "BasedOn") continue;
-                    if (namedArgument.Value.Value is INamedTypeSymbol basedOnType)
-                    {
-                        next = basedOnType;
-                    }
-                }
-            }
-            if (next is null) break;
-            current = next;
-        }
-        return profileType.ToDisplayString();
-    }
 
     // Walks the BasedOn chain so a derived profile inherits base operators; same-named derived
     // operators win. Cycle protection: short-circuits when a profile is seen a second time.
@@ -146,12 +109,12 @@ internal static class ProfileResolver
 
                 if (isBuiltIn)
                 {
-                    // Built-in operators emit via BuiltInProfileCatalog; no lambda metadata needed.
+                    // Built-in operators come from the profile's own runtime Profile accessor.
                     operatorMetadata.Remove(operatorName);
                     continue;
                 }
 
-                var customMetadata = TryBuildCustomOperatorModel(member, operatorName, profileFullName, compilation);
+                var customMetadata = TryBuildCustomOperatorModel(member, operatorName, profileFullName);
                 if (customMetadata is not null)
                 {
                     operatorMetadata[operatorName] = customMetadata;
@@ -164,122 +127,25 @@ internal static class ProfileResolver
         }
     }
 
-    // Mirrors BuiltInProfileCatalog.IsBuiltIn but keeps the resolver independent of emission.
-    private static bool IsBuiltInProfileName(string profileFullName) =>
+    public static bool IsBuiltInProfileName(string profileFullName) =>
         profileFullName.StartsWith("Filtering.Net.", StringComparison.Ordinal)
         && !profileFullName.StartsWith("Filtering.Net.Generated.", StringComparison.Ordinal);
 
-    // Returns null for unsupported shapes (statement-bodied methods, Expression.Lambda factory, etc.);
-    // the emitter then falls back to a throwing stub.
+    // Returns null when the member is not an Expression<Func<...>> of a supported arity; the operator
+    // then has no runtime bridge entry and surfaces as a configuration error at startup.
     private static CustomOperatorModel? TryBuildCustomOperatorModel(
         ISymbol operatorMember,
         string operatorName,
-        string declaringProfileFullName,
-        Compilation? compilation)
+        string declaringProfileFullName)
     {
-        var lambdaSyntax = TryFindLambdaSyntax(operatorMember);
-        if (lambdaSyntax is null) return null;
-
-        var parameters = lambdaSyntax.ParameterList.Parameters;
-        if (parameters.Count == 0 || parameters.Count > 2) return null;
-
-        var columnParameterName = parameters[0].Identifier.Text;
-        string? valueParameterName = null;
-        string? valueClrType = null;
-        var isArrayValue = false;
-
-        if (parameters.Count == 2)
-        {
-            valueParameterName = parameters[1].Identifier.Text;
-            var valueType = ExtractValueTypeFromExpressionFunc(operatorMember, parameterIndex: 1);
-            if (valueType is not null)
-            {
-                valueClrType = ProfileLambdaQualifier.FormatType(valueType);
-                isArrayValue = valueType is IArrayTypeSymbol;
-            }
-        }
-
-        // Identifiers are fully qualified so the body resolves in the generated file without
-        // any using directives. Falls back to raw source when no compilation is available.
-        var lambdaBodySource = ProfileLambdaQualifier.QualifyLambdaBody(lambdaSyntax.Body, compilation);
+        var predicateSignature = OperatorPredicateSignature.TryRead(operatorMember);
+        if (predicateSignature is null) return null;
 
         return new CustomOperatorModel(
             OperatorName: operatorName,
             DeclaringProfileFullName: declaringProfileFullName,
-            ColumnParameterName: columnParameterName,
-            ValueParameterName: valueParameterName,
-            ValueClrType: valueClrType,
-            IsArrayValue: isArrayValue,
-            LambdaBodyCSharp: lambdaBodySource,
+            ValueClrType: predicateSignature.ValueType is null ? null : TypeNameFormatter.Format(predicateSignature.ValueType),
             Location: LocationInfo.FromLocation(operatorMember.Locations.FirstOrDefault()));
-    }
-
-
-    private static ParenthesizedLambdaExpressionSyntax? TryFindLambdaSyntax(ISymbol operatorMember)
-    {
-        foreach (var syntaxReference in operatorMember.DeclaringSyntaxReferences)
-        {
-            var syntax = syntaxReference.GetSyntax();
-            ArrowExpressionClauseSyntax? arrow = syntax switch
-            {
-                PropertyDeclarationSyntax property => property.ExpressionBody,
-                MethodDeclarationSyntax method => method.ExpressionBody,
-                _ => null,
-            };
-            if (arrow is not null && arrow.Expression is ParenthesizedLambdaExpressionSyntax arrowLambda)
-            {
-                return arrowLambda;
-            }
-
-            if (syntax is PropertyDeclarationSyntax blockProperty && blockProperty.AccessorList is not null)
-            {
-                foreach (var accessor in blockProperty.AccessorList.Accessors)
-                {
-                    if (!accessor.IsKind(SyntaxKind.GetAccessorDeclaration)) continue;
-                    if (accessor.ExpressionBody?.Expression is ParenthesizedLambdaExpressionSyntax accessorArrowLambda)
-                    {
-                        return accessorArrowLambda;
-                    }
-                    if (accessor.Body is null) continue;
-                    foreach (var statement in accessor.Body.Statements)
-                    {
-                        if (statement is ReturnStatementSyntax returnStatement
-                            && returnStatement.Expression is ParenthesizedLambdaExpressionSyntax returnLambda)
-                        {
-                            return returnLambda;
-                        }
-                    }
-                }
-            }
-
-            if (syntax is MethodDeclarationSyntax blockMethod && blockMethod.Body is not null)
-            {
-                foreach (var statement in blockMethod.Body.Statements)
-                {
-                    if (statement is ReturnStatementSyntax returnStatement
-                        && returnStatement.Expression is ParenthesizedLambdaExpressionSyntax methodReturnLambda)
-                    {
-                        return methodReturnLambda;
-                    }
-                }
-            }
-        }
-        return null;
-    }
-
-    private static ITypeSymbol? ExtractValueTypeFromExpressionFunc(ISymbol operatorMember, int parameterIndex)
-    {
-        ITypeSymbol? memberType = operatorMember switch
-        {
-            IPropertySymbol property => property.Type,
-            IMethodSymbol method => method.ReturnType,
-            _ => null,
-        };
-        if (memberType is not INamedTypeSymbol expressionType) return null;
-        if (expressionType.TypeArguments.Length != 1) return null;
-        if (expressionType.TypeArguments[0] is not INamedTypeSymbol funcType) return null;
-        if (parameterIndex >= funcType.TypeArguments.Length - 1) return null;
-        return funcType.TypeArguments[parameterIndex];
     }
 
     public static bool IsCompatible(ITypeSymbol clrType, string profileFullName)

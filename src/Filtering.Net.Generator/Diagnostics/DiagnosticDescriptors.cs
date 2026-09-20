@@ -9,7 +9,7 @@ internal static class DiagnosticDescriptors
     // Single help-link target — every rule's "More info" goes to the catalogue table.
     private const string HelpLink = "https://sheva-serga.github.io/Filtering.NET/diagnostics/";
 
-    // ---------- Errors (FN0001 - FN0021) ----------
+    // ---------- Errors (FN0001 - FN0022) ----------
 
     public static readonly DiagnosticDescriptor DuplicateMapping = new(
         id: "FN0001",
@@ -197,6 +197,15 @@ internal static class DiagnosticDescriptors
         id: "FN0021",
         title: "[MapNested] on collection navigation is not supported in v1",
         messageFormat: "[MapNested(nameof({0}))] target is a collection navigation; collection navigations require Any/All quantifier semantics and are deferred to a future version.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLink);
+
+    public static readonly DiagnosticDescriptor FilterClassHasBaseType = new(
+        id: "FN0022",
+        title: "[GenerateFilter] class declares a base class",
+        messageFormat: "Filter class '{0}' derives from '{1}'. The generated part derives from FilterDefinition<TEntity>, so the class cannot declare another base class.",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,

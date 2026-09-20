@@ -1,3 +1,0 @@
-/// <inheritdoc />
-public global::Filtering.Net.FilterValidationResult Validate(int? page, int? pageSize)
-    => global::Filtering.Net.PageValidation.Validate(page, pageSize, _maxPageSize);

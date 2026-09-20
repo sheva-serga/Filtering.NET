@@ -71,7 +71,7 @@ public class DiExtensionEmissionTests
     }
 
     // A custom operator with a non-null typed value forces the generator to emit the
-    // IJsonTypeInfoResolver-accepting ctor and _serializerOptions field that the AddFiltering
+    // IJsonTypeInfoResolver-accepting ctor and schema serializer options that the AddFiltering
     // tests below reflect on. Element-only filter classes don't emit either.
     private const string TypedValueFilterSource = """
         using System;
@@ -146,9 +146,8 @@ public class DiExtensionEmissionTests
 
     private static IJsonTypeInfoResolver? GetSerializerResolver(object filterInstance)
     {
-        var optionsField = filterInstance.GetType()
-            .GetField("_serializerOptions", BindingFlags.Instance | BindingFlags.NonPublic)!;
-        var options = (JsonSerializerOptions)optionsField.GetValue(filterInstance)!;
+        var schema = filterInstance.GetType().GetProperty("Schema")!.GetValue(filterInstance)!;
+        var options = (JsonSerializerOptions)schema.GetType().GetProperty("SerializerOptions")!.GetValue(schema)!;
         return options.TypeInfoResolver;
     }
 }

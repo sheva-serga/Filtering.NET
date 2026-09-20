@@ -176,11 +176,10 @@ internal static class PropertyMappingExtractor
             }
         }
 
-        // Custom profiles delegate TryGet to a BasedOn root; when there's no symbol the
-        // resolved profile already names the extractor-owning class directly.
-        var extractorProfileFullName = resolvedProfileSymbol is not null
-            ? ProfileResolver.ResolveExtractorProfileFullName(resolvedProfileSymbol)
-            : resolvedProfile.ProfileFullName;
+        // No symbol means an auto-emitted enum profile, which carries its own runtime Profile accessor.
+        var profileBridges = resolvedProfileSymbol is not null
+            ? ProfileBridgeBuilder.BuildChain(resolvedProfileSymbol)
+            : [];
 
         // -------- Compute allowed operators --------
         var profileOperators = resolvedProfile.Operators;
@@ -250,15 +249,17 @@ internal static class PropertyMappingExtractor
         var model = new PropertyMappingModel(
             PropertyName: propertyName!,
             PropertyClrType: propertyClrType,
+            IsNullableValueType: propertySymbol.Type is INamedTypeSymbol { ConstructedFrom.SpecialType: SpecialType.System_Nullable_T },
             ProfileFullName: resolvedProfile.ProfileFullName,
-            ExtractorProfileFullName: extractorProfileFullName,
             AllowedOperators: new EquatableList<string>(allowedOperators),
+            HasOperatorRestriction: onlySet is not null || exceptSet is not null,
             Alias: alias,
             Sortable: sortable,
             DefaultSortDirection: defaultSortDirection,
             ConfigurationMethodName: methodSymbol.Name,
             CustomOperators: new EquatableList<CustomOperatorModel>(filteredCustomOperators),
             HasTypedValueOperator: hasTypedValueOperator,
+            ProfileBridges: new EquatableList<ProfileBridgeModel>(profileBridges),
             DeclarationLocation: declarationLocation);
 
         return new PropertyMappingExtractionResult(Model: model, Diagnostics: diagnostics);

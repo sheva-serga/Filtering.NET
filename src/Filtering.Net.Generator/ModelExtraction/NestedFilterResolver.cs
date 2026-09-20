@@ -27,6 +27,8 @@ internal static class NestedFilterResolver
         var hostEntitySymbol = compilation.GetTypeByMetadataName(hostModel.FullEntityTypeName);
 
         var mergedProperties = new List<PropertyMappingModel>(hostModel.Properties);
+        var resolvedNestedMappings = new List<NestedMappingModel>(hostModel.NestedMappings.Count);
+        var typedValueTracker = new TypedValueTracker();
 
         // Seeded with the host so a [MapNested] whose target is the host itself trips the cycle
         // check on the first recursive entry rather than infinite-looping. The parallel location
@@ -45,7 +47,12 @@ internal static class NestedFilterResolver
             cancellationToken.ThrowIfCancellationRequested();
 
             var targetModel = ResolveTargetForNested(nested, hostEntitySymbol, compilation, allHostExtractionResults, newDiagnostics);
-            if (targetModel is null) continue;
+            if (targetModel is null)
+            {
+                resolvedNestedMappings.Add(nested);
+                continue;
+            }
+            resolvedNestedMappings.Add(nested with { ResolvedTargetClassFqn = ClassFqnOf(targetModel) });
 
             var spliced = SpliceMappings(
                 targetModel,
@@ -57,6 +64,7 @@ internal static class NestedFilterResolver
                 newDiagnostics,
                 visitedFilterClasses,
                 nestedSiteStack,
+                typedValueTracker,
                 cancellationToken);
             mergedProperties.AddRange(spliced);
         }
@@ -112,16 +120,28 @@ internal static class NestedFilterResolver
         // A spliced typed-value operator forces JsonSerializerOptions threading even when the host's
         // own extraction said no — the host extractor ran before splice and couldn't see it.
         var mergedHasAnyTypedValueProperty = hostModel.HasAnyTypedValueProperty
+            || typedValueTracker.NestedFilterNeedsSerializerOptions
             || mergedProperties.Exists(mapping => mapping.HasTypedValueOperator);
 
         return new ResolvedHost(
             hostModel with
             {
                 Properties = new EquatableList<PropertyMappingModel>(mergedProperties),
+                NestedMappings = new EquatableList<NestedMappingModel>(resolvedNestedMappings),
                 HasAnyTypedValueProperty = mergedHasAnyTypedValueProperty,
             },
             new EquatableList<DiagnosticInfo>(newDiagnostics));
     }
+
+    // A nested filter's [PropertyMap] rules are lifted at runtime but never spliced into the merged
+    // property list, so their typed values have to be tracked on the side.
+    private sealed class TypedValueTracker
+    {
+        public bool NestedFilterNeedsSerializerOptions { get; set; }
+    }
+
+    private static string ClassFqnOf(FilterClassModel model) =>
+        string.IsNullOrEmpty(model.Namespace) ? model.ClassName : model.Namespace + "." + model.ClassName;
 
     private static string WireKeyOf(PropertyMappingModel mapping)
         => string.IsNullOrEmpty(mapping.Alias) ? mapping.PropertyName : mapping.Alias!;
@@ -271,10 +291,12 @@ internal static class NestedFilterResolver
         List<DiagnosticInfo> diagnosticsSink,
         HashSet<string> visitedFilterClasses,
         Stack<Location?> nestedSiteStack,
+        TypedValueTracker typedValueTracker,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var output = new List<PropertyMappingModel>();
+        typedValueTracker.NestedFilterNeedsSerializerOptions |= target.HasAnyTypedValueProperty;
 
         var targetClassFqn = string.IsNullOrEmpty(target.Namespace)
             ? target.ClassName
@@ -337,6 +359,7 @@ internal static class NestedFilterResolver
                     diagnosticsSink,
                     visitedFilterClasses,
                     nestedSiteStack,
+                    typedValueTracker,
                     cancellationToken));
             }
         }

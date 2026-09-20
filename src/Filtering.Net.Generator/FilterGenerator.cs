@@ -56,6 +56,8 @@ public sealed class FilterGenerator : IIncrementalGenerator
         var diBundle = modelsCollected.Combine(compilationProvider);
         context.RegisterSourceOutput(diBundle, GenerateAssemblyDiExtension!);
 
+        context.RegisterSourceOutput(modelsCollected, GenerateProfileBridges);
+
         var enumEmissionBundle = modelsCollected.Combine(compilationProvider);
         context.RegisterSourceOutput(enumEmissionBundle, GenerateEnumProfiles!);
 
@@ -171,6 +173,14 @@ public sealed class FilterGenerator : IIncrementalGenerator
             ? $"{model.ClassName}.g.cs"
             : $"{model.Namespace}.{model.ClassName}.g.cs";
         sourceProductionContext.AddSource(hintName, emittedSource);
+    }
+
+    private static void GenerateProfileBridges(SourceProductionContext sourceProductionContext, ImmutableArray<FilterClassModel> models)
+    {
+        if (models.IsDefaultOrEmpty) return;
+        var profileBridges = ProfileBridgeEmitter.CollectDistinct(models);
+        if (profileBridges.Count == 0) return;
+        sourceProductionContext.AddSource(ProfileBridgeEmitter.HintName, ProfileBridgeEmitter.Emit(profileBridges));
     }
 
     private static void GenerateAssemblyDiExtension(

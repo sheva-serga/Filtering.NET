@@ -1,13 +1,15 @@
 namespace Filtering.Net.Generator;
 
-// HasAnyTypedValueProperty: emitter uses this to decide whether to thread JsonSerializerOptions
-// through Apply/Validate — classes with no typed-value properties can skip JSON deserialisation.
+// HasAnyTypedValueProperty: the class (or a filter it nests) has an operator whose value is
+// deserialized through the JSON resolver, so the emitter adds the resolver-accepting constructor.
 internal sealed record FilterClassModel(
     string Namespace,
     string ClassName,
     string FullEntityTypeName,
     int MaxPageSize,
     int DefaultPageSize,
+    int MaxNestingDepth,
+    int MaxLeafConditions,
     EquatableList<PropertyMappingModel> Properties,
     EquatableList<InterceptorModel> Interceptors,
     EquatableList<PropertyOverrideModel> Overrides,

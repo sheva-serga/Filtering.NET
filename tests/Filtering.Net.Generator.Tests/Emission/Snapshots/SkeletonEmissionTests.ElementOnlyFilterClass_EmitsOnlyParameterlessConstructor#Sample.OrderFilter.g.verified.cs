@@ -9,14 +9,14 @@ namespace Sample
         public OrderFilter()
             : base(CreateSchema(serializerOptions: null)) { }
 
-        private static partial void MapId() { }
+        private static partial void MapReference() { }
 
         /// <summary>Builds the schema of this filter: one entry per mapping declared on the class.</summary>
         internal static global::Filtering.Net.FilterSchema<global::Sample.Order> CreateSchema(global::System.Text.Json.JsonSerializerOptions? serializerOptions) =>
             new global::Filtering.Net.FilterSchemaBuilder<global::Sample.Order>(
                     new global::Filtering.Net.FilterSettings(50, 200, 10, 50),
                     serializerOptions)
-                .Add(global::Filtering.Net.FilterProperty.Map("Id", (global::Sample.Order entity) => entity.Id, global::Filtering.Net.Int32Filter.Profile)
+                .Add(global::Filtering.Net.FilterProperty.Map("Reference", (global::Sample.Order entity) => entity.Reference, global::Filtering.Net.StringFilter.Profile)
                     .Build())
                 .Build();
     }

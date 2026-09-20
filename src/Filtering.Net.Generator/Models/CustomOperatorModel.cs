@@ -1,13 +1,9 @@
 namespace Filtering.Net.Generator;
 
-// Pre-extracted by ProfileResolver so the emitter can inline lambda bodies without re-walking syntax.
-// Built-in profile operators go through BuiltInProfileCatalog instead; no instances here.
+// An operator declared on a user profile. ValueClrType is null for unary operators; a non-null
+// value type means the operator takes a typed value deserialized through the JSON resolver.
 internal sealed record CustomOperatorModel(
     string OperatorName,
     string DeclaringProfileFullName,
-    string ColumnParameterName,
-    string? ValueParameterName,
     string? ValueClrType,
-    bool IsArrayValue,
-    string LambdaBodyCSharp,
     LocationInfo? Location);

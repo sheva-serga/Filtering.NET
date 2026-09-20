@@ -1,5 +1,6 @@
 namespace Filtering.Net.Generator;
 
+// SchemaEntries are complete ".Add(...)" / ".AddRange(...)" calls, already formatted in C#.
 internal sealed record FilterClassView(
     string Namespace,
     bool HasNamespace,
@@ -7,11 +8,8 @@ internal sealed record FilterClassView(
     string EntityFullName,
     int DefaultPageSize,
     int MaxPageSize,
+    int MaxNestingDepth,
+    int MaxLeafConditions,
     bool ThreadsSerializerOptions,
     IReadOnlyList<string> ConfigurationMethodNames,
-    string ValidateNodeBody,
-    string ValidateSortBody,
-    string ValidatePageBody,
-    string ApplyFilterBody,
-    string ApplySortingBody,
-    IReadOnlyList<string> PerPropertyClassBodies);
+    IReadOnlyList<string> SchemaEntries);

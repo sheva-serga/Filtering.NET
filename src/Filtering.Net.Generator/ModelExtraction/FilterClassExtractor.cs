@@ -14,6 +14,8 @@ internal static class FilterClassExtractor
 
     private const int FallbackDefaultPageSize = 50;
     private const int FallbackMaxPageSize = 200;
+    private const int FallbackMaxNestingDepth = 10;
+    private const int FallbackMaxLeafConditions = 50;
 
     public static FilterClassModelWithDiagnostics Extract(
         GeneratorAttributeSyntaxContext context,
@@ -41,6 +43,18 @@ internal static class FilterClassExtractor
 
         // -------- Page settings (class override + assembly default) --------
         var (defaultPageSize, maxPageSize) = ResolvePageSettings(classSymbol, context.SemanticModel.Compilation.Assembly);
+        var (maxNestingDepth, maxLeafConditions) = ResolveRequestLimits(context.SemanticModel.Compilation.Assembly);
+
+        // FN0022: the generated part declares FilterDefinition<TEntity> as the base class.
+        if (classSymbol.BaseType is { SpecialType: not SpecialType.System_Object } declaredBaseType)
+        {
+            diagnostics.Add(DiagnosticInfo.From(
+                DiagnosticDescriptors.FilterClassHasBaseType,
+                classSymbol.Locations.FirstOrDefault(),
+                classSymbol.Name,
+                declaredBaseType.ToDisplayString()));
+            return new FilterClassModelWithDiagnostics(Model: null, Diagnostics: new EquatableList<DiagnosticInfo>(diagnostics));
+        }
 
         var compilation = context.SemanticModel.Compilation;
 
@@ -157,6 +171,8 @@ internal static class FilterClassExtractor
             FullEntityTypeName: entityType.ToDisplayString(),
             MaxPageSize: maxPageSize,
             DefaultPageSize: defaultPageSize,
+            MaxNestingDepth: maxNestingDepth,
+            MaxLeafConditions: maxLeafConditions,
             Properties: new EquatableList<PropertyMappingModel>(properties),
             Interceptors: new EquatableList<InterceptorModel>(interceptors),
             Overrides: new EquatableList<PropertyOverrideModel>(overrides),
@@ -452,6 +468,28 @@ internal static class FilterClassExtractor
         }
 
         return (defaultPageSize, maxPageSize);
+    }
+
+    private static (int MaxNestingDepth, int MaxLeafConditions) ResolveRequestLimits(IAssemblySymbol assemblySymbol)
+    {
+        var maxNestingDepth = FallbackMaxNestingDepth;
+        var maxLeafConditions = FallbackMaxLeafConditions;
+        foreach (var assemblyAttribute in assemblySymbol.GetAttributes())
+        {
+            if (assemblyAttribute.AttributeClass?.ToDisplayString() != FilterDefaultsAttributeFullName) continue;
+            foreach (var namedArgument in assemblyAttribute.NamedArguments)
+            {
+                if (namedArgument.Key == "MaxNestingDepth" && namedArgument.Value.Value is int configuredDepth)
+                {
+                    maxNestingDepth = configuredDepth;
+                }
+                else if (namedArgument.Key == "MaxLeafConditions" && namedArgument.Value.Value is int configuredLeafCount)
+                {
+                    maxLeafConditions = configuredLeafCount;
+                }
+            }
+        }
+        return (maxNestingDepth, maxLeafConditions);
     }
 
     private static AttributeData? FindAttribute(System.Collections.Immutable.ImmutableArray<AttributeData> attributes, string fullName)

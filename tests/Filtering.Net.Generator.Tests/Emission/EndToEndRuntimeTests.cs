@@ -195,7 +195,7 @@ public class EndToEndRuntimeTests
         """;
 
     // Typed-value source: forces the generator to emit the IJsonTypeInfoResolver-accepting ctor
-    // and _serializerOptions field. Element-only filter classes emit neither.
+    // that feeds the schema's serializer options. Element-only filter classes emit neither.
     private const string TypedValueEmailFilterSource = """
         using System;
         using System.Linq.Expressions;
@@ -250,14 +250,11 @@ public class EndToEndRuntimeTests
 
         // Act
         var instance = resolverCtor.Invoke([suppliedResolver]);
-        var serializerOptionsField = userFilterType.GetField(
-            "_serializerOptions",
-            BindingFlags.NonPublic | BindingFlags.Instance)!;
-        var actualOptions = (System.Text.Json.JsonSerializerOptions)serializerOptionsField.GetValue(instance)!;
+        var schema = userFilterType.GetProperty("Schema")!.GetValue(instance)!;
+        var actualOptions = (System.Text.Json.JsonSerializerOptions)schema.GetType().GetProperty("SerializerOptions")!.GetValue(schema)!;
 
         // Assert
         resolverCtor.Should().NotBeNull("the IJsonTypeInfoResolver-accepting constructor must be emitted");
-        serializerOptionsField.Should().NotBeNull("the _serializerOptions field must be emitted");
         actualOptions.TypeInfoResolver.Should().BeSameAs(suppliedResolver);
     }
 

@@ -2,20 +2,24 @@ using System.Text;
 
 namespace Filtering.Net.Generator;
 
+// Emits the generated half of a [GenerateFilter<TEntity>] class: the FilterDefinition<TEntity> base,
+// constructors, marker-method bodies, and CreateSchema. All filtering logic lives in the runtime.
 internal static class SourceEmitter
 {
+    private const string EntityParameterName = "entity";
+    private const string PropertyFactoryType = "global::Filtering.Net.FilterProperty";
+    // Scriban re-indents multi-line values to the column of the tag, so this is relative to the entry.
+    private const string ContinuationIndent = "    ";
+
     public static string EmitForClass(FilterClassModel model) =>
         ScribanRuntime.Render("FilterClass", BuildView(model));
 
     internal static FilterClassView BuildView(FilterClassModel model)
     {
         var entityFullName = "global::" + model.FullEntityTypeName;
-        var hasNamespace = !string.IsNullOrEmpty(model.Namespace);
-        var indent = hasNamespace ? "        " : "    ";
-        var perPropertyIndent = hasNamespace ? "    " : string.Empty;
-        // Only the host's own partial methods get implementation parts: direct [Map]/[PropertyMap]
-        // (SourceFilterClassFqn is null) plus each [MapNested]. Spliced properties carry inner-filter
-        // method names that aren't declared on this host; emitting them yields CS8795/CS0757.
+
+        // Only the host's own partial methods get implementation parts. Properties spliced in by the
+        // nested resolver carry the inner filter's method names, which are not declared on this host.
         var configurationMethodNames = model.Properties
             .Where(property => property.SourceFilterClassFqn is null)
             .Select(property => property.ConfigurationMethodName)
@@ -23,76 +27,105 @@ internal static class SourceEmitter
             .Distinct(StringComparer.Ordinal)
             .ToList();
 
-        var validateNodeBody = Indent(ValidateNodeEmitter.Emit(model), indent);
-        var validateSortBody = Indent(ValidateSortEmitter.Emit(model), indent);
-        var validatePageBody = Indent(ValidatePageEmitter.Emit(model), indent);
-        var applyFilterBody = Indent(ApplyFilterEmitter.Emit(model), indent);
-        var applySortingBody = Indent(ApplySortingEmitter.Emit(model), indent);
-
-        var perPropertyBodies = BuildPerPropertyBodies(model, perPropertyIndent);
-
         return new FilterClassView(
             Namespace: model.Namespace ?? string.Empty,
-            HasNamespace: hasNamespace,
+            HasNamespace: !string.IsNullOrEmpty(model.Namespace),
             ClassName: model.ClassName,
             EntityFullName: entityFullName,
             DefaultPageSize: model.DefaultPageSize,
             MaxPageSize: model.MaxPageSize,
+            MaxNestingDepth: model.MaxNestingDepth,
+            MaxLeafConditions: model.MaxLeafConditions,
             ThreadsSerializerOptions: model.HasAnyTypedValueProperty,
             ConfigurationMethodNames: configurationMethodNames,
-            ValidateNodeBody: validateNodeBody,
-            ValidateSortBody: validateSortBody,
-            ValidatePageBody: validatePageBody,
-            ApplyFilterBody: applyFilterBody,
-            ApplySortingBody: applySortingBody,
-            PerPropertyClassBodies: perPropertyBodies);
+            SchemaEntries: BuildSchemaEntries(model, entityFullName));
     }
 
-    private static List<string> BuildPerPropertyBodies(FilterClassModel model, string indent)
+    private static List<string> BuildSchemaEntries(FilterClassModel model, string entityFullName)
     {
-        var overridesByName = new Dictionary<string, PropertyOverrideModel>(StringComparer.Ordinal);
-        foreach (var overrideModel in model.Overrides)
-        {
-            overridesByName[overrideModel.PropertyName] = overrideModel;
-        }
+        var schemaEntries = new List<string>();
+        var mappedPropertyNames = new HashSet<string>(StringComparer.Ordinal);
 
-        var bodies = new List<string>();
         foreach (var property in model.Properties)
         {
-            string raw;
-            if (overridesByName.TryGetValue(property.PropertyName, out var overrideForMappedProperty))
-            {
-                raw = PerPropertyClassEmitter.EmitOverride(model, overrideForMappedProperty);
-            }
-            else
-            {
-                raw = PerPropertyClassEmitter.Emit(model, property);
-            }
-            bodies.Add(Indent(raw, indent));
+            // Spliced properties arrive at runtime through the nested filter's own schema.
+            if (property.SourceFilterClassFqn is not null) continue;
+            mappedPropertyNames.Add(property.PropertyName);
+            schemaEntries.Add(BuildMapEntry(model, property, entityFullName));
         }
+
         foreach (var overrideModel in model.Overrides)
         {
-            if (model.Properties.Any(property => property.PropertyName == overrideModel.PropertyName)) continue;
-            bodies.Add(Indent(PerPropertyClassEmitter.EmitOverride(model, overrideModel), indent));
+            // A property carried by both [Map] and [PropertyMap] is already an FN0002 error.
+            if (overrideModel.BuilderTypeFqn is null || mappedPropertyNames.Contains(overrideModel.PropertyName)) continue;
+            schemaEntries.Add(
+                $".Add({PropertyFactoryType}.MapRule({Literal(overrideModel.PropertyName)}, {overrideModel.MethodName}(new {overrideModel.BuilderTypeFqn}())).Build())");
         }
-        return bodies;
+
+        foreach (var nestedMapping in model.NestedMappings)
+        {
+            if (nestedMapping.ResolvedTargetClassFqn is null) continue;
+            schemaEntries.Add(BuildNestedEntry(nestedMapping, entityFullName));
+        }
+        return schemaEntries;
     }
 
-    private static string Indent(string block, string indent)
+    private static string BuildMapEntry(FilterClassModel model, PropertyMappingModel property, string entityFullName)
     {
-        if (string.IsNullOrEmpty(block)) return block;
-        var builder = new StringBuilder(block.Length + 64);
-        var lines = block.Split('\n');
-        for (var i = 0; i < lines.Length; i++)
+        var factoryMethod = property.IsNullableValueType ? "MapNullable" : "Map";
+        var accessor = $"({entityFullName} {EntityParameterName}) => {EntityParameterName}.{property.PropertyName}";
+        var entry = new StringBuilder()
+            .Append($".Add({PropertyFactoryType}.{factoryMethod}({Literal(property.PropertyName)}, {accessor}, {ProfileBridgeBuilder.ProfileReference(property.ProfileFullName)})");
+
+        if (!string.IsNullOrEmpty(property.Alias))
         {
-            var line = lines[i].TrimEnd('\r');
-            if (line.Length > 0)
-            {
-                builder.Append(indent);
-                builder.Append(line);
-            }
-            if (i < lines.Length - 1) builder.Append('\n');
+            AppendOption(entry, $".Alias({Literal(property.Alias!)})");
         }
-        return builder.ToString();
+        if (property.HasOperatorRestriction)
+        {
+            AppendOption(entry, $".Only({string.Join(", ", property.AllowedOperators.Select(Literal))})");
+        }
+        if (FindInterceptorCall(model, property.PropertyName) is { } interceptorCall)
+        {
+            AppendOption(entry, interceptorCall);
+        }
+        if (property.Sortable)
+        {
+            AppendOption(entry, property.DefaultSortDirection == "Desc" ? ".Sortable(global::Filtering.Net.SortDir.Desc)" : ".Sortable()");
+        }
+        AppendOption(entry, ".Build())");
+        return entry.ToString();
     }
+
+    private static string? FindInterceptorCall(FilterClassModel model, string propertyName)
+    {
+        foreach (var interceptor in model.Interceptors)
+        {
+            if (interceptor.PropertyName != propertyName || interceptor.ValueClrType is null) continue;
+            if (interceptor.Raw) return $".InterceptRaw({interceptor.MethodName})";
+            return interceptor.ValueClrType.EndsWith("[]", StringComparison.Ordinal)
+                ? $".InterceptArray({interceptor.MethodName})"
+                : $".Intercept({interceptor.MethodName})";
+        }
+        return null;
+    }
+
+    private static string BuildNestedEntry(NestedMappingModel nestedMapping, string entityFullName)
+    {
+        var navigation = $"{EntityParameterName} => {EntityParameterName}.{nestedMapping.NavigationPropertyName}";
+        var disableSorting = nestedMapping.DisableSorting ? "true" : "false";
+        return new StringBuilder()
+            .Append($".AddRange(global::{nestedMapping.ResolvedTargetClassFqn}.CreateSchema(serializerOptions)")
+            .Append('\n').Append(ContinuationIndent)
+            .Append($".LiftInto<{entityFullName}>({navigation}, {Literal(nestedMapping.Prefix)}, only: {PathArray(nestedMapping.Only)}, except: {PathArray(nestedMapping.Except)}, disableSorting: {disableSorting}))")
+            .ToString();
+    }
+
+    private static void AppendOption(StringBuilder entry, string option) =>
+        entry.Append('\n').Append(ContinuationIndent).Append(option);
+
+    private static string PathArray(EquatableList<string> paths) =>
+        paths.Count == 0 ? "null" : $"new string[] {{ {string.Join(", ", paths.Select(Literal))} }}";
+
+    private static string Literal(string value) => "\"" + EmissionNames.EscapeStringLiteral(value) + "\"";
 }

@@ -17,6 +17,12 @@ public static class {{ class_name }}
     [global::Filtering.Net.FilterOperator("isNull")]
     public static global::System.Linq.Expressions.Expression<global::System.Func<{{ enum_full_name }}?, bool>> IsNull => column => column == null;
 
+    public static global::Filtering.Net.FilterProfile<{{ enum_full_name }}> Profile { get; } = global::Filtering.Net.FilterProfile<{{ enum_full_name }}>.Create("{{ class_name }}",
+        global::Filtering.Net.FilterOperator.Value<{{ enum_full_name }}, {{ enum_full_name }}>("eq", Eq, TryGetValue),
+        global::Filtering.Net.FilterOperator.Value<{{ enum_full_name }}, {{ enum_full_name }}>("ne", Ne, TryGetValue),
+        global::Filtering.Net.FilterOperator.Value<{{ enum_full_name }}, {{ enum_full_name }}[]>("in", In, TryGetArray),
+        global::Filtering.Net.FilterOperator.UnaryOverNullable<{{ enum_full_name }}>("isNull", IsNull));
+
     public static bool TryGetValue(global::System.Text.Json.JsonElement element, out {{ enum_full_name }} value, out string error) =>
         global::Filtering.Net.EnumExtractor.TryGetValue<{{ enum_full_name }}>(element, out value, out error);
 

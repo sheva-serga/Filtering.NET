@@ -17,6 +17,12 @@ public static class UserStatusFilter
     [global::Filtering.Net.FilterOperator("isNull")]
     public static global::System.Linq.Expressions.Expression<global::System.Func<global::Sample.UserStatus?, bool>> IsNull => column => column == null;
 
+    public static global::Filtering.Net.FilterProfile<global::Sample.UserStatus> Profile { get; } = global::Filtering.Net.FilterProfile<global::Sample.UserStatus>.Create("UserStatusFilter",
+        global::Filtering.Net.FilterOperator.Value<global::Sample.UserStatus, global::Sample.UserStatus>("eq", Eq, TryGetValue),
+        global::Filtering.Net.FilterOperator.Value<global::Sample.UserStatus, global::Sample.UserStatus>("ne", Ne, TryGetValue),
+        global::Filtering.Net.FilterOperator.Value<global::Sample.UserStatus, global::Sample.UserStatus[]>("in", In, TryGetArray),
+        global::Filtering.Net.FilterOperator.UnaryOverNullable<global::Sample.UserStatus>("isNull", IsNull));
+
     public static bool TryGetValue(global::System.Text.Json.JsonElement element, out global::Sample.UserStatus value, out string error) =>
         global::Filtering.Net.EnumExtractor.TryGetValue<global::Sample.UserStatus>(element, out value, out error);
 

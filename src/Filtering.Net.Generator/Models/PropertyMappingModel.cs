@@ -1,17 +1,20 @@
 namespace Filtering.Net.Generator;
 
+// PropertyName is a verbatim CLR accessor path ("Department.Name"); the emitter splices it after "entity.".
 internal sealed record PropertyMappingModel(
     string PropertyName,
     string PropertyClrType,
+    bool IsNullableValueType,
     string ProfileFullName,
-    string ExtractorProfileFullName,
     EquatableList<string> AllowedOperators,
+    bool HasOperatorRestriction,
     string? Alias,
     bool Sortable,
     string DefaultSortDirection,
     string ConfigurationMethodName,
     EquatableList<CustomOperatorModel> CustomOperators,
     bool HasTypedValueOperator,
+    EquatableList<ProfileBridgeModel> ProfileBridges,
     LocationInfo? DeclarationLocation = null,
     LocationInfo? InliningSiteLocation = null,
     string? SourceFilterClassFqn = null);

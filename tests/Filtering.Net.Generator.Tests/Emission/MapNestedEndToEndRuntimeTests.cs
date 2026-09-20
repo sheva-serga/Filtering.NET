@@ -210,10 +210,10 @@ public class MapNestedEndToEndRuntimeTests
     }
 
     [Fact]
-    public void Filter_SourceInterceptorDoesNotPropagateThroughSplice()
+    public void Filter_SourceInterceptor_RunsThroughNestedLift()
     {
-        // Pins current v1 behaviour: source-filter [InterceptValue] is not invoked through a
-        // [MapNested] splice. Upper-case "ALICE" against lower-case stored emails returns nothing.
+        // The source filter's [InterceptValue] lower-cases the value, so upper-case "ALICE" matches
+        // the lower-case stored email even though the leaf targets the host filter.
         // Arrange
         var assembly = RuntimeLoader.LoadGeneratedAssembly(InterceptorSource);
         var userFilterType = assembly.GetType("Sample.UserFilter")!;
@@ -235,7 +235,7 @@ public class MapNestedEndToEndRuntimeTests
         foreach (var _ in (System.Collections.IEnumerable)filteredQuery) matchCount++;
 
         // Assert
-        matchCount.Should().Be(0);
+        matchCount.Should().Be(1);
     }
 
     [Fact]

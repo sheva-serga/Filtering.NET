@@ -30,13 +30,12 @@ public class SkeletonEmissionTests
     }
 
     [Fact]
-    public async Task ElementOnlyFilterClass_EmitsNoExplicitConstructors()
+    public async Task ElementOnlyFilterClass_EmitsOnlyParameterlessConstructor()
     {
         // Arrange — element-only (built-in StringFilter, no custom operators, no PropertyMap overrides).
-        // The skeleton must NOT emit the _serializerOptions field, the [RequiresUnreferencedCode]
-        // parameterless ctor, or the IJsonTypeInfoResolver-accepting ctor — none of those have
-        // anything to do here, and the [RequiresUnreferencedCode] annotation would force consumers
-        // to either eat IL2026 warnings under PublishAot or supply a resolver they don't need.
+        // The skeleton must emit a plain parameterless ctor only: no [RequiresUnreferencedCode]
+        // and no IJsonTypeInfoResolver-accepting ctor. The annotation would force consumers to
+        // either eat IL2026 warnings under PublishAot or supply a resolver they don't need.
         var consumerSource = """
             using Filtering.Net;
             namespace Sample;
@@ -58,10 +57,10 @@ public class SkeletonEmissionTests
     }
 
     [Fact]
-    public async Task TypedValueFilterClass_EmitsDualConstructorsAndSerializerOptionsField()
+    public async Task TypedValueFilterClass_EmitsDualConstructors()
     {
         // Arrange — typed-value (custom operator with non-null value type on a non-built-in profile).
-        // The skeleton MUST emit the _serializerOptions field plus both constructors so consumers
+        // The skeleton MUST emit both constructors so consumers
         // can route a JsonSerializerContext through typed-value JSON deserialization.
         var consumerSource = """
             using System;
