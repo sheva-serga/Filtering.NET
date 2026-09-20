@@ -32,6 +32,17 @@ public static class SingleFilter
     /// <summary>Null-check operator template (<c>isNull</c>).</summary>
     [FilterOperator("isNull")] public static Expression<Func<float?, bool>> IsNull => column => column == null;
 
+    /// <summary>The runtime form of this profile, built from the operator templates above.</summary>
+    public static FilterProfile<float> Profile { get; } = FilterProfile<float>.Create("SingleFilter",
+        FilterOperator.Value<float, float>("eq", Eq, TryGetValue),
+        FilterOperator.Value<float, float>("ne", Ne, TryGetValue),
+        FilterOperator.Value<float, float>("gt", Gt, TryGetValue),
+        FilterOperator.Value<float, float>("gte", Gte, TryGetValue),
+        FilterOperator.Value<float, float>("lt", Lt, TryGetValue),
+        FilterOperator.Value<float, float>("lte", Lte, TryGetValue),
+        FilterOperator.Value<float, float[]>("in", In, TryGetArray),
+        FilterOperator.UnaryOverNullable<float>("isNull", IsNull));
+
     /// <summary>Extracts a <see cref="float"/> from a JSON Number or invariant-culture JSON String via <see cref="NumericExtractor"/>.</summary>
     public static bool TryGetValue(JsonElement element, out float value, out string error) =>
         NumericExtractor.TryGetValue(

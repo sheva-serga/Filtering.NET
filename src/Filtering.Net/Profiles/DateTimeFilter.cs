@@ -35,6 +35,16 @@ public static class DateTimeFilter
     [FilterOperator("isNull")]
     public static Expression<Func<DateTime?, bool>> IsNull => column => column == null;
 
+    /// <summary>The runtime form of this profile, built from the operator templates above.</summary>
+    public static FilterProfile<DateTime> Profile { get; } = FilterProfile<DateTime>.Create("DateTimeFilter",
+        FilterOperator.Value<DateTime, DateTime>("eq", Eq, TryGetValue),
+        FilterOperator.Value<DateTime, DateTime>("ne", Ne, TryGetValue),
+        FilterOperator.Value<DateTime, DateTime>("gt", Gt, TryGetValue),
+        FilterOperator.Value<DateTime, DateTime>("gte", Gte, TryGetValue),
+        FilterOperator.Value<DateTime, DateTime>("lt", Lt, TryGetValue),
+        FilterOperator.Value<DateTime, DateTime>("lte", Lte, TryGetValue),
+        FilterOperator.UnaryOverNullable<DateTime>("isNull", IsNull));
+
     /// <summary>Extracts a <see cref="DateTime"/> from an ISO 8601 JSON String.</summary>
     public static bool TryGetValue(JsonElement element, out DateTime value, out string error)
     {

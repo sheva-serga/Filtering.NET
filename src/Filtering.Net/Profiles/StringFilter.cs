@@ -35,6 +35,16 @@ public static class StringFilter
     [FilterOperator("isNull")]
     public static Expression<Func<string, bool>> IsNull => column => column == null;
 
+    /// <summary>The runtime form of this profile, built from the operator templates above.</summary>
+    public static FilterProfile<string> Profile { get; } = FilterProfile<string>.Create("StringFilter",
+        FilterOperator.Value<string, string>("eq", Eq, TryGetValue),
+        FilterOperator.Value<string, string>("ne", Ne, TryGetValue),
+        FilterOperator.Value<string, string>("contains", Contains, TryGetValue),
+        FilterOperator.Value<string, string>("startsWith", StartsWith, TryGetValue),
+        FilterOperator.Value<string, string>("endsWith", EndsWith, TryGetValue),
+        FilterOperator.Value<string, string[]>("in", In, TryGetArray),
+        FilterOperator.Unary<string>("isNull", IsNull));
+
     /// <summary>Extracts a <see cref="string"/> from a JSON String; returns false with a populated <paramref name="error"/> for any other JSON kind.</summary>
     public static bool TryGetValue(JsonElement element, out string value, out string error)
     {

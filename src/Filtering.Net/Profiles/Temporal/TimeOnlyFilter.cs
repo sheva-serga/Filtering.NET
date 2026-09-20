@@ -33,6 +33,16 @@ public static class TimeOnlyFilter
     [FilterOperator("isNull")]
     public static Expression<Func<TimeOnly?, bool>> IsNull => column => column == null;
 
+    /// <summary>The runtime form of this profile, built from the operator templates above.</summary>
+    public static FilterProfile<TimeOnly> Profile { get; } = FilterProfile<TimeOnly>.Create("TimeOnlyFilter",
+        FilterOperator.Value<TimeOnly, TimeOnly>("eq", Eq, TryGetValue),
+        FilterOperator.Value<TimeOnly, TimeOnly>("ne", Ne, TryGetValue),
+        FilterOperator.Value<TimeOnly, TimeOnly>("gt", Gt, TryGetValue),
+        FilterOperator.Value<TimeOnly, TimeOnly>("gte", Gte, TryGetValue),
+        FilterOperator.Value<TimeOnly, TimeOnly>("lt", Lt, TryGetValue),
+        FilterOperator.Value<TimeOnly, TimeOnly>("lte", Lte, TryGetValue),
+        FilterOperator.UnaryOverNullable<TimeOnly>("isNull", IsNull));
+
     /// <summary>Extracts a <see cref="TimeOnly"/> from an ISO 8601 time JSON String (HH:mm:ss).</summary>
     public static bool TryGetValue(JsonElement element, out TimeOnly value, out string error)
     {

@@ -32,6 +32,17 @@ public static class Int32Filter
     /// <summary>Null-check operator template (<c>isNull</c>).</summary>
     [FilterOperator("isNull")] public static Expression<Func<int?, bool>> IsNull => column => column == null;
 
+    /// <summary>The runtime form of this profile, built from the operator templates above.</summary>
+    public static FilterProfile<int> Profile { get; } = FilterProfile<int>.Create("Int32Filter",
+        FilterOperator.Value<int, int>("eq", Eq, TryGetValue),
+        FilterOperator.Value<int, int>("ne", Ne, TryGetValue),
+        FilterOperator.Value<int, int>("gt", Gt, TryGetValue),
+        FilterOperator.Value<int, int>("gte", Gte, TryGetValue),
+        FilterOperator.Value<int, int>("lt", Lt, TryGetValue),
+        FilterOperator.Value<int, int>("lte", Lte, TryGetValue),
+        FilterOperator.Value<int, int[]>("in", In, TryGetArray),
+        FilterOperator.UnaryOverNullable<int>("isNull", IsNull));
+
     /// <summary>Extracts an <see cref="int"/> from a JSON Number or invariant-culture JSON String via <see cref="NumericExtractor"/>.</summary>
     public static bool TryGetValue(JsonElement element, out int value, out string error) =>
         NumericExtractor.TryGetValue(

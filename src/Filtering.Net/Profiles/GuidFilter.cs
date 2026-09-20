@@ -23,6 +23,13 @@ public static class GuidFilter
     [FilterOperator("isNull")]
     public static Expression<Func<Guid?, bool>> IsNull => column => column == null;
 
+    /// <summary>The runtime form of this profile, built from the operator templates above.</summary>
+    public static FilterProfile<Guid> Profile { get; } = FilterProfile<Guid>.Create("GuidFilter",
+        FilterOperator.Value<Guid, Guid>("eq", Eq, TryGetValue),
+        FilterOperator.Value<Guid, Guid>("ne", Ne, TryGetValue),
+        FilterOperator.Value<Guid, Guid[]>("in", In, TryGetArray),
+        FilterOperator.UnaryOverNullable<Guid>("isNull", IsNull));
+
     /// <summary>Extracts a <see cref="Guid"/> from a JSON String; returns false for non-string values or invalid GUID formats.</summary>
     public static bool TryGetValue(JsonElement element, out Guid value, out string error)
     {

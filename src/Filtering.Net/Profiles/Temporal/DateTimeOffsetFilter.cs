@@ -35,6 +35,16 @@ public static class DateTimeOffsetFilter
     [FilterOperator("isNull")]
     public static Expression<Func<DateTimeOffset?, bool>> IsNull => column => column == null;
 
+    /// <summary>The runtime form of this profile, built from the operator templates above.</summary>
+    public static FilterProfile<DateTimeOffset> Profile { get; } = FilterProfile<DateTimeOffset>.Create("DateTimeOffsetFilter",
+        FilterOperator.Value<DateTimeOffset, DateTimeOffset>("eq", Eq, TryGetValue),
+        FilterOperator.Value<DateTimeOffset, DateTimeOffset>("ne", Ne, TryGetValue),
+        FilterOperator.Value<DateTimeOffset, DateTimeOffset>("gt", Gt, TryGetValue),
+        FilterOperator.Value<DateTimeOffset, DateTimeOffset>("gte", Gte, TryGetValue),
+        FilterOperator.Value<DateTimeOffset, DateTimeOffset>("lt", Lt, TryGetValue),
+        FilterOperator.Value<DateTimeOffset, DateTimeOffset>("lte", Lte, TryGetValue),
+        FilterOperator.UnaryOverNullable<DateTimeOffset>("isNull", IsNull));
+
     /// <summary>Extracts a <see cref="DateTimeOffset"/> from an ISO 8601 JSON String.</summary>
     public static bool TryGetValue(JsonElement element, out DateTimeOffset value, out string error)
     {

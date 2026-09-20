@@ -32,6 +32,17 @@ public static class DecimalFilter
     /// <summary>Null-check operator template (<c>isNull</c>).</summary>
     [FilterOperator("isNull")] public static Expression<Func<decimal?, bool>> IsNull => column => column == null;
 
+    /// <summary>The runtime form of this profile, built from the operator templates above.</summary>
+    public static FilterProfile<decimal> Profile { get; } = FilterProfile<decimal>.Create("DecimalFilter",
+        FilterOperator.Value<decimal, decimal>("eq", Eq, TryGetValue),
+        FilterOperator.Value<decimal, decimal>("ne", Ne, TryGetValue),
+        FilterOperator.Value<decimal, decimal>("gt", Gt, TryGetValue),
+        FilterOperator.Value<decimal, decimal>("gte", Gte, TryGetValue),
+        FilterOperator.Value<decimal, decimal>("lt", Lt, TryGetValue),
+        FilterOperator.Value<decimal, decimal>("lte", Lte, TryGetValue),
+        FilterOperator.Value<decimal, decimal[]>("in", In, TryGetArray),
+        FilterOperator.UnaryOverNullable<decimal>("isNull", IsNull));
+
     /// <summary>Extracts a <see cref="decimal"/> from a JSON Number or invariant-culture JSON String via <see cref="NumericExtractor"/>.</summary>
     public static bool TryGetValue(JsonElement element, out decimal value, out string error) =>
         NumericExtractor.TryGetValue(

@@ -33,6 +33,16 @@ public static class DateOnlyFilter
     [FilterOperator("isNull")]
     public static Expression<Func<DateOnly?, bool>> IsNull => column => column == null;
 
+    /// <summary>The runtime form of this profile, built from the operator templates above.</summary>
+    public static FilterProfile<DateOnly> Profile { get; } = FilterProfile<DateOnly>.Create("DateOnlyFilter",
+        FilterOperator.Value<DateOnly, DateOnly>("eq", Eq, TryGetValue),
+        FilterOperator.Value<DateOnly, DateOnly>("ne", Ne, TryGetValue),
+        FilterOperator.Value<DateOnly, DateOnly>("gt", Gt, TryGetValue),
+        FilterOperator.Value<DateOnly, DateOnly>("gte", Gte, TryGetValue),
+        FilterOperator.Value<DateOnly, DateOnly>("lt", Lt, TryGetValue),
+        FilterOperator.Value<DateOnly, DateOnly>("lte", Lte, TryGetValue),
+        FilterOperator.UnaryOverNullable<DateOnly>("isNull", IsNull));
+
     /// <summary>Extracts a <see cref="DateOnly"/> from an ISO 8601 date JSON String (yyyy-MM-dd).</summary>
     public static bool TryGetValue(JsonElement element, out DateOnly value, out string error)
     {

@@ -15,6 +15,11 @@ public static class BoolFilter
     [FilterOperator("isNull")]
     public static Expression<Func<bool?, bool>> IsNull => column => column == null;
 
+    /// <summary>The runtime form of this profile, built from the operator templates above.</summary>
+    public static FilterProfile<bool> Profile { get; } = FilterProfile<bool>.Create("BoolFilter",
+        FilterOperator.Value<bool, bool>("eq", Eq, TryGetValue),
+        FilterOperator.UnaryOverNullable<bool>("isNull", IsNull));
+
     /// <summary>Extracts a <see cref="bool"/> from a JSON True/False value; returns false with a populated <paramref name="error"/> for any other kind.</summary>
     public static bool TryGetValue(JsonElement element, out bool value, out string error)
     {

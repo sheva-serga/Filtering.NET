@@ -32,6 +32,17 @@ public static class Int16Filter
     /// <summary>Null-check operator template (<c>isNull</c>).</summary>
     [FilterOperator("isNull")] public static Expression<Func<short?, bool>> IsNull => column => column == null;
 
+    /// <summary>The runtime form of this profile, built from the operator templates above.</summary>
+    public static FilterProfile<short> Profile { get; } = FilterProfile<short>.Create("Int16Filter",
+        FilterOperator.Value<short, short>("eq", Eq, TryGetValue),
+        FilterOperator.Value<short, short>("ne", Ne, TryGetValue),
+        FilterOperator.Value<short, short>("gt", Gt, TryGetValue),
+        FilterOperator.Value<short, short>("gte", Gte, TryGetValue),
+        FilterOperator.Value<short, short>("lt", Lt, TryGetValue),
+        FilterOperator.Value<short, short>("lte", Lte, TryGetValue),
+        FilterOperator.Value<short, short[]>("in", In, TryGetArray),
+        FilterOperator.UnaryOverNullable<short>("isNull", IsNull));
+
     /// <summary>Extracts a <see cref="short"/> from a JSON Number or invariant-culture JSON String via <see cref="NumericExtractor"/>.</summary>
     public static bool TryGetValue(JsonElement element, out short value, out string error) =>
         NumericExtractor.TryGetValue(

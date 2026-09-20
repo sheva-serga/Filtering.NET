@@ -32,6 +32,17 @@ public static class ByteFilter
     /// <summary>Null-check operator template (<c>isNull</c>).</summary>
     [FilterOperator("isNull")] public static Expression<Func<byte?, bool>> IsNull => column => column == null;
 
+    /// <summary>The runtime form of this profile, built from the operator templates above.</summary>
+    public static FilterProfile<byte> Profile { get; } = FilterProfile<byte>.Create("ByteFilter",
+        FilterOperator.Value<byte, byte>("eq", Eq, TryGetValue),
+        FilterOperator.Value<byte, byte>("ne", Ne, TryGetValue),
+        FilterOperator.Value<byte, byte>("gt", Gt, TryGetValue),
+        FilterOperator.Value<byte, byte>("gte", Gte, TryGetValue),
+        FilterOperator.Value<byte, byte>("lt", Lt, TryGetValue),
+        FilterOperator.Value<byte, byte>("lte", Lte, TryGetValue),
+        FilterOperator.Value<byte, byte[]>("in", In, TryGetArray),
+        FilterOperator.UnaryOverNullable<byte>("isNull", IsNull));
+
     /// <summary>Extracts a <see cref="byte"/> from a JSON Number or invariant-culture JSON String via <see cref="NumericExtractor"/>.</summary>
     public static bool TryGetValue(JsonElement element, out byte value, out string error) =>
         NumericExtractor.TryGetValue(

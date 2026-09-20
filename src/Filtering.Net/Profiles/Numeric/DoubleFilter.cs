@@ -32,6 +32,17 @@ public static class DoubleFilter
     /// <summary>Null-check operator template (<c>isNull</c>).</summary>
     [FilterOperator("isNull")] public static Expression<Func<double?, bool>> IsNull => column => column == null;
 
+    /// <summary>The runtime form of this profile, built from the operator templates above.</summary>
+    public static FilterProfile<double> Profile { get; } = FilterProfile<double>.Create("DoubleFilter",
+        FilterOperator.Value<double, double>("eq", Eq, TryGetValue),
+        FilterOperator.Value<double, double>("ne", Ne, TryGetValue),
+        FilterOperator.Value<double, double>("gt", Gt, TryGetValue),
+        FilterOperator.Value<double, double>("gte", Gte, TryGetValue),
+        FilterOperator.Value<double, double>("lt", Lt, TryGetValue),
+        FilterOperator.Value<double, double>("lte", Lte, TryGetValue),
+        FilterOperator.Value<double, double[]>("in", In, TryGetArray),
+        FilterOperator.UnaryOverNullable<double>("isNull", IsNull));
+
     /// <summary>Extracts a <see cref="double"/> from a JSON Number or invariant-culture JSON String via <see cref="NumericExtractor"/>.</summary>
     public static bool TryGetValue(JsonElement element, out double value, out string error) =>
         NumericExtractor.TryGetValue(
