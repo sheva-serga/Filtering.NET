@@ -22,7 +22,10 @@ public sealed class UsersController(AppDbContext dbContext, IFilterDefinition<Us
     {
         try
         {
+            // Read-only endpoint: AsNoTracking skips the identity-map entries and original-value
+            // snapshots the change tracker would otherwise build for every returned row.
             var pageResult = await _dbContext.Users
+                .AsNoTracking()
                 .Include(user => user.Department)
                 .ApplyPagedAsync(_userFilter, request, cancellationToken);
 
@@ -51,9 +54,11 @@ public sealed class UsersController(AppDbContext dbContext, IFilterDefinition<Us
             var validationResult = _userFilter.Validate(request);
             if (!validationResult.IsValid) return BadRequest(validationResult);
 
+            // Read-only endpoint: see the AsNoTracking note in SearchAsync.
+            var userQuery = _dbContext.Users.AsNoTracking().Include(user => user.Department);
             var filteredQuery = request.Where is not null
-                ? _userFilter.ApplyFilter(_dbContext.Users.Include(user => user.Department), request.Where)
-                : _dbContext.Users.Include(user => user.Department).AsQueryable();
+                ? _userFilter.ApplyFilter(userQuery, request.Where)
+                : userQuery.AsQueryable();
             var sortedQuery = request.Sort is { Count: > 0 }
                 ? _userFilter.ApplySorting(filteredQuery, request.Sort)
                 : filteredQuery;

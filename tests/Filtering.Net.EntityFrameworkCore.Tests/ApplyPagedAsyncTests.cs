@@ -9,8 +9,8 @@ namespace Filtering.Net.EntityFrameworkCore.Tests;
 
 /// <summary>
 /// Tests <see cref="FilteringEntityFrameworkExtensions.ApplyPagedAsync{T}"/> against a
-/// SQLite in-memory database, using a hand-written <see cref="IFilterDefinition{TEntity}"/>
-/// passthrough so we exercise the EF Core async path without depending on the source generator.
+/// SQLite in-memory database, driving a hand-built <see cref="FilterDefinition{TEntity}"/> so the
+/// EF Core async path is exercised over the real engine without depending on the source generator.
 /// </summary>
 public class ApplyPagedAsyncTests
 {
@@ -20,12 +20,12 @@ public class ApplyPagedAsyncTests
         // Arrange
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var dbContext = await CreateSeededDbContextAsync(rowCount: 7, cancellationToken);
-        var passthroughDefinition = new PassthroughFilterDefinition();
+        var widgetDefinition = CreateWidgetDefinition();
         var request = new FilterRequest();
 
         // Act
         var pageResult = await dbContext.Widgets.AsQueryable()
-            .ApplyPagedAsync(passthroughDefinition, request, cancellationToken);
+            .ApplyPagedAsync(widgetDefinition, request, cancellationToken);
 
         // Assert
         pageResult.TotalCount.Should().Be(7);
@@ -39,12 +39,12 @@ public class ApplyPagedAsyncTests
         // Arrange
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var dbContext = await CreateSeededDbContextAsync(rowCount: 25, cancellationToken);
-        var passthroughDefinition = new PassthroughFilterDefinition();
-        var request = new FilterRequest { Page = 2, PageSize = 10 };
+        var widgetDefinition = CreateWidgetDefinition();
+        var request = new FilterRequest { Sort = [new SortItem("Id")], Page = 2, PageSize = 10 };
 
         // Act
         var pageResult = await dbContext.Widgets.AsQueryable()
-            .ApplyPagedAsync(passthroughDefinition, request, cancellationToken);
+            .ApplyPagedAsync(widgetDefinition, request, cancellationToken);
 
         // Assert
         pageResult.TotalCount.Should().Be(25);
@@ -56,12 +56,138 @@ public class ApplyPagedAsyncTests
     }
 
     [Fact]
+    public async Task ApplyPagedAsync_PageWithoutPageSize_ReportsTheEngineResolvedPageSize()
+    {
+        // Arrange — 25 rows at the definition's DefaultPageSize of 10 makes page 3 the last, partial
+        // page. Reporting the materialised row count instead would claim PageSize 5 and 5 total pages.
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var dbContext = await CreateSeededDbContextAsync(rowCount: 25, cancellationToken);
+        var widgetDefinition = CreateWidgetDefinition(new FilterSettings(DefaultPageSize: 10));
+        var request = new FilterRequest { Sort = [new SortItem("Id")], Page = 3 };
+
+        // Act
+        var pageResult = await dbContext.Widgets.AsQueryable()
+            .ApplyPagedAsync(widgetDefinition, request, cancellationToken);
+
+        // Assert
+        pageResult.Items.Should().HaveCount(5);
+        pageResult.PageSize.Should().Be(10);
+        pageResult.TotalPages.Should().Be(3);
+        pageResult.HasNext.Should().BeFalse();
+        pageResult.HasPrevious.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ApplyPagedAsync_PageBeyondTheLastPage_ReportsTheSameTotalPagesAsAnInRangePage()
+    {
+        // Arrange
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var dbContext = await CreateSeededDbContextAsync(rowCount: 25, cancellationToken);
+        var widgetDefinition = CreateWidgetDefinition(new FilterSettings(DefaultPageSize: 10));
+        var request = new FilterRequest { Sort = [new SortItem("Id")], Page = 9 };
+
+        // Act
+        var pageResult = await dbContext.Widgets.AsQueryable()
+            .ApplyPagedAsync(widgetDefinition, request, cancellationToken);
+
+        // Assert — an empty slice must not collapse PageSize to 0 and TotalPages to 1.
+        pageResult.Items.Should().BeEmpty();
+        pageResult.PageSize.Should().Be(10);
+        pageResult.TotalPages.Should().Be(3);
+        pageResult.HasNext.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ApplyPagedAsync_PageSizeWithoutPage_ReturnsTheFirstPage()
+    {
+        // Arrange
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var dbContext = await CreateSeededDbContextAsync(rowCount: 25, cancellationToken);
+        var widgetDefinition = CreateWidgetDefinition();
+        var request = new FilterRequest { Sort = [new SortItem("Id")], PageSize = 10 };
+
+        // Act
+        var pageResult = await dbContext.Widgets.AsQueryable()
+            .ApplyPagedAsync(widgetDefinition, request, cancellationToken);
+
+        // Assert
+        pageResult.Page.Should().Be(1);
+        pageResult.PageSize.Should().Be(10);
+        pageResult.Items.Select(widget => widget.Id).Should().Equal(Enumerable.Range(1, 10));
+        pageResult.TotalPages.Should().Be(3);
+        pageResult.HasPrevious.Should().BeFalse();
+        pageResult.HasNext.Should().BeTrue();
+    }
+
+    [Fact]
+    public async Task ApplyPagedAsync_PageSizeAboveTheConfiguredMaximum_FailsValidation()
+    {
+        // Arrange
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var dbContext = await CreateSeededDbContextAsync(rowCount: 25, cancellationToken);
+        var widgetDefinition = CreateWidgetDefinition(new FilterSettings(DefaultPageSize: 10, MaxPageSize: 20));
+        var request = new FilterRequest { PageSize = 200 };
+
+        // Act
+        var applyOversizedPage = () => dbContext.Widgets.AsQueryable()
+            .ApplyPagedAsync(widgetDefinition, request, cancellationToken);
+
+        // Assert
+        var thrownException = await applyOversizedPage.Should().ThrowAsync<FilterValidationException>();
+        thrownException.Which.Result.Errors.Should().ContainSingle(error => error.Code == FilterValidationCode.PageSizeTooLarge);
+    }
+
+    [Fact]
+    public async Task ApplyPagedAsync_NeitherPageNorPageSize_ReportsTheWholeSetAsOnePage()
+    {
+        // Arrange — nothing was paged, so the reported coordinates must describe a single page
+        // covering every matched row rather than the definition's default page size.
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var dbContext = await CreateSeededDbContextAsync(rowCount: 7, cancellationToken);
+        var widgetDefinition = CreateWidgetDefinition(new FilterSettings(DefaultPageSize: 2));
+        var request = new FilterRequest { Sort = [new SortItem("Id")] };
+
+        // Act
+        var pageResult = await dbContext.Widgets.AsQueryable()
+            .ApplyPagedAsync(widgetDefinition, request, cancellationToken);
+
+        // Assert
+        pageResult.Items.Should().HaveCount(7);
+        pageResult.Page.Should().Be(1);
+        pageResult.PageSize.Should().Be(7);
+        pageResult.TotalPages.Should().Be(1);
+        pageResult.HasNext.Should().BeFalse();
+        pageResult.HasPrevious.Should().BeFalse();
+    }
+
+    [Fact]
+    public async Task ApplyPagedAsync_NoRowsAndNoPaging_ReportsOneEmptyPage()
+    {
+        // Arrange
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await using var dbContext = await CreateSeededDbContextAsync(rowCount: 0, cancellationToken);
+        var widgetDefinition = CreateWidgetDefinition();
+        var request = new FilterRequest();
+
+        // Act
+        var pageResult = await dbContext.Widgets.AsQueryable()
+            .ApplyPagedAsync(widgetDefinition, request, cancellationToken);
+
+        // Assert
+        pageResult.TotalCount.Should().Be(0);
+        pageResult.Page.Should().Be(1);
+        pageResult.PageSize.Should().Be(0);
+        pageResult.TotalPages.Should().Be(1);
+        pageResult.HasNext.Should().BeFalse();
+    }
+
+    [Fact]
     public async Task ApplyPagedAsync_Sort_OrdersBySpecifiedField()
     {
         // Arrange
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var dbContext = await CreateSeededDbContextAsync(rowCount: 5, cancellationToken);
-        var passthroughDefinition = new PassthroughFilterDefinition();
+        var widgetDefinition = CreateWidgetDefinition();
         var request = new FilterRequest
         {
             Sort = [new SortItem("Id", SortDir.Desc)],
@@ -69,7 +195,7 @@ public class ApplyPagedAsyncTests
 
         // Act
         var pageResult = await dbContext.Widgets.AsQueryable()
-            .ApplyPagedAsync(passthroughDefinition, request, cancellationToken);
+            .ApplyPagedAsync(widgetDefinition, request, cancellationToken);
 
         // Assert
         pageResult.Items.Select(widget => widget.Id).Should().BeInDescendingOrder();
@@ -81,15 +207,24 @@ public class ApplyPagedAsyncTests
         // Arrange
         var cancellationToken = TestContext.Current.CancellationToken;
         await using var dbContext = await CreateSeededDbContextAsync(rowCount: 3, cancellationToken);
-        var failingDefinition = new AlwaysFailingFilterDefinition();
-        var request = new FilterRequest();
+        var widgetDefinition = CreateWidgetDefinition();
+        var request = new FilterRequest
+        {
+            Where = new FilterLeaf("Mystery", "eq", System.Text.Json.JsonDocument.Parse("\"x\"").RootElement),
+        };
 
         // Act
-        var act = () => dbContext.Widgets.AsQueryable().ApplyPagedAsync(failingDefinition, request, cancellationToken);
+        var applyInvalidRequest = () => dbContext.Widgets.AsQueryable().ApplyPagedAsync(widgetDefinition, request, cancellationToken);
 
         // Assert
-        await act.Should().ThrowAsync<FilterValidationException>();
+        await applyInvalidRequest.Should().ThrowAsync<FilterValidationException>();
     }
+
+    private static FilterDefinition<Widget> CreateWidgetDefinition(FilterSettings? settings = null) =>
+        new(new FilterSchemaBuilder<Widget>(settings ?? new FilterSettings())
+            .Add(FilterProperty.Map<Widget, int>("Id", widget => widget.Id, Int32Filter.Profile).Sortable().Build())
+            .Add(FilterProperty.Map<Widget, string>("Name", widget => widget.Name, StringFilter.Profile).Sortable().Build())
+            .Build());
 
     private static async Task<TestDbContext> CreateSeededDbContextAsync(int rowCount, CancellationToken cancellationToken = default)
     {
@@ -127,61 +262,5 @@ public class ApplyPagedAsyncTests
             await base.DisposeAsync();
             await _ownedConnection.DisposeAsync();
         }
-    }
-
-    /// <summary>
-    /// Passthrough <see cref="IFilterDefinition{TEntity}"/> implementation: never reports a
-    /// validation error, ignores filter expressions, and translates a single Id-based sort.
-    /// Lets the test exercise <see cref="FilteringEntityFrameworkExtensions.ApplyPagedAsync{T}"/>
-    /// without depending on the source generator output.
-    /// </summary>
-    private sealed class PassthroughFilterDefinition : IFilterDefinition<Widget>
-    {
-        public FilterValidationResult Validate(FilterNode? where) => FilterValidationResult.Success;
-        public FilterValidationResult Validate(IReadOnlyList<SortItem>? sortItems) => FilterValidationResult.Success;
-        public FilterValidationResult Validate(int? page, int? pageSize) => FilterValidationResult.Success;
-        public FilterValidationResult Validate(FilterRequest request) => FilterValidationResult.Success;
-        public IQueryable<Widget> ApplyFilter(IQueryable<Widget> query, FilterNode? where) => query;
-
-        public IQueryable<Widget> ApplySorting(
-            IQueryable<Widget> query,
-            IReadOnlyList<SortItem>? sortItems,
-            int? page = null,
-            int? pageSize = null)
-        {
-            var sortedQuery = query;
-            if (sortItems is { Count: > 0 } && sortItems[0].Field == "Id")
-            {
-                sortedQuery = sortItems[0].Dir == SortDir.Desc
-                    ? sortedQuery.OrderByDescending(widget => widget.Id)
-                    : sortedQuery.OrderBy(widget => widget.Id);
-            }
-            else
-            {
-                sortedQuery = sortedQuery.OrderBy(widget => widget.Id);
-            }
-
-            if (page is not null && pageSize is not null)
-            {
-                var skipCount = (Math.Max(1, page.Value) - 1) * pageSize.Value;
-                sortedQuery = sortedQuery.Skip(skipCount).Take(pageSize.Value);
-            }
-            return sortedQuery;
-        }
-    }
-
-    /// <summary>Validation always fails — used to confirm <c>ApplyPagedAsync</c> rethrows as
-    /// <see cref="FilterValidationException"/>.</summary>
-    private sealed class AlwaysFailingFilterDefinition : IFilterDefinition<Widget>
-    {
-        private static readonly FilterValidationResult FailingResult =
-            new([new FilterValidationError("$", FilterValidationCode.UnknownField, "boom")]);
-
-        public FilterValidationResult Validate(FilterNode? where) => FailingResult;
-        public FilterValidationResult Validate(IReadOnlyList<SortItem>? sortItems) => FailingResult;
-        public FilterValidationResult Validate(int? page, int? pageSize) => FailingResult;
-        public FilterValidationResult Validate(FilterRequest request) => FailingResult;
-        public IQueryable<Widget> ApplyFilter(IQueryable<Widget> query, FilterNode? where) => query;
-        public IQueryable<Widget> ApplySorting(IQueryable<Widget> query, IReadOnlyList<SortItem>? sortItems, int? page = null, int? pageSize = null) => query;
     }
 }

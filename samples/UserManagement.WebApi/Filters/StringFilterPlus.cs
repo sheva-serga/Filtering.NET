@@ -8,11 +8,14 @@ namespace UserManagement.WebApi.Filters;
 [FilterProfile<string>(BasedOn = typeof(StringFilter))]
 public static class StringFilterPlus
 {
-    // Case-insensitive substring — String.Contains translates to a SQL LIKE on most providers.
+    // Case-insensitive substring: both sides are lowered so providers translate it to
+    // LOWER("Column") LIKE '%' || LOWER(@value) || '%'. Lowering only the value would leave an
+    // ordinary case-sensitive LIKE.
     [FilterOperator("fuzzy")]
+    // CA1862 wants a StringComparison overload, which has no SQL translation in an expression tree.
 #pragma warning disable CA1862
     public static Expression<Func<string, string, bool>> Fuzzy =>
-        (column, value) => column.Contains(value.ToLower());
+        (column, value) => column.ToLower().Contains(value.ToLower());
 #pragma warning restore CA1862
 
     // EF.Functions.* inside a [FilterOperator] body — translates to PostgreSQL ILIKE under Npgsql.

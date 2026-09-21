@@ -1,4 +1,4 @@
-using System.Text.Json;
+﻿using System.Text.Json;
 
 using AwesomeAssertions;
 
@@ -17,13 +17,14 @@ public class MapNestedSqlTranslationTests(MapNestedSqliteFixture sqliteFixture)
     private readonly MapNestedSqliteFixture _sqliteFixture = sqliteFixture;
 
     [Fact]
-    public async Task ApplyFilter_DepartmentNameEq_ProducesLeftJoinAndParameterizedPredicate()
+    public async Task ApplyFilter_DepartmentNameEq_ProducesInnerJoinAndParameterizedPredicate()
     {
-        // Arrange
+        // Arrange — User.Department is a non-nullable reference navigation, so EF models it as
+        // required and the spliced path must translate to an INNER JOIN.
         var cancellationToken = TestContext.Current.CancellationToken;
         await _sqliteFixture.ResetAsync();
         await using var dbContext = await _sqliteFixture.CreateContextAsync();
-        await SeedTwoUsersWithDifferentDepartmentsAsync(dbContext, cancellationToken);
+        await MapNestedSeed.SeedTwoUsersWithDifferentDepartmentsAsync(dbContext, cancellationToken);
         var userFilter = new UserFilter();
         var request = new FilterRequest
         {
@@ -38,11 +39,34 @@ public class MapNestedSqlTranslationTests(MapNestedSqliteFixture sqliteFixture)
         // Assert
         matchedUsers.Should().ContainSingle().Which.Login.Should().Be("alice");
         renderedSql.Should().Contain("WHERE");
-        renderedSql.Should().Contain("JOIN", because: "the navigation department must materialise as a SQL join");
+        renderedSql.Should().Contain("INNER JOIN", because: "the required navigation department must materialise as an inner join");
         var hasParameterPlaceholder = System.Text.RegularExpressions.Regex.IsMatch(renderedSql, "@\\w+");
         var hasParameterDeclaration = renderedSql.Contains(".param set ", StringComparison.Ordinal);
         (hasParameterPlaceholder || hasParameterDeclaration).Should().BeTrue(
             because: "the user-supplied 'Sales' literal must travel as a parameter, not an inline SQL literal");
+    }
+
+    [Fact]
+    public async Task ApplyFilter_ManagerNameEq_ProducesLeftJoinForTheOptionalNavigation()
+    {
+        // Arrange — Employee.Manager is optional (int? ManagerId), which is the shape that makes EF
+        // emit a LEFT JOIN. Dana has no manager, so she must not match and must not break the join.
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await _sqliteFixture.ResetAsync();
+        await using var dbContext = await _sqliteFixture.CreateContextAsync();
+        await MapNestedSeed.SeedManagerChainAsync(dbContext, cancellationToken);
+        var employeeFilter = new EmployeeFilter();
+
+        // Act
+        var filteredQuery = employeeFilter.ApplyFilter(
+            dbContext.Employees.AsQueryable(),
+            FilterRequestBuilder.Leaf("manager.name", "eq", "Dana"));
+        var renderedSql = filteredQuery.ToQueryString();
+        var matchedNames = await filteredQuery.Select(employee => employee.Name).ToListAsync(cancellationToken);
+
+        // Assert
+        renderedSql.Should().Contain("LEFT JOIN", because: "an optional reference navigation must not filter managerless rows out through the join itself");
+        matchedNames.Should().BeEquivalentTo(["Mia", "Noa"]);
     }
 
     [Fact]
@@ -52,7 +76,7 @@ public class MapNestedSqlTranslationTests(MapNestedSqliteFixture sqliteFixture)
         var cancellationToken = TestContext.Current.CancellationToken;
         await _sqliteFixture.ResetAsync();
         await using var dbContext = await _sqliteFixture.CreateContextAsync();
-        await SeedTwoLevelGraphAsync(dbContext, cancellationToken);
+        await MapNestedSeed.SeedTwoLevelGraphAsync(dbContext, cancellationToken);
         var userFilter = new UserFilter();
         var request = new FilterRequest
         {
@@ -126,7 +150,7 @@ public class MapNestedSqlTranslationTests(MapNestedSqliteFixture sqliteFixture)
         var cancellationToken = TestContext.Current.CancellationToken;
         await _sqliteFixture.ResetAsync();
         await using var dbContext = await _sqliteFixture.CreateContextAsync();
-        await SeedThreeUsersInUnsortedOrderAsync(dbContext, cancellationToken);
+        await MapNestedSeed.SeedThreeUsersInUnsortedOrderAsync(dbContext, cancellationToken);
         var userFilter = new UserFilter();
         var sortItems = new List<SortItem> { new("department.name", SortDir.Asc) };
 
@@ -148,7 +172,7 @@ public class MapNestedSqlTranslationTests(MapNestedSqliteFixture sqliteFixture)
         var cancellationToken = TestContext.Current.CancellationToken;
         await _sqliteFixture.ResetAsync();
         await using var dbContext = await _sqliteFixture.CreateContextAsync();
-        await SeedFourUsersTwoMatchingAsync(dbContext, cancellationToken);
+        await MapNestedSeed.SeedFourUsersTwoMatchingAsync(dbContext, cancellationToken);
         var userFilter = new UserFilter();
         var request = new FilterRequest
         {
@@ -162,73 +186,5 @@ public class MapNestedSqlTranslationTests(MapNestedSqliteFixture sqliteFixture)
         // Assert
         pageResult.TotalCount.Should().Be(2);
         pageResult.Items.Select(user => user.Login).Should().BeEquivalentTo(["alice", "carol"]);
-    }
-
-    private static async Task SeedTwoUsersWithDifferentDepartmentsAsync(
-        MapNestedDbContext dbContext,
-        CancellationToken cancellationToken)
-    {
-        var salesCompany = new Company { Id = 1, Country = "DE" };
-        var engineeringCompany = new Company { Id = 2, Country = "US" };
-        dbContext.Companies.AddRange(salesCompany, engineeringCompany);
-        var salesDepartment = new Department { Id = 1, Name = "Sales", Company = salesCompany };
-        var engineeringDepartment = new Department { Id = 2, Name = "Engineering", Company = engineeringCompany };
-        dbContext.Departments.AddRange(salesDepartment, engineeringDepartment);
-        dbContext.Users.AddRange(
-            new User { Id = 1, Login = "alice", Department = salesDepartment },
-            new User { Id = 2, Login = "bob", Department = engineeringDepartment });
-        await dbContext.SaveChangesAsync(cancellationToken);
-    }
-
-    private static async Task SeedTwoLevelGraphAsync(
-        MapNestedDbContext dbContext,
-        CancellationToken cancellationToken)
-    {
-        var deCompany = new Company { Id = 1, Country = "DE" };
-        var usCompany = new Company { Id = 2, Country = "US" };
-        dbContext.Companies.AddRange(deCompany, usCompany);
-        var berlinDepartment = new Department { Id = 1, Name = "Sales", Company = deCompany };
-        var newYorkDepartment = new Department { Id = 2, Name = "Engineering", Company = usCompany };
-        var munichDepartment = new Department { Id = 3, Name = "Sales", Company = deCompany };
-        dbContext.Departments.AddRange(berlinDepartment, newYorkDepartment, munichDepartment);
-        dbContext.Users.AddRange(
-            new User { Id = 1, Login = "alice", Department = berlinDepartment },
-            new User { Id = 2, Login = "bob", Department = newYorkDepartment },
-            new User { Id = 3, Login = "carol", Department = munichDepartment });
-        await dbContext.SaveChangesAsync(cancellationToken);
-    }
-
-    private static async Task SeedThreeUsersInUnsortedOrderAsync(
-        MapNestedDbContext dbContext,
-        CancellationToken cancellationToken)
-    {
-        var company = new Company { Id = 1, Country = "DE" };
-        dbContext.Companies.Add(company);
-        var marketingDepartment = new Department { Id = 1, Name = "Marketing", Company = company };
-        var engineeringDepartment = new Department { Id = 2, Name = "Engineering", Company = company };
-        var salesDepartment = new Department { Id = 3, Name = "Sales", Company = company };
-        dbContext.Departments.AddRange(marketingDepartment, engineeringDepartment, salesDepartment);
-        dbContext.Users.AddRange(
-            new User { Id = 1, Login = "carol", Department = salesDepartment },
-            new User { Id = 2, Login = "alice", Department = engineeringDepartment },
-            new User { Id = 3, Login = "bob", Department = marketingDepartment });
-        await dbContext.SaveChangesAsync(cancellationToken);
-    }
-
-    private static async Task SeedFourUsersTwoMatchingAsync(
-        MapNestedDbContext dbContext,
-        CancellationToken cancellationToken)
-    {
-        var company = new Company { Id = 1, Country = "DE" };
-        dbContext.Companies.Add(company);
-        var salesDepartment = new Department { Id = 1, Name = "Sales", Company = company };
-        var engineeringDepartment = new Department { Id = 2, Name = "Engineering", Company = company };
-        dbContext.Departments.AddRange(salesDepartment, engineeringDepartment);
-        dbContext.Users.AddRange(
-            new User { Id = 1, Login = "alice", Department = salesDepartment },
-            new User { Id = 2, Login = "bob", Department = engineeringDepartment },
-            new User { Id = 3, Login = "carol", Department = salesDepartment },
-            new User { Id = 4, Login = "dave", Department = engineeringDepartment });
-        await dbContext.SaveChangesAsync(cancellationToken);
     }
 }

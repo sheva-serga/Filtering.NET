@@ -167,4 +167,112 @@ public class DateBoolGuidEnumScenarios(SqliteFixture sqliteFixture)
         // Assert
         pageResult.Items.Select(widget => widget.Id).Should().BeEquivalentTo([1, 4]);
     }
+
+    [Fact]
+    public async Task ApplyPagedAsync_OptionalStatusEqRequest_TranslatesTheLiftedEnumComparison()
+    {
+        // Arrange — a nullable enum column goes through MapNullable, so the comparison is lifted
+        // before it reaches the provider.
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await _sqliteFixture.ResetAsync();
+        await using var dbContext = await _sqliteFixture.CreateContextAsync();
+        await WidgetSeed.SeedAsync(dbContext);
+        var widgetFilter = new WidgetFilter();
+        var request = new FilterRequest
+        {
+            Where = FilterRequestBuilder.Leaf("OptionalStatus", "eq", "Active"),
+        };
+
+        // Act
+        var pageResult = await dbContext.Widgets.AsQueryable().ApplyPagedAsync(widgetFilter, request, cancellationToken);
+
+        // Assert
+        pageResult.Items.Select(widget => widget.Id).Should().BeEquivalentTo([1, 5]);
+    }
+
+    [Fact]
+    public async Task ApplyPagedAsync_OptionalStatusIsNullRequest_ReturnsNullRowsOnly()
+    {
+        // Arrange
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await _sqliteFixture.ResetAsync();
+        await using var dbContext = await _sqliteFixture.CreateContextAsync();
+        await WidgetSeed.SeedAsync(dbContext);
+        var widgetFilter = new WidgetFilter();
+        var request = new FilterRequest
+        {
+            Where = FilterRequestBuilder.Leaf("OptionalStatus", "isNull", null),
+        };
+
+        // Act
+        var pageResult = await dbContext.Widgets.AsQueryable().ApplyPagedAsync(widgetFilter, request, cancellationToken);
+
+        // Assert
+        pageResult.Items.Select(widget => widget.Id).Should().BeEquivalentTo([2, 4]);
+    }
+
+    [Fact]
+    public async Task ApplyPagedAsync_OptionalStatusInRequest_TranslatesTheNullableArrayContains()
+    {
+        // Arrange
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await _sqliteFixture.ResetAsync();
+        await using var dbContext = await _sqliteFixture.CreateContextAsync();
+        await WidgetSeed.SeedAsync(dbContext);
+        var widgetFilter = new WidgetFilter();
+        var request = new FilterRequest
+        {
+            Where = FilterRequestBuilder.InLeaf("OptionalStatus", "Archived", "Pending"),
+        };
+
+        // Act
+        var pageResult = await dbContext.Widgets.AsQueryable().ApplyPagedAsync(widgetFilter, request, cancellationToken);
+
+        // Assert
+        pageResult.Items.Select(widget => widget.Id).Should().BeEquivalentTo([3]);
+    }
+
+    [Fact]
+    public async Task ApplyPagedAsync_OptionalExternalIdEqRequest_TranslatesTheLiftedGuidComparison()
+    {
+        // Arrange
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await _sqliteFixture.ResetAsync();
+        await using var dbContext = await _sqliteFixture.CreateContextAsync();
+        await WidgetSeed.SeedAsync(dbContext);
+        var widgetFilter = new WidgetFilter();
+        var request = new FilterRequest
+        {
+            Where = FilterRequestBuilder.Leaf("OptionalExternalId", "eq", new Guid("cccccccc-3333-3333-3333-333333333333")),
+        };
+
+        // Act
+        var pageResult = await dbContext.Widgets.AsQueryable().ApplyPagedAsync(widgetFilter, request, cancellationToken);
+
+        // Assert
+        pageResult.Items.Select(widget => widget.Id).Should().BeEquivalentTo([3]);
+    }
+
+    [Fact]
+    public async Task ApplyPagedAsync_OptionalExternalIdInRequest_TranslatesTheNullableGuidArrayContains()
+    {
+        // Arrange
+        var cancellationToken = TestContext.Current.CancellationToken;
+        await _sqliteFixture.ResetAsync();
+        await using var dbContext = await _sqliteFixture.CreateContextAsync();
+        await WidgetSeed.SeedAsync(dbContext);
+        var widgetFilter = new WidgetFilter();
+        var request = new FilterRequest
+        {
+            Where = FilterRequestBuilder.InLeaf("OptionalExternalId",
+                new Guid("aaaaaaaa-1111-1111-1111-111111111111"),
+                new Guid("eeeeeeee-5555-5555-5555-555555555555")),
+        };
+
+        // Act
+        var pageResult = await dbContext.Widgets.AsQueryable().ApplyPagedAsync(widgetFilter, request, cancellationToken);
+
+        // Assert
+        pageResult.Items.Select(widget => widget.Id).Should().BeEquivalentTo([1, 5]);
+    }
 }
