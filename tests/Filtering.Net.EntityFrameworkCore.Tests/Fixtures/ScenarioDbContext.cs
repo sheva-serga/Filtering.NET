@@ -9,6 +9,8 @@ public sealed class ScenarioDbContext(DbContextOptions<ScenarioDbContext> option
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         modelBuilder.Entity<WidgetEntity>().HasKey(widget => widget.Id);
+        // WidgetSeed assigns the keys; SQL Server rejects explicit values for an identity column.
+        modelBuilder.Entity<WidgetEntity>().Property(widget => widget.Id).ValueGeneratedNever();
         modelBuilder.Entity<WidgetEntity>()
             .Property(widget => widget.Status)
             .HasConversion<WidgetStatusConverter>();

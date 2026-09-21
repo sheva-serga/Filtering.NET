@@ -14,6 +14,11 @@ public sealed class MapNestedDbContext(DbContextOptions<MapNestedDbContext> opti
         modelBuilder.Entity<Company>().HasKey(company => company.Id);
         modelBuilder.Entity<Department>().HasKey(department => department.Id);
         modelBuilder.Entity<User>().HasKey(user => user.Id);
+        // The seeds assign the keys; SQL Server rejects explicit values for an identity column.
+        modelBuilder.Entity<Company>().Property(company => company.Id).ValueGeneratedNever();
+        modelBuilder.Entity<Department>().Property(department => department.Id).ValueGeneratedNever();
+        modelBuilder.Entity<User>().Property(user => user.Id).ValueGeneratedNever();
+        modelBuilder.Entity<Employee>().Property(employee => employee.Id).ValueGeneratedNever();
         modelBuilder.Entity<Employee>().HasOne(employee => employee.Manager).WithMany().HasForeignKey(employee => employee.ManagerId);
     }
 }

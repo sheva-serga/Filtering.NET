@@ -1,6 +1,9 @@
 using Filtering.Net.EntityFrameworkCore.Tests.Fixtures;
 
+using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
+
+using Npgsql;
 
 using Testcontainers.MsSql;
 using Testcontainers.PostgreSql;
@@ -17,6 +20,7 @@ namespace Filtering.Net.EntityFrameworkCore.Tests.MapNested;
 public sealed class MapNestedPostgresFixture : IAsyncLifetime
 {
     private PostgreSqlContainer? _container;
+    private int _databaseCounter;
 
     /// <summary>True when the container actually started; false on no-Docker hosts.</summary>
     public bool IsAvailable { get; private set; }
@@ -47,11 +51,15 @@ public sealed class MapNestedPostgresFixture : IAsyncLifetime
     public async Task<MapNestedDbContext> CreateResetContextAsync()
     {
         if (!IsAvailable || _container is null) throw new InvalidOperationException("Postgres container not available.");
+        // A database per context: the container's default database cannot be dropped to reset it.
+        var connectionString = new NpgsqlConnectionStringBuilder(_container.GetConnectionString())
+        {
+            Database = $"map_nested_{Interlocked.Increment(ref _databaseCounter)}",
+        }.ConnectionString;
         var contextOptions = new DbContextOptionsBuilder<MapNestedDbContext>()
-            .UseNpgsql(_container.GetConnectionString())
+            .UseNpgsql(connectionString)
             .Options;
         var dbContext = new MapNestedDbContext(contextOptions);
-        await dbContext.Database.EnsureDeletedAsync();
         await dbContext.Database.EnsureCreatedAsync();
         return dbContext;
     }
@@ -70,6 +78,7 @@ public sealed class MapNestedPostgresCollection : ICollectionFixture<MapNestedPo
 public sealed class MapNestedSqlServerFixture : IAsyncLifetime
 {
     private MsSqlContainer? _container;
+    private int _databaseCounter;
 
     /// <summary>True when the container actually started; false on no-Docker hosts.</summary>
     public bool IsAvailable { get; private set; }
@@ -100,11 +109,15 @@ public sealed class MapNestedSqlServerFixture : IAsyncLifetime
     public async Task<MapNestedDbContext> CreateResetContextAsync()
     {
         if (!IsAvailable || _container is null) throw new InvalidOperationException("SQL Server container not available.");
+        // A database per context: the container's default database (master) cannot be dropped to reset it.
+        var connectionString = new SqlConnectionStringBuilder(_container.GetConnectionString())
+        {
+            InitialCatalog = $"MapNested{Interlocked.Increment(ref _databaseCounter)}",
+        }.ConnectionString;
         var contextOptions = new DbContextOptionsBuilder<MapNestedDbContext>()
-            .UseSqlServer(_container.GetConnectionString())
+            .UseSqlServer(connectionString)
             .Options;
         var dbContext = new MapNestedDbContext(contextOptions);
-        await dbContext.Database.EnsureDeletedAsync();
         await dbContext.Database.EnsureCreatedAsync();
         return dbContext;
     }
