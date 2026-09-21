@@ -111,7 +111,7 @@ internal static class SourceEmitter
             .Append('\n').Append(ContinuationIndent)
             .Append($"nestedContext => global::{nestedMapping.ResolvedTargetClassFqn}.CreateSchema(serializerOptions, nestedContext),")
             .Append('\n').Append(ContinuationIndent)
-            .Append($"{navigation}, {Literal(nestedMapping.Prefix)}, only: {PathArray(nestedMapping.Only)}, except: {PathArray(nestedMapping.Except)}, disableSorting: {disableSorting})")
+            .Append($"{navigation}, {Literal(nestedMapping.Prefix)}, only: {(nestedMapping.HasOnly ? ExplicitPathArray(nestedMapping.Only) : "null")}, except: {PathArray(nestedMapping.Except)}, disableSorting: {disableSorting})")
             .ToString();
     }
 
@@ -119,7 +119,11 @@ internal static class SourceEmitter
         entry.Append('\n').Append(ContinuationIndent).Append(option);
 
     private static string PathArray(EquatableList<string> paths) =>
-        paths.Count == 0 ? "null" : $"new string[] {{ {string.Join(", ", paths.Select(Literal))} }}";
+        paths.Count == 0 ? "null" : ExplicitPathArray(paths);
+
+    // An explicitly empty Only must stay an empty array: the runtime reads null as "no whitelist".
+    private static string ExplicitPathArray(EquatableList<string> paths) =>
+        $"new string[] {{ {string.Join(", ", paths.Select(Literal))} }}";
 
     private static string Literal(string value) => "\"" + EmissionNames.EscapeStringLiteral(value) + "\"";
 }

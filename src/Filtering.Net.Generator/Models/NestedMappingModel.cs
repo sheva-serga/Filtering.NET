@@ -10,7 +10,8 @@ internal enum NestedNavigationKind
     Reference,
 }
 
-// MaxDepth zero means unbounded. NestingKey (declaring class + navigation) and ResolvedTargetClassFqn are filled in by
+// MaxDepth zero means unbounded. HasOnly separates an explicitly empty Only (allow nothing) from an absent one (no whitelist).
+// NestingKey (declaring class + navigation) and ResolvedTargetClassFqn are filled in by
 // NestedFilterResolver; the target stays null when resolution reported a diagnostic.
 internal sealed record NestedMappingModel(
     string NavigationPropertyName,
@@ -26,4 +27,5 @@ internal sealed record NestedMappingModel(
     LocationInfo? ExplicitFilterClassLocation = null,
     int MaxDepth = 0,
     string? NestingKey = null,
-    string? ResolvedTargetClassFqn = null);
+    string? ResolvedTargetClassFqn = null,
+    bool HasOnly = false);

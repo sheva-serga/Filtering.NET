@@ -105,7 +105,7 @@ internal static class PropertyMappingExtractor
         var model = new PropertyDeclarationModel(
             PropertyName: propertyName!,
             PropertyClrType: propertySymbol.Type.ToDisplayString(),
-            PropertyClrTypeKey: UnwrapNullable(propertySymbol.Type).ToDisplayString(),
+            PropertyClrTypeKey: UnwrapNullable(propertySymbol.Type).WithNullableAnnotation(NullableAnnotation.NotAnnotated).ToDisplayString(),
             IsNullableValueType: propertySymbol.Type is INamedTypeSymbol { ConstructedFrom.SpecialType: SpecialType.System_Nullable_T },
             ExplicitProfileFullName: explicitProfile?.ToDisplayString(),
             ExplicitProfileLocation: LocationInfo.FromLocation(explicitProfile?.Locations.FirstOrDefault()),

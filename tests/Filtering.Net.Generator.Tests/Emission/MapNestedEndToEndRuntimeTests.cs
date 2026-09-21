@@ -107,6 +107,45 @@ public class MapNestedEndToEndRuntimeTests
         keptResult.IsValid.Should().BeTrue();
     }
 
+    private const string EmptyOnlySource = """
+        using Filtering.Net;
+        namespace Sample;
+        public class Department { public string Name { get; set; } = ""; }
+        public class User { public string Login { get; set; } = ""; public Department Department { get; set; } = new(); }
+        [Map(nameof(Department.Name))]
+        [GenerateFilter<Department>] public partial class DepartmentFilter
+        {
+        }
+        [GenerateFilter<User>]
+        [Map(nameof(User.Login))]
+        [MapNested(nameof(User.Department), Only = new string[0])]
+        public partial class UserFilter
+        {
+        }
+        """;
+
+    [Fact]
+    public void Filter_ExplicitlyEmptyOnly_LiftsNoNestedPropertyLikeTheRuntimeLiftInto()
+    {
+        // Arrange — an empty Only emitted as null would read as "no whitelist" and lift everything.
+        var assembly = RuntimeLoader.LoadGeneratedAssembly(EmptyOnlySource);
+        var userFilterType = assembly.GetType("Sample.UserFilter")!;
+        var instance = Activator.CreateInstance(userFilterType)!;
+        var validateNodeMethod = userFilterType.GetMethods()
+            .First(m => m.Name == "Validate" && m.GetParameters().Length == 1
+                        && m.GetParameters()[0].ParameterType == typeof(FilterNode));
+
+        // Act
+        var nestedResult = (FilterValidationResult)validateNodeMethod.Invoke(instance,
+            [new FilterLeaf("department.name", "eq", JsonDocument.Parse("\"Sales\"").RootElement)])!;
+        var ownResult = (FilterValidationResult)validateNodeMethod.Invoke(instance,
+            [new FilterLeaf("login", "eq", JsonDocument.Parse("\"ann\"").RootElement)])!;
+
+        // Assert
+        nestedResult.Errors.Should().ContainSingle(error => error.Code == FilterValidationCode.UnknownField);
+        ownResult.IsValid.Should().BeTrue();
+    }
+
     private const string NullableNavigationSource = """
         using Filtering.Net;
         namespace Sample;

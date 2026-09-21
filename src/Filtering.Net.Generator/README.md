@@ -91,7 +91,7 @@ Then `[Map(nameof(User.Name), Profile = typeof(StringFilterPlus))]` and the new 
 | FN0018 | Error | Named property doesn't exist, isn't a reference type, or is a primitive/value type. |
 | FN0019 | Error | Named navigation is a collection type; collection navigations are deferred to a future version. |
 | FN0020 | Error | The `[GenerateFilter]` partial declares a base class; the generated part derives from `FilterDefinition<TEntity>`. |
-| FN0021 | Error | `[MapNested]` declares a `MaxDepth` outside 1–64. |
+| FN0021 | Error | `[MapNested]` declares a negative `MaxDepth` or one above 64 (`0`, the default, means unbounded). |
 | FN0022 | Error | `[Map(Profile = typeof(X))]` references a type that is not marked with `[FilterProfile<TColumn>]`. |
 | FN0023 | Error | `[PropertyMap]` method has a signature the generated `CreateSchema` cannot call. |
 | FN0024 | Error | A dotted `[Map]` path reads a member through a `Nullable<T>` segment. |

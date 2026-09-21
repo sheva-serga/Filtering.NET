@@ -15,11 +15,11 @@ public enum FilterValidationCode
     EmptyInArray,
     /// <summary>Interceptor threw FilterValidationException.</summary>
     InterceptorRejected,
-    /// <summary>Sort field not configured as sortable.</summary>
+    /// <summary>Sort item names no field, or names one that is not configured as sortable.</summary>
     NotSortable,
     /// <summary>Sort direction value not Asc/Desc.</summary>
     InvalidSortDirection,
-    /// <summary>page &lt; 1.</summary>
+    /// <summary>page &lt; 1, or a page so large that the rows to skip overflow an <see cref="int"/>.</summary>
     PageInvalid,
     /// <summary>pageSize &gt; MaxPageSize.</summary>
     PageSizeTooLarge,
@@ -29,8 +29,8 @@ public enum FilterValidationCode
     NestingTooDeep,
     /// <summary>Total leaf count exceeds MaxLeafConditions.</summary>
     TooManyConditions,
-    /// <summary>and: [] or or: [] group with zero children.</summary>
+    /// <summary>A group (and, or, not) with zero children.</summary>
     GroupEmpty,
-    /// <summary>Node the engine cannot interpret: a not group without exactly one child, a combinator outside <see cref="LogicalOp"/>, or an unrecognized <see cref="FilterNode"/> subtype.</summary>
+    /// <summary>Node the engine cannot interpret: a not group with more than one child, a combinator outside <see cref="LogicalOp"/>, or an unrecognized <see cref="FilterNode"/> subtype.</summary>
     InvalidNodeShape
 }

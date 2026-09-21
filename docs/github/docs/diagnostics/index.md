@@ -31,7 +31,7 @@ Filtering.Net ships 37 compile-time analyzer rules — 29 errors (`FN0001`–`FN
 | FN0018 | NestedNavigationInvalid | Named property doesn't exist, isn't a reference type, or is a primitive/value type. |
 | FN0019 | NestedCollectionUnsupported | Named navigation is a collection type; collection navigations are deferred to a future version. |
 | FN0020 | FilterClassHasBaseType | The `[GenerateFilter]` partial declares a base class. The generated part derives from `FilterDefinition<TEntity>`, so the class cannot have another base. |
-| FN0021 | NestedMaxDepthInvalid | `[MapNested]` declares a `MaxDepth` outside 1–64. Use a value in range to bound the nesting, or omit it. |
+| FN0021 | NestedMaxDepthInvalid | `[MapNested]` declares a negative `MaxDepth` or one above 64. Use 1–64 to bound the nesting, or omit it (the default `0` means unbounded). |
 | FN0022 | ProfileTypeNotAProfile | `[Map(Profile = typeof(X))]` references a type not marked with `[FilterProfile<TColumn>]`. |
 | FN0023 | PropertyMapSignatureInvalid | `[PropertyMap]` method is not `static`, does not take exactly one `FilterRuleBuilder<TEntity, TValue>`, or does not return `FilterRule<TEntity, TValue>`. |
 | FN0024 | NullableValueTypeInPath | A dotted `[Map]` path reads a member through a `Nullable<T>` segment (e.g. `"Created.Year"` on a `DateTime?`), which does not expose it. |

@@ -74,4 +74,50 @@ public class Fn0004Tests
         // Assert
         DiagnosticTestHelpers.AssertDiagnosticHasAdditionalLocations(source, "FN0004", expectedAdditionalCount: 0);
     }
+
+    [Fact]
+    public void StringFilterOnNullableReferenceStringProperty_DoesNotFireFN0004()
+    {
+        // Arrange
+        var source = """
+            #nullable enable
+            using Filtering.Net;
+            namespace TestNs;
+            public class User { public string? MiddleName { get; set; } }
+            [GenerateFilter<User>]
+            [Map(nameof(User.MiddleName), Profile = typeof(StringFilter))]
+            public partial class UserFilter
+            {
+            }
+            """;
+
+        // Act
+        // (no separate act step — AssertNoDiagnostic is the verification)
+
+        // Assert
+        DiagnosticTestHelpers.AssertNoDiagnostic(source, "FN0004");
+    }
+
+    [Fact]
+    public void InferredProfileOnNullableReferenceStringProperty_DoesNotFireFN0006()
+    {
+        // Arrange
+        var source = """
+            #nullable enable
+            using Filtering.Net;
+            namespace TestNs;
+            public class User { public string? MiddleName { get; set; } }
+            [GenerateFilter<User>]
+            [Map(nameof(User.MiddleName))]
+            public partial class UserFilter
+            {
+            }
+            """;
+
+        // Act
+        // (no separate act step — AssertNoDiagnostic is the verification)
+
+        // Assert
+        DiagnosticTestHelpers.AssertNoDiagnostic(source, "FN0006");
+    }
 }

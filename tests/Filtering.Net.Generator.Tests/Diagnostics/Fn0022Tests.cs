@@ -101,4 +101,40 @@ public class Fn0022Tests
         // Assert
         DiagnosticTestHelpers.AssertNoDiagnostic(source, "FN0022");
     }
+
+    [Fact]
+    public void ProfileNestedTwoLevelsDeep_DoesNotFireFN0022()
+    {
+        // Arrange — the profile index has to descend through every level of type nesting.
+        var source = """
+            using System;
+            using System.Linq.Expressions;
+            using Filtering.Net;
+            namespace TestNs;
+            public class User { public string Name { get; set; } = ""; }
+            public static class Outer
+            {
+                public static class Inner
+                {
+                    [FilterProfile<string>(BasedOn = typeof(StringFilter))]
+                    public static class TextProfile
+                    {
+                        [FilterOperator("isBlank")]
+                        public static Expression<Func<string, bool>> IsBlank => column => column == "";
+                    }
+                }
+            }
+            [GenerateFilter<User>]
+            [Map(nameof(User.Name), Profile = typeof(Outer.Inner.TextProfile))]
+            public partial class UserFilter
+            {
+            }
+            """;
+
+        // Act
+        // (no separate act step — AssertNoDiagnostic is the verification)
+
+        // Assert
+        DiagnosticTestHelpers.AssertNoDiagnostic(source, "FN0022");
+    }
 }

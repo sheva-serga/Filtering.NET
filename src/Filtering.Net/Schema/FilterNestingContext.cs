@@ -3,6 +3,9 @@ namespace Filtering.Net;
 /// <summary>The chain of nestings a schema is currently being built through. It lets circular filter graphs stop at each nesting's <c>MaxDepth</c> and turns an unbounded cycle into a configuration error instead of endless recursion.</summary>
 public sealed class FilterNestingContext
 {
+    // Same ceiling the generator enforces (FN0021): schema construction recurses once per level.
+    private const int MaxSupportedNestingDepth = 64;
+
     private readonly NestingStep[] _path;
 
     private FilterNestingContext(NestingStep[] path)
@@ -18,8 +21,8 @@ public sealed class FilterNestingContext
     {
         if (string.IsNullOrWhiteSpace(nestingKey))
             throw new FilterConfigurationException("A nesting key must be a non-empty string.");
-        if (maxDepth < 0)
-            throw new FilterConfigurationException($"Nesting '{nestingKey}' has MaxDepth {maxDepth}; it must be zero (unbounded) or positive.");
+        if (maxDepth < 0 || maxDepth > MaxSupportedNestingDepth)
+            throw new FilterConfigurationException($"Nesting '{nestingKey}' has MaxDepth {maxDepth}; it must be zero (unbounded) or between 1 and {MaxSupportedNestingDepth}.");
 
         var isBounded = maxDepth > 0;
         if (isBounded)

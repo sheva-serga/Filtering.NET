@@ -53,6 +53,7 @@ internal static class MapNestedExtractor
             var prefixArgumentPresent = false;
             IReadOnlyList<string> only = Array.Empty<string>();
             IReadOnlyList<string> except = Array.Empty<string>();
+            var hasOnly = false;
             var disableSorting = false;
             var maxDepth = 0;
 
@@ -65,7 +66,11 @@ internal static class MapNestedExtractor
                         prefix = namedArgument.Value.Value as string;
                         break;
                     case "Only":
-                        if (!namedArgument.Value.IsNull) only = ToStringList(namedArgument.Value.Values);
+                        if (!namedArgument.Value.IsNull)
+                        {
+                            only = ToStringList(namedArgument.Value.Values);
+                            hasOnly = true;
+                        }
                         break;
                     case "Except":
                         if (!namedArgument.Value.IsNull) except = ToStringList(namedArgument.Value.Values);
@@ -109,6 +114,7 @@ internal static class MapNestedExtractor
                 Except: new EquatableList<string>(except),
                 DisableSorting: disableSorting,
                 AttributeLocation: LocationInfo.FromLocation(attributeLocation),
+                HasOnly: hasOnly,
                 NavigationKind: navigation.Kind,
                 NavigationTypeFullName: navigation.TypeFullName,
                 NavigationLocation: navigation.DeclarationLocation,

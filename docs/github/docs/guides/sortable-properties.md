@@ -36,7 +36,7 @@ A consumer requesting `{ "sort": [{ "field": "createdAt" }, { "field": "id", "di
 
 - Only one `[Map]` per property is allowed (regardless of `Sortable` setting). Duplicates trigger `FN0001 DuplicateMapping`.
 - Properties with sortable-looking CLR types (numbers, dates) that are not marked `Sortable = true` raise `FN1002` as a friendly nudge.
-- `dir` is a numeric enum on the wire (`0` = ascending, `1` = descending). No string-enum converter is registered, so `"dir": "asc"` does not bind — the member stays null and the property's `DefaultSortDirection` is used instead. A number outside the enum fails validation with `InvalidSortDirection` at `sort[<index>].dir`.
+- `dir` is a numeric enum on the wire (`0` = ascending, `1` = descending). No string-enum converter is registered, so `"dir": "asc"` is a `JsonException` during deserialization — in ASP.NET Core the request is rejected as a 400 by model binding before Filtering.Net sees it. A number outside the enum fails validation with `InvalidSortDirection` at `sort[<index>].dir`.
 - A sort item with a missing or empty `field` fails validation with `NotSortable`.
 
 ## See also

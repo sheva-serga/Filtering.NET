@@ -17,11 +17,22 @@ internal static class SymbolEnumerator
             }
             else if (member is INamedTypeSymbol type)
             {
-                yield return type;
-                foreach (var nestedType in type.GetTypeMembers())
+                foreach (var typeOrNestedType in EnumerateWithNestedTypes(type))
                 {
-                    yield return nestedType;
+                    yield return typeOrNestedType;
                 }
+            }
+        }
+    }
+
+    private static IEnumerable<INamedTypeSymbol> EnumerateWithNestedTypes(INamedTypeSymbol type)
+    {
+        yield return type;
+        foreach (var nestedType in type.GetTypeMembers())
+        {
+            foreach (var typeOrNestedType in EnumerateWithNestedTypes(nestedType))
+            {
+                yield return typeOrNestedType;
             }
         }
     }

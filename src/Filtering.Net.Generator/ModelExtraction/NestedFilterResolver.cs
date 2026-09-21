@@ -431,7 +431,7 @@ internal static class NestedFilterResolver
         {
             foreach (var mapping in target.Properties)
             {
-                if (!IsPathAllowed(mapping.PropertyName, originalNested.Only, originalNested.Except)) continue;
+                if (!IsPathAllowed(mapping.PropertyName, originalNested.HasOnly, originalNested.Only, originalNested.Except)) continue;
 
                 var splicedPropertyName = accumulatedClrPath + "." + mapping.PropertyName;
                 var childWireKey = string.IsNullOrEmpty(mapping.Alias) ? mapping.PropertyName : mapping.Alias!;
@@ -459,7 +459,7 @@ internal static class NestedFilterResolver
             foreach (var propertyOverride in target.Overrides)
             {
                 if (propertyOverride.BuilderTypeFqn is null) continue;
-                if (!IsPathAllowed(propertyOverride.PropertyName, originalNested.Only, originalNested.Except)) continue;
+                if (!IsPathAllowed(propertyOverride.PropertyName, originalNested.HasOnly, originalNested.Only, originalNested.Except)) continue;
                 mappingSources.Add(new MappingSource(
                     MappingSourceKind.Spliced,
                     accumulatedClrPath + "." + propertyOverride.PropertyName,
@@ -510,9 +510,9 @@ internal static class NestedFilterResolver
     private static string ShortNameOf(string classFqn) =>
         classFqn.Substring(classFqn.LastIndexOf('.') + 1);
 
-    private static bool IsPathAllowed(string relativePath, EquatableList<string> only, EquatableList<string> except)
+    private static bool IsPathAllowed(string relativePath, bool hasOnly, EquatableList<string> only, EquatableList<string> except)
     {
-        if (only.Count > 0)
+        if (hasOnly)
         {
             var matched = false;
             foreach (var allowed in only)

@@ -197,6 +197,30 @@ public class PropertyMapOverrideEmissionTests
         generatedFileDiagnostics.Should().BeEmpty();
     }
 
+    private const string NullableBuilderParameterSource = """
+        #nullable enable
+        using Filtering.Net;
+        namespace Sample;
+        public class User { public string FirstName { get; set; } = ""; }
+        [GenerateFilter<User>]
+        public partial class UserFilter
+        {
+            [PropertyMap("FullName")]
+            public static FilterRule<User, string> MapFullName(FilterRuleBuilder<User, string>? builder) =>
+                builder!.For(user => user.FirstName).Operator("startsWith", (string column) => column.StartsWith("A"));
+        }
+        """;
+
+    [Fact]
+    public void NullableAnnotatedBuilderParameter_Compiles()
+    {
+        // Act
+        // (no separate act step — CompileVerifier.AssertCompilesCleanly is the verification)
+
+        // Assert — a '?' carried into the emitted `new FilterRuleBuilder<...>?()` is CS8628.
+        CompileVerifier.AssertCompilesCleanly(NullableBuilderParameterSource);
+    }
+
     private static object ActivateFilterWithResolver(Assembly assembly, string filterTypeName, IJsonTypeInfoResolver resolver)
     {
         var filterType = assembly.GetType(filterTypeName)!;

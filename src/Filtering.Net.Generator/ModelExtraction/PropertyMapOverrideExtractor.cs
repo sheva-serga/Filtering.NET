@@ -26,7 +26,7 @@ internal static class PropertyMapOverrideExtractor
             PropertyName: propertyName,
             MethodName: methodSymbol.Name,
             BuilderTypeFqn: signatureProblem is null
-                ? TypeNameFormatter.FormatWithNullableAnnotations(methodSymbol.Parameters[0].Type)
+                ? TypeNameFormatter.FormatWithNullableAnnotations(methodSymbol.Parameters[0].Type.WithNullableAnnotation(NullableAnnotation.NotAnnotated))
                 : null,
             Operators: new EquatableList<OverrideOperatorModel>(operators),
             HasTypedValueOperator: hasTypedValueOperator,

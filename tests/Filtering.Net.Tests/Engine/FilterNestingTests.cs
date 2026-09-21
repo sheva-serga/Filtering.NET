@@ -132,4 +132,17 @@ public class FilterNestingTests
         // Assert
         enterWithNegativeDepth.Should().Throw<FilterConfigurationException>();
     }
+
+    [Fact]
+    public void AddNested_MaxDepthAboveTheSupportedCeiling_ThrowsConfigurationException()
+    {
+        // Act
+        var enterWithHugeDepth = () => new FilterSchemaBuilder<Person>(new FilterSettings())
+            .AddNested(FilterNestingContext.Root, "PersonFilter.MapDepartment", maxDepth: 65,
+                _ => new FilterSchemaBuilder<Department>(new FilterSettings()).Build(),
+                person => person.Department, "Department");
+
+        // Assert
+        enterWithHugeDepth.Should().Throw<FilterConfigurationException>().WithMessage("*between 1 and 64*");
+    }
 }
