@@ -1,16 +1,16 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <!-- netstandard2.0 keeps the package loadable everywhere; net8.0 is what ships DateOnlyFilter / TimeOnlyFilter,
+    <!-- netstandard2.0 keeps the package loadable everywhere; the net8.0+ assets are what ship DateOnlyFilter / TimeOnlyFilter,
          whose #if NET6_0_OR_GREATER bodies need DateOnly and TimeOnly from the BCL. -->
-    <TargetFrameworks>netstandard2.0;net8.0</TargetFrameworks>
+    <TargetFrameworks>netstandard2.0;net8.0;net9.0;net10.0</TargetFrameworks>
     <PackageId>Filtering.Net</PackageId>
     <Title>Filtering.Net — Source-Generated IQueryable Filtering</Title>
     <Description>Type-safe filter, sort, and pagination for IQueryable and EF Core. A source-generated schema over a generic engine, with no reflection over your types.</Description>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
   <ItemGroup>
-    <!-- Both are netstandard2.0-only: net8.0 supplies System.Text.Json in the shared framework (a package
-         reference there is pruned with NU1510) and needs no PolySharp polyfills.
+    <!-- Both are netstandard2.0-only: net8.0 and later supply System.Text.Json in the shared framework (a package
+         reference there is pruned with NU1510) and need no PolySharp polyfills.
          8.0.5 patches GHSA-8g4q-xg66-9fp4 and GHSA-hh2w-p6rv-4g7w (plan specified 8.0.0; bumped to remove vulnerability under TreatWarningsAsErrors). -->
     <PackageReference Include="System.Text.Json" Version="8.0.5" Condition="'$(TargetFramework)' == 'netstandard2.0'" />
     <PackageReference Include="PolySharp" Version="1.14.1" PrivateAssets="all" Condition="'$(TargetFramework)' == 'netstandard2.0'" />

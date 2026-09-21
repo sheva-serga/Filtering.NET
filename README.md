@@ -89,7 +89,7 @@ A request body looks like:
 
 | Package | Targets | What's in it |
 |---------|---------|--------------|
-| `Filtering.Net` | `netstandard2.0`, `net8.0` | Runtime types: `FilterRequest`, `FilterNode`, `IFilterDefinition<T>`, the `FilterDefinition<T>` engine, `FilterValidationException`, `[GenerateFilter<T>]`, `[Map]`, `[FilterProfile]`, …, plus the `Apply` `IQueryable` extension. `DateOnlyFilter` / `TimeOnlyFilter` ship in the `net8.0` asset only. |
+| `Filtering.Net` | `netstandard2.0`, `net8.0`, `net9.0`, `net10.0` | Runtime types: `FilterRequest`, `FilterNode`, `IFilterDefinition<T>`, the `FilterDefinition<T>` engine, `FilterValidationException`, `[GenerateFilter<T>]`, `[Map]`, `[FilterProfile]`, …, plus the `Apply` `IQueryable` extension. `DateOnlyFilter` / `TimeOnlyFilter` are absent from the `netstandard2.0` asset. |
 | `Filtering.Net.Generator` | `netstandard2.0` | Roslyn incremental source generator + 37-rule analyzer (`FN0001`–`FN0029` errors, `FN1001`–`FN1008` warnings). Templates are source-embedded Scriban; the analyzer DLL ships with no runtime NuGet dependencies. Consumed as an analyzer reference. |
 | `Filtering.Net.EntityFrameworkCore` | `net8.0`, `net9.0`, `net10.0` | EF Core async helpers: `IQueryable<T>.ApplyPagedAsync(...)` and `PageResult<T>`. |
 

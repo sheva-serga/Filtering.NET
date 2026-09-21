@@ -6,7 +6,7 @@ Filter / sort / page library for `IQueryable<T>` and EF Core. Consumers declare 
 
 | Path | Role |
 |------|------|
-| `src/Filtering.Net/` | Runtime: attributes, request types, the `FilterDefinition<TEntity>` engine with `FilterSchema` / `FilterProperty` / `FilterProfile` / `FilterOperator`, built-in profiles, `IQueryable.Apply(...)` extension. Multi-targets `netstandard2.0`/`net8.0`; `DateOnlyFilter` / `TimeOnlyFilter` are net8.0-only. |
+| `src/Filtering.Net/` | Runtime: attributes, request types, the `FilterDefinition<TEntity>` engine with `FilterSchema` / `FilterProperty` / `FilterProfile` / `FilterOperator`, built-in profiles, `IQueryable.Apply(...)` extension. Multi-targets `netstandard2.0`/`net8.0`/`net9.0`/`net10.0`; `DateOnlyFilter` / `TimeOnlyFilter` are absent from the `netstandard2.0` asset. |
 | `src/Filtering.Net.Generator/` | Roslyn incremental source generator + analyzer. Templates live as embedded `.scriban` resources under `Emission/Templates/`. `netstandard2.0`. |
 | `src/Filtering.Net.EntityFrameworkCore/` | EF async helpers (`ApplyPagedAsync`, `PageResult<T>`). Multi-targets `net8.0`/`net9.0`/`net10.0`. |
 | `samples/UserManagement.WebApi/` | ASP.NET Core 9 + EF Core 9 + PostgreSQL end-to-end demo. |

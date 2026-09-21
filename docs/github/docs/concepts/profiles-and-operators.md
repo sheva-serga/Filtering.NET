@@ -24,7 +24,7 @@ Filtering.Net ships profiles for every common scalar in `src/Filtering.Net/Profi
 - **`DateTimeFilter`** and the `Temporal/*` profiles for `DateTimeOffset`, `DateOnly`, and `TimeOnly` — `eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `isNull`.
 - **Auto-emitted `<EnumName>Filter`** — for every enum referenced by a `[GenerateFilter<T>]` graph, the generator emits a `[FilterProfile<TEnum>]` static class with `eq`, `ne`, `in`, `isNull`.
 
-There is no `between` and no `notNull`; a two-value operator is a [`[PropertyMap]` override](../guides/property-map-overrides.md), and "not null" is a `not` group wrapped around an `isNull` leaf. `DateOnlyFilter` and `TimeOnlyFilter` ship in the package's `net8.0` asset only — `DateOnly` and `TimeOnly` do not exist under `netstandard2.0`.
+There is no `between` and no `notNull`; a two-value operator is a [`[PropertyMap]` override](../guides/property-map-overrides.md), and "not null" is a `not` group wrapped around an `isNull` leaf. `DateOnlyFilter` and `TimeOnlyFilter` ship in the package's `net8.0`, `net9.0` and `net10.0` assets only — `DateOnly` and `TimeOnly` do not exist under `netstandard2.0`.
 
 The emitted SQL matches what you would write by hand: `LIKE` for `contains` / `startsWith` / `endsWith`, `IN` for `in`, `IS NULL` for `isNull`.
 

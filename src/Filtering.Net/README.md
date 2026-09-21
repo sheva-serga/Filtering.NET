@@ -15,7 +15,7 @@ dotnet add package Filtering.Net.Generator   # the source generator (compile-tim
 
 If you only install `Filtering.Net`, you get the request types and the `IQueryable.Apply` extension, but you'll need to write `IFilterDefinition<T>` implementations by hand. Add the generator package to skip that work.
 
-The package targets `netstandard2.0` and `net8.0`. `DateOnlyFilter` and `TimeOnlyFilter` ship in the `net8.0` asset only, because `DateOnly` / `TimeOnly` do not exist in `netstandard2.0`.
+The package targets `netstandard2.0`, `net8.0`, `net9.0` and `net10.0`. `DateOnlyFilter` and `TimeOnlyFilter` are absent from the `netstandard2.0` asset, because `DateOnly` / `TimeOnly` do not exist in `netstandard2.0`.
 
 ## Quickstart
 

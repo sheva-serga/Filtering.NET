@@ -30,7 +30,7 @@ Always, unless you have a reason to opt out. Letting the resolver pick is the lo
 
 Nullable reference and value-typed columns share the underlying type's profile — `string?` resolves to `StringFilter`, `int?` resolves to `Int32Filter`. The `isNull` operator uses the nullable form internally.
 
-`sbyte`, `ushort`, `uint`, and `ulong` have no built-in profile: mapping one of those without `Profile = typeof(...)` raises `FN0006`. `DateOnlyFilter` and `TimeOnlyFilter` live in the package's `net8.0` asset only, so a project consuming the `netstandard2.0` asset does not see them.
+`sbyte`, `ushort`, `uint`, and `ulong` have no built-in profile: mapping one of those without `Profile = typeof(...)` raises `FN0006`. `DateOnlyFilter` and `TimeOnlyFilter` live in the package's `net8.0`, `net9.0` and `net10.0` assets only, so a project consuming the `netstandard2.0` asset does not see them.
 
 ## Variations
 

@@ -2,7 +2,7 @@
 
 The runtime: request types, profiles, and the filter engine. Generated filter classes derive from `FilterDefinition<TEntity>` and only supply a schema. The engine composes predicates per request from typed, compiler-checked lambdas. No reflection over consumer types, no `MakeGenericMethod`, no `Compile()`.
 
-**Target:** `netstandard2.0;net8.0`. The netstandard2.0 asset is polyfilled via `PolySharp` and carries the `System.Text.Json` package reference; the net8.0 asset needs neither and is the only one that compiles `Profiles/Temporal/DateOnlyFilter.cs` / `TimeOnlyFilter.cs` (both `#if NET6_0_OR_GREATER`). Ships as the `Filtering.Net` NuGet package.
+**Target:** `netstandard2.0;net8.0;net9.0;net10.0`. The netstandard2.0 asset is polyfilled via `PolySharp` and carries the `System.Text.Json` package reference; the net8.0+ assets need neither and are the only ones that compile `Profiles/Temporal/DateOnlyFilter.cs` / `TimeOnlyFilter.cs` (both `#if NET6_0_OR_GREATER`). Ships as the `Filtering.Net` NuGet package.
 
 ## What lives here
 

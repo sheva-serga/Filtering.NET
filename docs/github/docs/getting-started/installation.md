@@ -21,11 +21,11 @@ dotnet add package Filtering.Net.EntityFrameworkCore
 
 | Package | Targets |
 |---------|---------|
-| `Filtering.Net` | `netstandard2.0`, `net8.0` |
+| `Filtering.Net` | `netstandard2.0`, `net8.0`, `net9.0`, `net10.0` |
 | `Filtering.Net.Generator` | `netstandard2.0` (analyzer-only, no runtime DLL) |
 | `Filtering.Net.EntityFrameworkCore` | `net8.0`, `net9.0`, `net10.0` |
 
-The runtime keeps a `netstandard2.0` asset so it can be loaded inside the analyzer process and on every consumer TFM; that asset is polyfilled with PolySharp and carries a `System.Text.Json` package reference. The `net8.0` asset needs neither, and it is the one that ships `DateOnlyFilter` and `TimeOnlyFilter` — `DateOnly` and `TimeOnly` do not exist under `netstandard2.0`, so a project resolving the `netstandard2.0` asset cannot map a `DateOnly` / `TimeOnly` column.
+The runtime keeps a `netstandard2.0` asset so it can be loaded inside the analyzer process and on every consumer TFM; that asset is polyfilled with PolySharp and carries a `System.Text.Json` package reference. The `net8.0`, `net9.0` and `net10.0` assets need neither, and they are the ones that ship `DateOnlyFilter` and `TimeOnlyFilter` — `DateOnly` and `TimeOnly` do not exist under `netstandard2.0`, so a project resolving the `netstandard2.0` asset cannot map a `DateOnly` / `TimeOnly` column.
 
 EF Core 8.0.13 / 9.0.5 / 10.0.0 floors are pinned per TFM in the EF helpers package (the 8.0 / 9.0 patches close GHSA-qj66-m88j-hmgj on transitive `Microsoft.Extensions.Caching.Memory`).
 
