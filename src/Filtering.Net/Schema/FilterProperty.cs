@@ -1,6 +1,7 @@
 #pragma warning disable IDE0130 // Namespace does not match folder structure
 
 using System.Linq.Expressions;
+using System.Text.Json;
 
 namespace Filtering.Net;
 
@@ -44,11 +45,12 @@ public abstract class FilterProperty<TEntity>
     // True for properties that arrived through a nested filter; Only / Except of an outer nesting skip them.
     internal bool IsLifted { get; }
 
-    internal abstract bool RequiresSerializerOptions { get; }
+    // Names of this property's operators whose value is deserialized through JsonSerializerOptions; empty when none.
+    internal abstract IReadOnlyList<string> TypedValueOperators { get; }
 
-    internal abstract void ValidateLeaf(FilterLeaf leaf, string path, List<FilterValidationError> errors, FilterValueContext valueContext);
+    internal abstract void ValidateLeaf(FilterLeaf leaf, string path, List<FilterValidationError> errors, JsonSerializerOptions? serializerOptions);
 
-    internal abstract Expression<Func<TEntity, bool>> BuildPredicate(FilterLeaf leaf, FilterValueContext valueContext);
+    internal abstract Expression<Func<TEntity, bool>> BuildPredicate(FilterLeaf leaf, JsonSerializerOptions? serializerOptions);
 
     internal abstract IOrderedQueryable<TEntity> ApplySort(IQueryable<TEntity> query, IOrderedQueryable<TEntity>? orderedQuery, SortDir direction);
 
@@ -77,7 +79,7 @@ public static class FilterProperty
             configuration => new ColumnFilterProperty<TEntity, TColumn, TColumn>(configuration, accessor, nullableSupport: null));
     }
 
-    /// <summary>Maps a nullable value-type property onto a profile declared over the underlying type; comparisons are lifted as C# lifts them.</summary>
+    /// <summary>Maps a nullable value-type property onto a profile declared over the underlying type; comparisons are lifted as C# lifts them, and an operator that reads the column outside a comparison (for example <c>column.Year == value</c>) only sees rows that have a value.</summary>
     public static FilterPropertyBuilder<TEntity, TColumn> MapNullable<TEntity, TColumn>(
         string field,
         Expression<Func<TEntity, TColumn?>> accessor,

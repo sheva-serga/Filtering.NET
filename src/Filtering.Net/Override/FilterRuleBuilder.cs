@@ -10,10 +10,13 @@ public sealed class FilterRuleBuilder<TEntity, TValue>
     private readonly List<FilterOperator<TValue>> _operators = [];
     private Expression<Func<TEntity, TValue>>? _propertyAccessor;
 
-    /// <summary>Declares the accessor the rule's operators apply to.</summary>
+    /// <summary>Declares the accessor the rule's operators apply to. Calling it a second time throws <see cref="FilterConfigurationException"/> rather than silently re-pointing the operators declared so far.</summary>
     public FilterRuleBuilder<TEntity, TValue> For(Expression<Func<TEntity, TValue>> propertyAccessor)
     {
-        _propertyAccessor = propertyAccessor ?? throw new ArgumentNullException(nameof(propertyAccessor));
+        if (propertyAccessor is null) throw new ArgumentNullException(nameof(propertyAccessor));
+        if (_propertyAccessor is not null)
+            throw new FilterConfigurationException("A [PropertyMap] rule calls For(...) more than once; declare exactly one accessor.");
+        _propertyAccessor = propertyAccessor;
         return this;
     }
 

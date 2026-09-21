@@ -1,6 +1,10 @@
+#if NET6_0_OR_GREATER
+using System.Globalization;
+using System.Linq.Expressions;
+using System.Text.Json;
+
 namespace Filtering.Net;
 
-#if NET6_0_OR_GREATER
 /// <summary>Built-in profile for <see cref="TimeOnly"/> properties.</summary>
 [FilterProfile<global::System.TimeOnly>]
 public static class TimeOnlyFilter

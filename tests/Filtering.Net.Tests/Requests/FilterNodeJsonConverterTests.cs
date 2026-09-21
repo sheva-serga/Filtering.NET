@@ -28,6 +28,21 @@ public class FilterNodeJsonConverterTests
     }
 
     [Fact]
+    public void Read_LeafWithoutValueMember_ProducesLeafWithUndefinedValue()
+    {
+        // Arrange — a unary operator is normally sent without a value at all.
+        var json = """{ "field": "score", "op": "isNull" }""";
+
+        // Act
+        var node = JsonSerializer.Deserialize<FilterNode>(json, Options);
+        var rewritten = JsonSerializer.Serialize(node, Options);
+
+        // Assert
+        node.Should().BeOfType<FilterLeaf>().Which.Value.ValueKind.Should().Be(JsonValueKind.Undefined);
+        rewritten.Should().Contain("\"value\":null");
+    }
+
+    [Fact]
     public void Read_AndGroup_ProducesFilterGroupAnd()
     {
         // Arrange

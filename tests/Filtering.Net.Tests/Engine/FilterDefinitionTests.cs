@@ -57,6 +57,34 @@ public class FilterDefinitionTests
     }
 
     [Fact]
+    public void Validate_ArrayOperatorWithNonArrayValue_ReportsInvalidValueTypeAtValuePath()
+    {
+        // Arrange
+        var definition = StandardDefinition();
+
+        // Act
+        var validationResult = definition.Validate(Leaf("Age", "in", "10"));
+
+        // Assert — without this the request passes validation and blows up as a 500 in ApplyFilter.
+        var validationError = validationResult.Errors.Should().ContainSingle().Subject;
+        validationError.Path.Should().Be("where.value");
+        validationError.Code.Should().Be(FilterValidationCode.InvalidValueType);
+    }
+
+    [Fact]
+    public void Validate_ArrayOperatorWithJsonArray_ReportsNoError()
+    {
+        // Arrange
+        var definition = StandardDefinition();
+
+        // Act
+        var validationResult = definition.Validate(Leaf("Age", "in", "[25, 41]"));
+
+        // Assert
+        validationResult.IsValid.Should().BeTrue();
+    }
+
+    [Fact]
     public void Validate_UnaryOperatorWithValue_ReportsNoValueError()
     {
         // Arrange
@@ -84,7 +112,68 @@ public class FilterDefinitionTests
     }
 
     [Fact]
-    public void Validate_NestingBeyondLimit_ReportsNestingTooDeepOnce()
+    public void Validate_NotGroupWithTwoChildren_ReportsInvalidNodeShape()
+    {
+        // Arrange
+        var definition = StandardDefinition();
+
+        // Act
+        var validationResult = definition.Validate(Group(LogicalOp.Not, Leaf("Age", "eq", "1"), Leaf("Age", "eq", "2")));
+
+        // Assert
+        var validationError = validationResult.Errors.Should().ContainSingle().Subject;
+        validationError.Path.Should().Be("where");
+        validationError.Code.Should().Be(FilterValidationCode.InvalidNodeShape);
+        validationError.Message.Should().Be("A 'not' group requires exactly one child, got 2.");
+    }
+
+    [Fact]
+    public void Validate_UndefinedCombinator_ReportsInvalidNodeShape()
+    {
+        // Arrange
+        var definition = StandardDefinition();
+
+        // Act
+        var validationResult = definition.Validate(Group((LogicalOp)7, Leaf("Age", "eq", "1")));
+
+        // Assert
+        var validationError = validationResult.Errors.Should().ContainSingle().Subject;
+        validationError.Path.Should().Be("where");
+        validationError.Code.Should().Be(FilterValidationCode.InvalidNodeShape);
+        validationError.Message.Should().Be("Group combinator '7' is not And, Or, or Not.");
+    }
+
+    [Fact]
+    public void Validate_UnknownNodeSubtype_ReportsInvalidNodeShape()
+    {
+        // Arrange
+        var definition = StandardDefinition();
+
+        // Act
+        var validationResult = definition.Validate(new UnsupportedNode());
+
+        // Assert
+        var validationError = validationResult.Errors.Should().ContainSingle().Subject;
+        validationError.Path.Should().Be("where");
+        validationError.Code.Should().Be(FilterValidationCode.InvalidNodeShape);
+    }
+
+    [Fact]
+    public void Validate_LeafWithNullField_ReportsUnknownField()
+    {
+        // Arrange
+        var definition = StandardDefinition();
+
+        // Act
+        var validationResult = definition.Validate(new FilterLeaf(null!, "eq", default));
+
+        // Assert
+        validationResult.Errors.Should().ContainSingle()
+            .Which.Code.Should().Be(FilterValidationCode.UnknownField);
+    }
+
+    [Fact]
+    public void Validate_NestingBeyondLimit_ReportsNestingTooDeepPerOverDeepNode()
     {
         // Arrange
         var definition = StandardDefinition(new FilterSettings(MaxNestingDepth: 2));
@@ -125,6 +214,117 @@ public class FilterDefinitionTests
         validationResult.Errors.Should().ContainSingle()
             .Which.Should().BeEquivalentTo(new FilterValidationError(
                 "sort[1].field", FilterValidationCode.NotSortable, "Field 'Score' is not configured as sortable.", Field: "Score"));
+    }
+
+    [Fact]
+    public void Validate_SortItemWithoutField_ReportsNotSortable()
+    {
+        // Arrange
+        var definition = StandardDefinition();
+
+        // Act
+        var validationResult = definition.Validate([new SortItem(null!), new SortItem("")]);
+
+        // Assert
+        validationResult.Errors.Should().HaveCount(2);
+        validationResult.Errors.Select(error => error.Path).Should().Equal("sort[0].field", "sort[1].field");
+        validationResult.Errors.Should().AllSatisfy(error =>
+        {
+            error.Code.Should().Be(FilterValidationCode.NotSortable);
+            error.Message.Should().Be("A sort item must name a field.");
+        });
+    }
+
+    [Fact]
+    public void Validate_SortDirectionOutsideEnum_ReportsInvalidSortDirection()
+    {
+        // Arrange
+        var definition = StandardDefinition();
+
+        // Act
+        var validationResult = definition.Validate([new SortItem("Name", (SortDir)7)]);
+
+        // Assert
+        validationResult.Errors.Should().ContainSingle()
+            .Which.Should().BeEquivalentTo(new FilterValidationError(
+                "sort[0].dir", FilterValidationCode.InvalidSortDirection, "Sort direction '7' is not Asc or Desc.", Field: "Name"));
+    }
+
+    [Fact]
+    public void Validate_PageOffsetBeyondIntRange_ReportsPageInvalid()
+    {
+        // Arrange
+        var definition = StandardDefinition();
+
+        // Act
+        var validationResult = definition.Validate(page: int.MaxValue, pageSize: 200);
+
+        // Assert
+        var validationError = validationResult.Errors.Should().ContainSingle().Subject;
+        validationError.Path.Should().Be("page");
+        validationError.Code.Should().Be(FilterValidationCode.PageInvalid);
+        validationError.Message.Should().Be("page 2147483647 is too large for a page size of 200.");
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(-1)]
+    public void Validate_PageSizeBelowOne_ReportsPageSizeInvalid(int requestedPageSize)
+    {
+        // Arrange
+        var definition = StandardDefinition();
+
+        // Act
+        var validationResult = definition.Validate(page: 1, pageSize: requestedPageSize);
+
+        // Assert — without the error the size is silently clamped to 1 and the client is told nothing.
+        var validationError = validationResult.Errors.Should().ContainSingle().Subject;
+        validationError.Path.Should().Be("pageSize");
+        validationError.Code.Should().Be(FilterValidationCode.PageSizeInvalid);
+        validationError.Message.Should().Be($"pageSize must be 1 or greater (was {requestedPageSize}).");
+    }
+
+    [Fact]
+    public void Validate_LargePageWithRepresentableOffset_ReportsNoError()
+    {
+        // Arrange
+        var definition = StandardDefinition();
+
+        // Act
+        var validationResult = definition.Validate(page: 10_000_000, pageSize: 200);
+
+        // Assert
+        validationResult.IsValid.Should().BeTrue();
+    }
+
+    [Theory]
+    [InlineData(null, 50)]
+    [InlineData(10, 10)]
+    [InlineData(1000, 200)]
+    [InlineData(0, 1)]
+    public void ResolvePageSize_RequestedSize_ClampsIntoConfiguredRange(int? requestedPageSize, int expectedPageSize)
+    {
+        // Arrange
+        var definition = StandardDefinition();
+
+        // Act
+        var resolvedPageSize = definition.ResolvePageSize(requestedPageSize);
+
+        // Assert
+        resolvedPageSize.Should().Be(expectedPageSize);
+    }
+
+    [Fact]
+    public void ResolvePageSize_CustomSettings_UsesConfiguredDefault()
+    {
+        // Arrange
+        var definition = StandardDefinition(new FilterSettings(DefaultPageSize: 25, MaxPageSize: 75));
+
+        // Act
+        var resolvedPageSize = definition.ResolvePageSize(null);
+
+        // Assert
+        resolvedPageSize.Should().Be(25);
     }
 
     [Fact]
@@ -210,9 +410,74 @@ public class FilterDefinitionTests
     }
 
     [Fact]
-    public void ApplySorting_TwoSortItems_OrdersByFirstThenSecond()
+    public void ApplyFilter_UnvalidatedUnknownOperator_ThrowsDispatchException()
     {
         // Arrange
+        var definition = StandardDefinition();
+
+        // Act
+        var applyUnknownOperator = () => definition.ApplyFilter(People(), Leaf("Age", "mystery", "1"));
+
+        // Assert
+        applyUnknownOperator.Should().Throw<FilterDispatchException>()
+            .WithMessage("Unknown operator 'mystery' for 'Age' (validation should have caught this).");
+    }
+
+    [Fact]
+    public void ApplyFilter_UnvalidatedUnparsableValue_ThrowsDispatchException()
+    {
+        // Arrange
+        var definition = StandardDefinition();
+
+        // Act — a JSON string where Int32Filter.TryGetValue expects a number. Swallowing this would
+        // silently filter on default(int) instead of failing.
+        var applyUnparsableValue = () => definition.ApplyFilter(People(), Leaf("Age", "eq", "\"abc\""));
+
+        // Assert
+        applyUnparsableValue.Should().Throw<FilterDispatchException>()
+            .WithMessage("Apply-time value extraction failed:*");
+    }
+
+    [Fact]
+    public void ApplyFilter_UnvalidatedUnparsableArrayValue_ThrowsDispatchException()
+    {
+        // Arrange
+        var definition = StandardDefinition();
+
+        // Act
+        var applyUnparsableArray = () => definition.ApplyFilter(People(), Leaf("Age", "in", "10"));
+
+        // Assert
+        applyUnparsableArray.Should().Throw<FilterDispatchException>()
+            .WithMessage("Apply-time array extraction failed:*");
+    }
+
+    [Fact]
+    public void ApplyFilter_UnvalidatedSingleChildGroupWithUndefinedCombinator_ThrowsDispatchException()
+    {
+        // Arrange
+        var definition = StandardDefinition();
+
+        // Act
+        var applyUndefinedCombinator = () => definition.ApplyFilter(People(), Group((LogicalOp)7, Leaf("Age", "eq", "30")));
+
+        // Assert
+        applyUndefinedCombinator.Should().Throw<FilterDispatchException>().WithMessage("Unknown LogicalOp '7'*");
+    }
+
+    public static TheoryData<SortDir, string[]> SecondarySortCases => new()
+    {
+        { SortDir.Asc, ["Sam", "Sara", "Otto", "Olive"] },
+        { SortDir.Desc, ["Sara", "Sam", "Olive", "Otto"] },
+    };
+
+    [Theory]
+    [MemberData(nameof(SecondarySortCases))]
+    public void ApplySorting_SecondarySortItem_AppliesThenByInThatDirection(SortDir secondaryDirection, string[] expectedNames)
+    {
+        // Arrange — two tied departments with two people each, so neither a lone primary sort (which
+        // is stable and would keep source order inside a group) nor a lone secondary sort can produce
+        // the expected sequence. Only a real ThenBy/ThenByDescending on top of the primary key does.
         var definition = Definition(
             properties:
             [
@@ -221,10 +486,12 @@ public class FilterDefinitionTests
             ]);
 
         // Act
-        var sortedNames = definition.ApplySorting(People(), [new SortItem("department.name", SortDir.Desc), new SortItem("Age", SortDir.Desc)]).Names();
+        var sortedNames = definition
+            .ApplySorting(PeopleInTwoTiedDepartments(), [new SortItem("department.name", SortDir.Desc), new SortItem("Age", secondaryDirection)])
+            .Names();
 
         // Assert
-        sortedNames.Should().Equal("Carol", "Alice", "Bob");
+        sortedNames.Should().Equal(expectedNames);
     }
 
     [Fact]
@@ -256,6 +523,45 @@ public class FilterDefinitionTests
     }
 
     [Fact]
+    public void ApplySorting_PageWithoutPageSize_TakesTheConfiguredDefaultPageSize()
+    {
+        // Arrange — DefaultPageSize and MaxPageSize differ so a fallback onto the wrong one shows up.
+        var definition = StandardDefinition(new FilterSettings(DefaultPageSize: 2, MaxPageSize: 3));
+
+        // Act
+        var pagedNames = definition.ApplySorting(People(), [new SortItem("Name")], page: 1, pageSize: null).Names();
+
+        // Assert
+        pagedNames.Should().Equal("Alice", "Bob");
+    }
+
+    [Fact]
+    public void ApplySorting_PageSizeAboveMaximum_ClampsToMaxPageSize()
+    {
+        // Arrange
+        var definition = StandardDefinition(new FilterSettings(DefaultPageSize: 2, MaxPageSize: 3));
+
+        // Act
+        var pagedNames = definition.ApplySorting(People(), [new SortItem("Name")], page: 1, pageSize: 100).Names();
+
+        // Assert
+        pagedNames.Should().Equal("Alice", "Bob", "Carol");
+    }
+
+    [Fact]
+    public void ApplySorting_PageBelowOne_ReturnsTheFirstPage()
+    {
+        // Arrange
+        var definition = StandardDefinition(new FilterSettings(DefaultPageSize: 2, MaxPageSize: 3));
+
+        // Act
+        var pagedNames = definition.ApplySorting(People(), [new SortItem("Name")], page: 0, pageSize: 2).Names();
+
+        // Assert
+        pagedNames.Should().Equal("Alice", "Bob");
+    }
+
+    [Fact]
     public void ApplySorting_NoSortableProperties_ThrowsDispatchException()
     {
         // Arrange
@@ -267,6 +573,43 @@ public class FilterDefinitionTests
         // Assert
         sortUnsortable.Should().Throw<FilterDispatchException>().WithMessage("No sortable fields are configured (got 'Age').");
     }
+
+    [Fact]
+    public void ApplySorting_MappedButNotSortableField_ThrowsDispatchExceptionNamingSortability()
+    {
+        // Arrange
+        var definition = StandardDefinition();
+
+        // Act
+        var sortOnNonSortable = () => definition.ApplySorting(People(), [new SortItem("Score")]);
+
+        // Assert
+        sortOnNonSortable.Should().Throw<FilterDispatchException>()
+            .WithMessage("Field 'Score' is not configured as sortable (validation should have caught this).");
+    }
+
+    [Fact]
+    public void ApplySorting_UnvalidatedPageOffsetBeyondIntRange_ThrowsDispatchException()
+    {
+        // Arrange
+        var definition = StandardDefinition();
+
+        // Act
+        var pageBeyondRange = () => definition.ApplySorting(People(), sortItems: null, page: int.MaxValue, pageSize: 200);
+
+        // Assert
+        pageBeyondRange.Should().Throw<FilterDispatchException>().WithMessage("*2147483647*200*");
+    }
+
+    private static IQueryable<Person> PeopleInTwoTiedDepartments() => new[]
+    {
+        new Person { Name = "Olive", Age = 30, Department = new Department { Name = "Ops" } },
+        new Person { Name = "Sam", Age = 25, Department = new Department { Name = "Sales" } },
+        new Person { Name = "Otto", Age = 20, Department = new Department { Name = "Ops" } },
+        new Person { Name = "Sara", Age = 40, Department = new Department { Name = "Sales" } },
+    }.AsQueryable();
+
+    private sealed record UnsupportedNode : FilterNode;
 
     private sealed class ValueShapeInspector : ExpressionVisitor
     {

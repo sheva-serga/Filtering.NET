@@ -1,6 +1,6 @@
 namespace Filtering.Net;
 
-/// <summary>Marks a partial method as the configuration for one filterable property on the target entity.</summary>
+/// <summary>Declares one filterable property of the target entity on a <c>[GenerateFilter&lt;TEntity&gt;]</c> partial. Apply it once per mapped property.</summary>
 /// <param name="propertyName">Name (or dotted nav path) of the property to map.</param>
 [AttributeUsage(AttributeTargets.Class, AllowMultiple = true, Inherited = false)]
 public sealed class MapAttribute(string propertyName) : Attribute

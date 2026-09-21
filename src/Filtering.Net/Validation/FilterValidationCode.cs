@@ -30,5 +30,7 @@ public enum FilterValidationCode
     /// <summary>Total leaf count exceeds MaxLeafConditions.</summary>
     TooManyConditions,
     /// <summary>and: [] or or: [] group with zero children.</summary>
-    GroupEmpty
+    GroupEmpty,
+    /// <summary>Node the engine cannot interpret: a not group without exactly one child, a combinator outside <see cref="LogicalOp"/>, or an unrecognized <see cref="FilterNode"/> subtype.</summary>
+    InvalidNodeShape
 }

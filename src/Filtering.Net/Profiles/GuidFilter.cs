@@ -49,29 +49,6 @@ public static class GuidFilter
     }
 
     /// <summary>Extracts a <see cref="Guid"/>[] from a JSON Array of Guid strings via <see cref="TryGetValue"/>.</summary>
-    public static bool TryGetArray(JsonElement element, out Guid[] values, out string error)
-    {
-        if (element.ValueKind != JsonValueKind.Array)
-        {
-            values = [];
-            error = $"Expected JSON Array of Guids, got {element.ValueKind}.";
-            return false;
-        }
-        var collected = new List<Guid>();
-        var elementIndex = 0;
-        foreach (var item in element.EnumerateArray())
-        {
-            if (!TryGetValue(item, out var itemValue, out var itemError))
-            {
-                values = [];
-                error = $"Array element [{elementIndex}]: {itemError}";
-                return false;
-            }
-            collected.Add(itemValue);
-            elementIndex++;
-        }
-        values = [.. collected];
-        error = string.Empty;
-        return true;
-    }
+    public static bool TryGetArray(JsonElement element, out Guid[] values, out string error) =>
+        NumericExtractor.TryGetArray(element, TryGetValue, out values, out error);
 }

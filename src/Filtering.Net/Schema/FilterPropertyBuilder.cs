@@ -36,6 +36,8 @@ public sealed class FilterPropertyBuilder<TEntity, TColumn>
     /// <summary>Accepts <paramref name="alias"/> as a second wire key for the property.</summary>
     public FilterPropertyBuilder<TEntity, TColumn> Alias(string alias)
     {
+        if (string.IsNullOrWhiteSpace(alias))
+            throw new FilterConfigurationException($"The alias of '{_field}' must be a non-empty string.");
         _alias = alias;
         return this;
     }

@@ -20,7 +20,7 @@ public sealed class MapNestedAttribute(string navigationPropertyName) : Attribut
     /// <summary>When true, every inlined mapping is demoted to filter-only.</summary>
     public bool DisableSorting { get; init; }
 
-    /// <summary>How many times this nesting may be followed along one path. Zero (the default) means unbounded, which is only legal when the nesting is not part of a cycle. Set it to allow self-referencing or circular filter graphs.</summary>
+    /// <summary>How many times this nesting may be followed along one path. Zero (the default) means unbounded. A cycle is legal as long as at least one <c>[MapNested]</c> in it declares a positive MaxDepth; an unbounded cycle is FN0014 at compile time and <c>FilterConfigurationException</c> at schema construction.</summary>
     public int MaxDepth { get; init; }
 }
 
@@ -45,6 +45,6 @@ public sealed class MapNestedAttribute<TFilter>(string navigationPropertyName) :
     /// <inheritdoc cref="MapNestedAttribute.DisableSorting"/>
     public bool DisableSorting { get; init; }
 
-    /// <summary>How many times this nesting may be followed along one path. Zero (the default) means unbounded, which is only legal when the nesting is not part of a cycle. Set it to allow self-referencing or circular filter graphs.</summary>
+    /// <inheritdoc cref="MapNestedAttribute.MaxDepth"/>
     public int MaxDepth { get; init; }
 }

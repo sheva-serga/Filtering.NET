@@ -37,6 +37,20 @@ public class FilterPropertyTests
         buildWithUnknownOperator.Should().Throw<FilterConfigurationException>().WithMessage("*'contains'*Int32Filter*");
     }
 
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void Alias_BlankAlias_ThrowsConfigurationException(string? alias)
+    {
+        // Act
+        var aliasWithBlank = () => FilterProperty.Map<Person, string>("Name", person => person.Name, StringFilter.Profile)
+            .Alias(alias!);
+
+        // Assert
+        aliasWithBlank.Should().Throw<FilterConfigurationException>().WithMessage("*'Name'*");
+    }
+
     [Fact]
     public void Validate_OperatorExcludedByOnly_ReportsOperatorNotAllowed()
     {
@@ -137,6 +151,26 @@ public class FilterPropertyTests
     }
 
     [Fact]
+    public void Validate_InterceptorThrowsNonValidationException_PropagatesItToTheCaller()
+    {
+        // Arrange — the documented way for an interceptor to reject a value is FilterValidationException.
+        // Anything else is a defect in the interceptor, and the engine deliberately does not swallow it
+        // into a validation error: that would hide the bug behind a 400.
+        var definition = Definition(properties:
+        [
+            FilterProperty.Map<Person, int>("Age", person => person.Age, Int32Filter.Profile)
+                .InterceptRaw((_, element) => int.Parse(element.GetString()!))
+                .Build(),
+        ]);
+
+        // Act
+        var validateWithFailingInterceptor = () => definition.Validate(Leaf("Age", "eq", "\"abc\""));
+
+        // Assert
+        validateWithFailingInterceptor.Should().Throw<FormatException>();
+    }
+
+    [Fact]
     public void LiftInto_DefaultPrefix_ExposesPrefixedFieldsAndKeepsBehaviour()
     {
         // Arrange
@@ -163,23 +197,149 @@ public class FilterPropertyTests
     public void LiftInto_CustomPrefixOnlyAndDisableSorting_AppliesToDirectPropertiesAndKeepsTransitiveOnes()
     {
         // Arrange
-        var companySchema = new FilterSchemaBuilder<Company>(new FilterSettings())
-            .Add(FilterProperty.Map<Company, string>("Country", company => company.Country, StringFilter.Profile).Sortable().Build())
-            .Build();
-        var departmentSchema = new FilterSchemaBuilder<Department>(new FilterSettings())
-            .Add(FilterProperty.Map<Department, string>("Name", department => department.Name, StringFilter.Profile).Build())
-            .AddRange(companySchema.LiftInto<Department>(department => department.Company, "Company"))
-            .Build();
+        var departmentSchema = DepartmentSchemaWithLiftedCompany();
 
         // Act
         var liftedProperties = departmentSchema.LiftInto<Person>(
             person => person.Department, "dept", only: ["Id"], except: null, disableSorting: true);
 
         // Assert
+        liftedProperties.Select(property => property.Field).Should().Equal("Department.Id", "Department.Company.Country");
+        liftedProperties.Select(property => property.Alias).Should().Equal("dept.Id", "dept.Company.Country");
+        liftedProperties.Should().AllSatisfy(property => property.Sortable.Should().BeFalse());
+    }
+
+    [Fact]
+    public void LiftInto_Except_DropsTheNamedPropertyAndKeepsTheOtherDirectOnes()
+    {
+        // Arrange
+        var departmentSchema = DepartmentSchemaWithLiftedCompany();
+
+        // Act
+        var liftedProperties = departmentSchema.LiftInto<Person>(
+            person => person.Department, "Department", only: null, except: ["Name"]);
+
+        // Assert — both halves of the except predicate: 'Name' is dropped, 'Id' survives.
+        liftedProperties.Select(property => property.Field).Should().Equal("Department.Id", "Department.Company.Country");
+    }
+
+    [Fact]
+    public void LiftInto_ExceptedPath_IsNotFilterableOnTheHost()
+    {
+        // Arrange
+        var departmentSchema = new FilterSchemaBuilder<Department>(new FilterSettings())
+            .Add(FilterProperty.Map<Department, int>("Id", department => department.Id, Int32Filter.Profile).Build())
+            .Add(FilterProperty.Map<Department, string>("Name", department => department.Name, StringFilter.Profile).Build())
+            .Build();
+        var definition = new FilterDefinition<Person>(new FilterSchemaBuilder<Person>(new FilterSettings())
+            .AddRange(departmentSchema.LiftInto<Person>(person => person.Department, "Department", only: null, except: ["Name"]))
+            .Build());
+
+        // Act
+        var excludedResult = definition.Validate(Leaf("department.name", "eq", "\"Ops\""));
+        var keptResult = definition.Validate(Leaf("department.id", "eq", "1"));
+
+        // Assert
+        excludedResult.Errors.Should().ContainSingle(error => error.Code == FilterValidationCode.UnknownField);
+        keptResult.IsValid.Should().BeTrue();
+    }
+
+    [Fact]
+    public void LiftInto_EmptyOnly_LiftsNoDirectProperties()
+    {
+        // Arrange
+        var departmentSchema = DepartmentSchemaWithLiftedCompany();
+
+        // Act
+        var liftedProperties = departmentSchema.LiftInto<Person>(person => person.Department, "Department", only: []);
+
+        // Assert
+        liftedProperties.Select(property => property.Field).Should().Equal("Department.Company.Country");
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void LiftInto_BlankPrefix_ThrowsConfigurationException(string prefix)
+    {
+        // Arrange
+        var departmentSchema = DepartmentSchemaWithLiftedCompany();
+
+        // Act
+        var liftWithBlankPrefix = () => departmentSchema.LiftInto<Person>(person => person.Department, prefix);
+
+        // Assert
+        liftWithBlankPrefix.Should().Throw<FilterConfigurationException>().WithMessage("*non-empty prefix*");
+    }
+
+    [Fact]
+    public void LiftInto_BlankPrefixOnAnEmptySchema_StillThrowsConfigurationException()
+    {
+        // Arrange
+        var emptySchema = new FilterSchemaBuilder<Department>(new FilterSettings()).Build();
+
+        // Act
+        var liftWithBlankPrefix = () => emptySchema.LiftInto<Person>(person => person.Department, "  ");
+
+        // Assert
+        liftWithBlankPrefix.Should().Throw<FilterConfigurationException>().WithMessage("*non-empty prefix*");
+    }
+
+    [Fact]
+    public void LiftInto_OnlyNamesUnknownProperty_ThrowsConfigurationException()
+    {
+        // Arrange
+        var departmentSchema = DepartmentSchemaWithLiftedCompany();
+
+        // Act
+        var liftWithTypo = () => departmentSchema.LiftInto<Person>(person => person.Department, "Department", only: ["Naem"]);
+
+        // Assert
+        liftWithTypo.Should().Throw<FilterConfigurationException>().WithMessage("*'Naem'*Department*");
+    }
+
+    [Fact]
+    public void LiftInto_ExceptNamesUnknownProperty_ThrowsConfigurationException()
+    {
+        // Arrange
+        var departmentSchema = DepartmentSchemaWithLiftedCompany();
+
+        // Act
+        var liftWithTypo = () => departmentSchema.LiftInto<Person>(person => person.Department, "Department", except: ["Naem"]);
+
+        // Assert
+        liftWithTypo.Should().Throw<FilterConfigurationException>().WithMessage("*'Naem'*Department*");
+    }
+
+    [Fact]
+    public void LiftInto_OnlyNamesTransitivePath_IsAcceptedBecauseABoundedNestingMayCutIt()
+    {
+        // Arrange
+        var departmentSchema = DepartmentSchemaWithLiftedCompany();
+
+        // Act
+        var liftedProperties = departmentSchema.LiftInto<Person>(
+            person => person.Department, "Department", only: ["Company.Headcount"]);
+
+        // Assert
+        liftedProperties.Select(property => property.Field).Should().Equal("Department.Company.Country");
+    }
+
+    [Fact]
+    public void LiftInto_MultiHopNavigation_UsesTheWholeMemberPathAsField()
+    {
+        // Arrange
+        var companySchema = new FilterSchemaBuilder<Company>(new FilterSettings())
+            .Add(FilterProperty.Map<Company, string>("Country", company => company.Country, StringFilter.Profile).Build())
+            .Build();
+
+        // Act
+        var liftedProperties = companySchema.LiftInto<Person>(person => person.Department.Company, "HomeCompany");
+
+        // Assert
         var liftedProperty = liftedProperties.Should().ContainSingle().Subject;
         liftedProperty.Field.Should().Be("Department.Company.Country");
-        liftedProperty.Alias.Should().Be("dept.Company.Country");
-        liftedProperty.Sortable.Should().BeFalse();
+        liftedProperty.Alias.Should().Be("HomeCompany.Country");
     }
 
     [Fact]
@@ -251,6 +411,66 @@ public class FilterPropertyTests
         validationResult.IsValid.Should().BeTrue();
         malformedResult.Errors.Should().ContainSingle(error => error.Code == FilterValidationCode.InvalidValueType);
         filteredNames.Should().Equal("Alice");
+    }
+
+    [Fact]
+    public void Validate_TypedValueOperatorWithJsonNullValue_ReturnsInvalidValueTypeError()
+    {
+        // Arrange
+        var typedValueProfile = Int32Filter.Profile.Extend("TypedInt",
+            FilterOperator.Value<int, AgeRange>("within", (column, range) => column >= range.From && column <= range.To));
+        var definition = Definition(
+            serializerOptions: new JsonSerializerOptions { TypeInfoResolver = new DefaultJsonTypeInfoResolver() },
+            properties: [FilterProperty.Map<Person, int>("Age", person => person.Age, typedValueProfile).Build()]);
+
+        // Act
+        var validationResult = definition.Validate(Leaf("Age", "within", "null"));
+
+        // Assert
+        validationResult.Errors.Should().ContainSingle(error => error.Code == FilterValidationCode.InvalidValueType);
+    }
+
+    [Fact]
+    public void Validate_TypedArrayOperatorOnNullableColumnWithJsonNullValue_ReturnsInvalidValueTypeError()
+    {
+        // Arrange
+        var typedArrayProfile = Int32Filter.Profile.Extend("TypedIntArray",
+            FilterOperator.Value<int, int[]>("anyOf", (column, values) => values.Contains(column)));
+        var definition = Definition(
+            serializerOptions: new JsonSerializerOptions { TypeInfoResolver = new DefaultJsonTypeInfoResolver() },
+            properties: [FilterProperty.MapNullable<Person, int>("Score", person => person.Score, typedArrayProfile).Build()]);
+
+        // Act
+        var validationResult = definition.Validate(Leaf("Score", "anyOf", "null"));
+
+        // Assert
+        validationResult.Errors.Should().ContainSingle(error => error.Code == FilterValidationCode.InvalidValueType);
+    }
+
+    [Fact]
+    public void SchemaBuild_TypedValueOperatorWithoutSerializerOptions_NamesTheOffendingOperator()
+    {
+        // Arrange
+        var typedValueProfile = Int32Filter.Profile.Extend("TypedInt",
+            FilterOperator.Value<int, AgeRange>("within", (column, range) => column >= range.From && column <= range.To));
+
+        // Act
+        var buildWithoutOptions = () => Definition(properties: [FilterProperty.Map<Person, int>("Age", person => person.Age, typedValueProfile).Build()]);
+
+        // Assert
+        buildWithoutOptions.Should().Throw<FilterConfigurationException>().WithMessage("*'within'*");
+    }
+
+    private static FilterSchema<Department> DepartmentSchemaWithLiftedCompany()
+    {
+        var companySchema = new FilterSchemaBuilder<Company>(new FilterSettings())
+            .Add(FilterProperty.Map<Company, string>("Country", company => company.Country, StringFilter.Profile).Sortable().Build())
+            .Build();
+        return new FilterSchemaBuilder<Department>(new FilterSettings())
+            .Add(FilterProperty.Map<Department, int>("Id", department => department.Id, Int32Filter.Profile).Sortable().Build())
+            .Add(FilterProperty.Map<Department, string>("Name", department => department.Name, StringFilter.Profile).Build())
+            .AddRange(companySchema.LiftInto<Department>(department => department.Company, "Company"))
+            .Build();
     }
 
     public sealed record AgeRange(int From, int To);

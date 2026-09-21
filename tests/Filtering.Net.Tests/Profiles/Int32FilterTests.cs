@@ -38,6 +38,20 @@ public class Int32FilterTests
     }
 
     [Fact]
+    public void TryGetValue_FromExponentString_ParsesLikeTheFloatingPointProfiles()
+    {
+        // Arrange
+        var element = JsonDocument.Parse("\"1E+5\"").RootElement;
+
+        // Act
+        var success = Int32Filter.TryGetValue(element, out var value, out var error);
+
+        // Assert
+        success.Should().BeTrue(because: error);
+        value.Should().Be(100000);
+    }
+
+    [Fact]
     public void TryGetArray_FromJsonArray_ReturnsAllInts()
     {
         // Arrange

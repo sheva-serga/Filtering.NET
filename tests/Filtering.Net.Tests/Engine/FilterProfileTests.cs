@@ -54,21 +54,119 @@ public class FilterProfileTests
         extendWithDuplicate.Should().Throw<FilterConfigurationException>();
     }
 
-    public static TheoryData<Type, string[]> BuiltInProfiles => new()
+    [Fact]
+    public void ExtendWithOverrides_RedeclaredInheritedOperator_ReplacesItAndKeepsTheRestOfTheBase()
     {
-        { typeof(StringFilter), [.. StringFilter.Profile.Operators.Keys] },
-        { typeof(BoolFilter), [.. BoolFilter.Profile.Operators.Keys] },
-        { typeof(GuidFilter), [.. GuidFilter.Profile.Operators.Keys] },
-        { typeof(DateTimeFilter), [.. DateTimeFilter.Profile.Operators.Keys] },
-        { typeof(DateTimeOffsetFilter), [.. DateTimeOffsetFilter.Profile.Operators.Keys] },
-        { typeof(ByteFilter), [.. ByteFilter.Profile.Operators.Keys] },
-        { typeof(Int16Filter), [.. Int16Filter.Profile.Operators.Keys] },
-        { typeof(Int32Filter), [.. Int32Filter.Profile.Operators.Keys] },
-        { typeof(Int64Filter), [.. Int64Filter.Profile.Operators.Keys] },
-        { typeof(DecimalFilter), [.. DecimalFilter.Profile.Operators.Keys] },
-        { typeof(DoubleFilter), [.. DoubleFilter.Profile.Operators.Keys] },
-        { typeof(SingleFilter), [.. SingleFilter.Profile.Operators.Keys] },
-    };
+        // Arrange
+        var caselessEquality = FilterOperator.Value<string, string>(
+            "eq", (column, value) => column.ToLower() == value.ToLower(), StringFilter.TryGetValue);
+
+        // Act
+        var derivedProfile = StringFilter.Profile.ExtendWithOverrides("CaselessStringFilter", caselessEquality);
+
+        // Assert
+        derivedProfile.Operators["eq"].Should().BeSameAs(caselessEquality);
+        derivedProfile.Operators.Keys.Should().BeEquivalentTo(StringFilter.Profile.Operators.Keys);
+        StringFilter.Profile.Operators["eq"].Should().NotBeSameAs(caselessEquality);
+    }
+
+    [Fact]
+    public void ExtendWithOverrides_RedeclaredInheritedOperatorDifferingOnlyInCase_ReplacesIt()
+    {
+        // Arrange
+        var caselessEquality = FilterOperator.Value<string, string>(
+            "EQ", (column, value) => column.ToLower() == value.ToLower(), StringFilter.TryGetValue);
+
+        // Act
+        var derivedProfile = StringFilter.Profile.ExtendWithOverrides("CaselessStringFilter", caselessEquality);
+
+        // Assert
+        derivedProfile.Operators.Should().HaveCount(StringFilter.Profile.Operators.Count);
+        derivedProfile.Operators["eq"].Should().BeSameAs(caselessEquality);
+    }
+
+    [Fact]
+    public void ExtendWithOverrides_SameOperatorNameTwiceInOneCall_ThrowsConfigurationException()
+    {
+        // Act
+        var extendWithDuplicate = () => StringFilter.Profile.ExtendWithOverrides("Broken",
+            FilterOperator.Value<string, string>("fuzzy", (column, value) => column.Contains(value), StringFilter.TryGetValue),
+            FilterOperator.Value<string, string>("FUZZY", (column, value) => column.StartsWith(value), StringFilter.TryGetValue));
+
+        // Assert
+        extendWithDuplicate.Should().Throw<FilterConfigurationException>().WithMessage("*'FUZZY' more than once*");
+    }
+
+    [Fact]
+    public void ApplyFilter_ProfileThatOverrodeAnInheritedOperator_UsesTheOverride()
+    {
+        // Arrange
+        var caselessProfile = StringFilter.Profile.ExtendWithOverrides("CaselessStringFilter",
+            FilterOperator.Value<string, string>("eq", (column, value) => column.ToLower() == value.ToLower(), StringFilter.TryGetValue));
+        var definition = EngineTestData.Definition(properties:
+        [
+            FilterProperty.Map<Person, string>("Name", person => person.Name, caselessProfile).Build(),
+        ]);
+
+        // Act
+        var filteredNames = definition.ApplyFilter(EngineTestData.People(), EngineTestData.Leaf("Name", "eq", "\"alice\"")).Names();
+
+        // Assert
+        filteredNames.Should().Equal("Alice");
+    }
+
+    // Named by type, so a built-in profile that stops being compiled into the shipped assembly
+    // breaks this file. The reflection test below closes the other direction: a profile the
+    // assembly ships that nobody listed here.
+    private static readonly Type[] BuiltInProfileTypes =
+    [
+        typeof(StringFilter),
+        typeof(BoolFilter),
+        typeof(GuidFilter),
+        typeof(DateTimeFilter),
+        typeof(DateTimeOffsetFilter),
+        typeof(DateOnlyFilter),
+        typeof(TimeOnlyFilter),
+        typeof(ByteFilter),
+        typeof(Int16Filter),
+        typeof(Int32Filter),
+        typeof(Int64Filter),
+        typeof(DecimalFilter),
+        typeof(DoubleFilter),
+        typeof(SingleFilter),
+    ];
+
+    public static TheoryData<Type, string[]> BuiltInProfiles
+    {
+        get
+        {
+            var builtInProfiles = new TheoryData<Type, string[]>();
+            foreach (var builtInProfileType in BuiltInProfileTypes)
+            {
+                builtInProfiles.Add(builtInProfileType, RuntimeOperatorNames(builtInProfileType));
+            }
+            return builtInProfiles;
+        }
+    }
+
+    [Fact]
+    public void BuiltInProfiles_ListedTypes_MatchEveryFilterProfileTheRuntimeAssemblyShips()
+    {
+        // Arrange
+        var shippedProfileTypes = typeof(StringFilter).Assembly.GetTypes()
+            .Where(candidateType => candidateType.IsPublic
+                && candidateType.IsAbstract
+                && candidateType.IsSealed
+                && candidateType.GetCustomAttributesData().Any(attributeData =>
+                    attributeData.AttributeType.IsGenericType
+                    && attributeData.AttributeType.GetGenericTypeDefinition() == typeof(FilterProfileAttribute<>)));
+
+        // Act
+        var listedProfileTypes = BuiltInProfileTypes;
+
+        // Assert
+        listedProfileTypes.Should().BeEquivalentTo(shippedProfileTypes);
+    }
 
     [Theory]
     [MemberData(nameof(BuiltInProfiles))]
@@ -81,5 +179,13 @@ public class FilterProfileTests
 
         // Assert
         runtimeOperatorNames.Should().BeEquivalentTo(declaredOperatorNames);
+    }
+
+    private static string[] RuntimeOperatorNames(Type builtInProfileType)
+    {
+        var profile = builtInProfileType.GetProperty("Profile", BindingFlags.Public | BindingFlags.Static)!.GetValue(null)!;
+        var operatorsByName = (System.Collections.IEnumerable)profile.GetType().GetProperty("Operators")!.GetValue(profile)!;
+        return [.. operatorsByName.Cast<object>()
+            .Select(operatorEntry => (string)operatorEntry.GetType().GetProperty("Key")!.GetValue(operatorEntry)!)];
     }
 }

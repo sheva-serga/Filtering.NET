@@ -7,9 +7,9 @@ namespace Filtering.Net;
 // over the accessor's entity parameter.
 internal abstract class BoundOperator
 {
-    public abstract void Validate(FilterLeaf leaf, string path, List<FilterValidationError> errors, FilterValueContext valueContext);
+    public abstract void Validate(FilterLeaf leaf, string path, List<FilterValidationError> errors, JsonSerializerOptions? serializerOptions);
 
-    public abstract Expression BuildBody(FilterLeaf leaf, FilterValueContext valueContext);
+    public abstract Expression BuildBody(FilterLeaf leaf, JsonSerializerOptions? serializerOptions);
 }
 
 internal sealed class OperatorBinding<TColumn>(
@@ -33,8 +33,6 @@ internal sealed class PropertyInterception<TColumn>(
     Func<InterceptContext, TColumn[], TColumn[]>? arrayInterceptor,
     Func<InterceptContext, JsonElement, TColumn>? rawInterceptor)
 {
-    public static readonly PropertyInterception<TColumn> None = new(null, null, null);
-
     public Func<InterceptContext, TColumn, TColumn>? ScalarInterceptor { get; } = scalarInterceptor;
 
     public Func<InterceptContext, TColumn[], TColumn[]>? ArrayInterceptor { get; } = arrayInterceptor;

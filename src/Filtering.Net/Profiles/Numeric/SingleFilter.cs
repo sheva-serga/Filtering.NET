@@ -48,7 +48,7 @@ public static class SingleFilter
         NumericExtractor.TryGetValue(
             element,
             (JsonElement e, out float v) => e.TryGetSingle(out v),
-            (string s, out float v) => float.TryParse(s, NumberStyles.Float, CultureInfo.InvariantCulture, out v),
+            (string s, out float v) => float.TryParse(s, NumericExtractor.InvariantNumberStyles, CultureInfo.InvariantCulture, out v),
             "float",
             out value, out error);
 

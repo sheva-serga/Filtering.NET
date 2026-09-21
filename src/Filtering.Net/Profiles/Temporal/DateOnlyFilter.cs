@@ -1,6 +1,10 @@
+#if NET6_0_OR_GREATER
+using System.Globalization;
+using System.Linq.Expressions;
+using System.Text.Json;
+
 namespace Filtering.Net;
 
-#if NET6_0_OR_GREATER
 /// <summary>Built-in profile for <see cref="DateOnly"/> properties.</summary>
 [FilterProfile<global::System.DateOnly>]
 public static class DateOnlyFilter

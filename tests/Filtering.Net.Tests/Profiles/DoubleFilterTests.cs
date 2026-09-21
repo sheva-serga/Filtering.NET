@@ -23,6 +23,20 @@ public class DoubleFilterTests
     }
 
     [Fact]
+    public void TryGetValue_FromThousandsSeparatedString_ParsesLikeTheIntegerProfiles()
+    {
+        // Arrange
+        var element = JsonDocument.Parse("\"1,000\"").RootElement;
+
+        // Act
+        var success = DoubleFilter.TryGetValue(element, out var value, out var error);
+
+        // Assert
+        success.Should().BeTrue(because: error);
+        value.Should().Be(1000d);
+    }
+
+    [Fact]
     public void TryGetArray_FromJsonArray_ReturnsAllDoubles()
     {
         // Arrange

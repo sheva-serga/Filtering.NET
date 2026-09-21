@@ -5,7 +5,8 @@ namespace Filtering.Net;
 // Splices a Nullable<TColumn> accessor into an operator predicate written over TColumn, producing
 // the lifted comparisons the C# compiler emits for "entity.NullableColumn == value". Anything the
 // lifter does not recognise falls back to a conversion to TColumn, which providers translate as the
-// column itself.
+// column itself; that unwrapping would throw on a null row in memory, so a body that used it is
+// wrapped in a HasValue guard, which is also what a provider's IS NOT NULL does implicitly.
 internal sealed class NullableColumnLifter : ExpressionVisitor
 {
     private static readonly Dictionary<Type, Type> WellKnownNullableTypes = new()
@@ -33,6 +34,8 @@ internal sealed class NullableColumnLifter : ExpressionVisitor
     private readonly Expression _nullableAccessorBody;
     private readonly ParameterExpression? _valueParameter;
     private readonly INullableColumnSupport _nullableSupport;
+    private bool _retargetArrayContains = true;
+    private bool _unwrappedTheColumn;
 
     public NullableColumnLifter(
         ParameterExpression columnParameter,
@@ -49,12 +52,32 @@ internal sealed class NullableColumnLifter : ExpressionVisitor
     // Set when a values.Contains(column) call was re-targeted; the caller must then supply a TColumn?[] value.
     public ParameterExpression? NullableArrayValueParameter { get; private set; }
 
-    public Expression Lift(Expression predicateBody) => Visit(predicateBody)!;
+    public Expression Lift(Expression predicateBody)
+    {
+        var liftedBody = Visit(predicateBody)!;
 
-    protected override Expression VisitParameter(ParameterExpression node) =>
-        node == _columnParameter
-            ? Expression.Convert(_nullableAccessorBody, _nullableSupport.ColumnType)
-            : base.VisitParameter(node);
+        // Re-targeting rewrites the matched Contains call only. A predicate that also reads the value array
+        // elsewhere (values.Length, a second Contains, ...) would be left with a free parameter of the original
+        // array type, so drop the re-targeting and let the whole body take the guarded conversion path instead.
+        if (NullableArrayValueParameter is not null && ReferencesParameter(liftedBody, _valueParameter!))
+        {
+            NullableArrayValueParameter = null;
+            _retargetArrayContains = false;
+            _unwrappedTheColumn = false;
+            liftedBody = Visit(predicateBody)!;
+        }
+
+        return _unwrappedTheColumn
+            ? Expression.AndAlso(Expression.Property(_nullableAccessorBody, nameof(Nullable<int>.HasValue)), liftedBody)
+            : liftedBody;
+    }
+
+    protected override Expression VisitParameter(ParameterExpression node)
+    {
+        if (node != _columnParameter) return base.VisitParameter(node);
+        _unwrappedTheColumn = true;
+        return Expression.Convert(_nullableAccessorBody, _nullableSupport.ColumnType);
+    }
 
     protected override Expression VisitBinary(BinaryExpression node)
     {
@@ -96,6 +119,7 @@ internal sealed class NullableColumnLifter : ExpressionVisitor
     // the array, or MemoryExtensions.Contains over an implicit span conversion (first-class spans).
     private bool IsValueArrayContainsColumn(MethodCallExpression node)
     {
+        if (!_retargetArrayContains) return false;
         if (_valueParameter is null || !_valueParameter.Type.IsArray) return false;
         if (_valueParameter.Type.GetElementType() != _nullableSupport.ColumnType) return false;
         if (!node.Method.IsStatic || node.Method.Name != nameof(Enumerable.Contains)) return false;
@@ -146,10 +170,28 @@ internal sealed class NullableColumnLifter : ExpressionVisitor
         _ => expression,
     };
 
+    private static bool ReferencesParameter(Expression expression, ParameterExpression parameter)
+    {
+        var detector = new ParameterReferenceDetector(parameter);
+        detector.Visit(expression);
+        return detector.Found;
+    }
+
     private static bool IsNullableValueType(Type type) => Nullable.GetUnderlyingType(type) is not null;
 
     private static bool IsComparison(ExpressionType nodeType) => nodeType is
         ExpressionType.Equal or ExpressionType.NotEqual
         or ExpressionType.GreaterThan or ExpressionType.GreaterThanOrEqual
         or ExpressionType.LessThan or ExpressionType.LessThanOrEqual;
+
+    private sealed class ParameterReferenceDetector(ParameterExpression parameter) : ExpressionVisitor
+    {
+        public bool Found { get; private set; }
+
+        protected override Expression VisitParameter(ParameterExpression node)
+        {
+            if (node == parameter) Found = true;
+            return node;
+        }
+    }
 }

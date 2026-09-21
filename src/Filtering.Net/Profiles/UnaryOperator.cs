@@ -33,7 +33,7 @@ internal sealed class UnaryOperator<TColumn>(string name, LambdaExpression predi
 
     private sealed class BoundUnaryOperator(Expression splicedBody) : BoundOperator
     {
-        public override void Validate(FilterLeaf leaf, string path, List<FilterValidationError> errors, FilterValueContext valueContext)
+        public override void Validate(FilterLeaf leaf, string path, List<FilterValidationError> errors, JsonSerializerOptions? serializerOptions)
         {
             if (leaf.Value.ValueKind is not JsonValueKind.Null and not JsonValueKind.Undefined)
             {
@@ -41,6 +41,6 @@ internal sealed class UnaryOperator<TColumn>(string name, LambdaExpression predi
             }
         }
 
-        public override Expression BuildBody(FilterLeaf leaf, FilterValueContext valueContext) => splicedBody;
+        public override Expression BuildBody(FilterLeaf leaf, JsonSerializerOptions? serializerOptions) => splicedBody;
     }
 }

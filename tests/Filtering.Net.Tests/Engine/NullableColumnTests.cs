@@ -140,4 +140,61 @@ public class NullableColumnTests
         // Assert
         filteredNames.Should().Equal("Alice", "Carol");
     }
+
+    [Fact]
+    public void ApplyFilter_CustomOperatorUsingColumnMemberOnNullRows_ExcludesThemInsteadOfThrowing()
+    {
+        // Arrange — nothing short-circuits the null row away, so the unwrapping fallback is evaluated on it.
+        var yearProfile = DateTimeFilter.Profile.Extend("YearFilter",
+            FilterOperator.Value<DateTime, int>("year", (column, year) => column.Year == year, Int32Filter.TryGetValue));
+        var definition = Definition(properties:
+        [
+            FilterProperty.MapNullable<Person, DateTime>("LastSeen", person => person.LastSeen, yearProfile).Build(),
+        ]);
+
+        // Act
+        var filteredNames = definition.ApplyFilter(People(), Leaf("LastSeen", "year", "2026")).Names();
+
+        // Assert
+        filteredNames.Should().Equal("Alice", "Carol");
+    }
+
+    [Fact]
+    public void ApplyFilter_UnaryOperatorUsingColumnMemberOnNullRows_ExcludesThemInsteadOfThrowing()
+    {
+        // Arrange
+        var evenScoreProfile = Int32Filter.Profile.Extend("EvenScore",
+            FilterOperator.Unary<int>("isEven", column => column % 2 == 0));
+        var definition = Definition(properties:
+        [
+            FilterProperty.MapNullable<Person, int>("Score", person => person.Score, evenScoreProfile).Build(),
+        ]);
+
+        // Act
+        var filteredNames = definition.ApplyFilter(People(), Leaf("Score", "isEven", "null")).Names();
+
+        // Assert
+        filteredNames.Should().Equal("Alice", "Carol");
+    }
+
+    [Fact]
+    public void ApplyFilter_ArrayOperatorReadingTheValuesOutsideContains_SkipsNullRowsWithoutThrowing()
+    {
+        // Arrange — re-targeting only the Contains call would leave the values.Length reference unbound.
+        var guardedInProfile = FilterProfile<int>.Create("GuardedIntIn",
+            FilterOperator.Value<int, int[]>(
+                "inNonEmpty",
+                (column, values) => values.Length > 0 && values.Contains(column),
+                Int32Filter.TryGetArray));
+        var definition = Definition(properties:
+        [
+            FilterProperty.MapNullable<Person, int>("Score", person => person.Score, guardedInProfile).Build(),
+        ]);
+
+        // Act
+        var filteredNames = definition.ApplyFilter(People(), Leaf("Score", "inNonEmpty", "[10, 20]")).Names();
+
+        // Assert
+        filteredNames.Should().Equal("Alice", "Carol");
+    }
 }

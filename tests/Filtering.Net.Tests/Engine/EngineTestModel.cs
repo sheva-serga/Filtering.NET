@@ -9,6 +9,8 @@ public sealed class Company
 
 public sealed class Department
 {
+    public int Id { get; set; }
+
     public string Name { get; set; } = "";
 
     public Company Company { get; set; } = new();

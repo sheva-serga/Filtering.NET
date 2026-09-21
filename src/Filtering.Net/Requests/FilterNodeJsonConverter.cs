@@ -62,8 +62,10 @@ internal sealed class FilterNodeJsonConverter : JsonConverter<FilterNode>
             throw new JsonException("FilterLeaf requires a string `field`.");
         if (!root.TryGetProperty("op", out var opElement) || opElement.ValueKind != JsonValueKind.String)
             throw new JsonException("FilterLeaf requires a string `op`.");
+        // An omitted value is how a unary operator is sent; default(JsonElement) has no parent document,
+        // so it must not be Cloned. Operators see it as JsonValueKind.Undefined.
         if (!root.TryGetProperty("value", out var valueElement))
-            valueElement = default;
+            return new FilterLeaf(fieldElement.GetString()!, opElement.GetString()!, default);
         return new FilterLeaf(fieldElement.GetString()!, opElement.GetString()!, valueElement.Clone());
     }
 
@@ -76,7 +78,9 @@ internal sealed class FilterNodeJsonConverter : JsonConverter<FilterNode>
                 writer.WriteString("field", leaf.Field);
                 writer.WriteString("op", leaf.Operator);
                 writer.WritePropertyName("value");
-                leaf.Value.WriteTo(writer);
+                // A leaf read from a request that omitted `value` carries an Undefined element, which cannot write itself.
+                if (leaf.Value.ValueKind == JsonValueKind.Undefined) writer.WriteNullValue();
+                else leaf.Value.WriteTo(writer);
                 writer.WriteEndObject();
                 break;
             case FilterGroup group:

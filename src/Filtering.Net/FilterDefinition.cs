@@ -15,7 +15,8 @@ public class FilterDefinition<TEntity>(FilterSchema<TEntity> schema) : IFilterDe
     public FilterValidationResult Validate(IReadOnlyList<SortItem>? sortItems) => FilterTreeValidator.ValidateSort(Schema, sortItems);
 
     /// <inheritdoc />
-    public FilterValidationResult Validate(int? page, int? pageSize) => PageValidation.Validate(page, pageSize, Schema.Settings.MaxPageSize);
+    public FilterValidationResult Validate(int? page, int? pageSize) =>
+        PageValidation.Validate(page, pageSize, ResolvePageSize(pageSize), Schema.Settings.MaxPageSize);
 
     /// <inheritdoc />
     public FilterValidationResult Validate(FilterRequest request)
@@ -31,6 +32,10 @@ public class FilterDefinition<TEntity>(FilterSchema<TEntity> schema) : IFilterDe
         }
         return aggregatedErrors.Count == 0 ? FilterValidationResult.Success : new FilterValidationResult(aggregatedErrors);
     }
+
+    /// <inheritdoc />
+    public int ResolvePageSize(int? requestedPageSize) =>
+        Math.Min(Math.Max(1, requestedPageSize ?? Schema.Settings.DefaultPageSize), Schema.Settings.MaxPageSize);
 
     /// <inheritdoc />
     public IQueryable<TEntity> ApplyFilter(IQueryable<TEntity> query, FilterNode? where)
@@ -51,8 +56,10 @@ public class FilterDefinition<TEntity>(FilterSchema<TEntity> schema) : IFilterDe
             IOrderedQueryable<TEntity>? orderedQuery = null;
             foreach (var sortItem in sortItems)
             {
-                if (!Schema.TryGetProperty(sortItem.Field, out var property) || !property.Sortable)
+                if (!Schema.TryGetProperty(sortItem.Field, out var property))
                     throw new FilterDispatchException($"Unknown sort field '{sortItem.Field}' (validation should have caught this).");
+                if (!property.Sortable)
+                    throw new FilterDispatchException($"Field '{sortItem.Field}' is not configured as sortable (validation should have caught this).");
                 orderedQuery = property.ApplySort(query, orderedQuery, sortItem.Dir ?? property.DefaultSortDirection);
             }
             resultQuery = orderedQuery!;
@@ -61,8 +68,13 @@ public class FilterDefinition<TEntity>(FilterSchema<TEntity> schema) : IFilterDe
         if (page is not null || pageSize is not null)
         {
             var pageNumber = Math.Max(1, page ?? 1);
-            var resolvedPageSize = Math.Min(Math.Max(1, pageSize ?? Schema.Settings.DefaultPageSize), Schema.Settings.MaxPageSize);
-            resultQuery = resultQuery.Skip((pageNumber - 1) * resolvedPageSize).Take(resolvedPageSize);
+            var resolvedPageSize = ResolvePageSize(pageSize);
+            // Computed in long so an oversized page fails loudly instead of wrapping into a negative Skip.
+            var skippedRowCount = (long)(pageNumber - 1) * resolvedPageSize;
+            if (skippedRowCount > int.MaxValue)
+                throw new FilterDispatchException(
+                    $"Page {pageNumber} at page size {resolvedPageSize} skips more rows than a query can express (validation should have caught this).");
+            resultQuery = resultQuery.Skip((int)skippedRowCount).Take(resolvedPageSize);
         }
         return resultQuery;
     }

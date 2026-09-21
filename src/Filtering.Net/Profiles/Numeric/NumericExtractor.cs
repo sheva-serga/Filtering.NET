@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 
 namespace Filtering.Net;
@@ -5,6 +6,13 @@ namespace Filtering.Net;
 /// <summary>Generic JSON-to-numeric extraction shared by every per-CLR-type numeric profile.</summary>
 public static class NumericExtractor
 {
+    /// <summary>
+    /// The one string-parsing contract every numeric profile uses, so the same literal is accepted on every numeric
+    /// column type and a value accepted as a JSON Number is also accepted as the equivalent JSON String.
+    /// Allows surrounding whitespace, a sign, a decimal point, thousands separators and an exponent.
+    /// </summary>
+    public const NumberStyles InvariantNumberStyles = NumberStyles.Number | NumberStyles.AllowExponent;
+
     /// <summary>Per-CLR-type JSON Number reader (e.g. <c>JsonElement.TryGetInt32</c>).</summary>
     public delegate bool TryGetFromJson<T>(JsonElement element, out T value);
 
@@ -52,6 +60,8 @@ public static class NumericExtractor
         return false;
     }
 
+    // Type-agnostic despite living here: the string, Guid and enum profiles walk their arrays through it too,
+    // so the array-shape error message and the element-index wording cannot drift between profiles.
     /// <summary>Walks a JSON Array via <paramref name="tryGetScalar"/>, short-circuiting on the first element failure.</summary>
     public static bool TryGetArray<T>(
         JsonElement element,

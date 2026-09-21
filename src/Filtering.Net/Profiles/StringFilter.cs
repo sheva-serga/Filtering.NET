@@ -60,29 +60,6 @@ public static class StringFilter
     }
 
     /// <summary>Extracts a <see cref="string"/>[] from a JSON Array of Strings via <see cref="TryGetValue"/>.</summary>
-    public static bool TryGetArray(JsonElement element, out string[] values, out string error)
-    {
-        if (element.ValueKind != JsonValueKind.Array)
-        {
-            values = [];
-            error = $"Expected JSON Array, got {element.ValueKind}.";
-            return false;
-        }
-        var collected = new List<string>();
-        var elementIndex = 0;
-        foreach (var item in element.EnumerateArray())
-        {
-            if (!TryGetValue(item, out var itemValue, out var itemError))
-            {
-                values = [];
-                error = $"Array element [{elementIndex}]: {itemError}";
-                return false;
-            }
-            collected.Add(itemValue);
-            elementIndex++;
-        }
-        values = [.. collected];
-        error = string.Empty;
-        return true;
-    }
+    public static bool TryGetArray(JsonElement element, out string[] values, out string error) =>
+        NumericExtractor.TryGetArray(element, TryGetValue, out values, out error);
 }

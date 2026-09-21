@@ -27,18 +27,8 @@ public static class PredicateBuilder
         Expression<Func<TEntity, bool>> right,
         Func<Expression, Expression, BinaryExpression> binaryFactory)
     {
-        var rebinder = new ParameterRebinder(right.Parameters[0], left.Parameters[0]);
-        var rebindedRightBody = rebinder.Visit(right.Body)!;
+        var rebindedRightBody = ExpressionSplicer.ReplaceParameter(right.Body, right.Parameters[0], left.Parameters[0]);
         var combinedBody = binaryFactory(left.Body, rebindedRightBody);
         return Expression.Lambda<Func<TEntity, bool>>(combinedBody, left.Parameters[0]);
-    }
-
-    private sealed class ParameterRebinder(ParameterExpression source, ParameterExpression target) : ExpressionVisitor
-    {
-        private readonly ParameterExpression _source = source;
-        private readonly ParameterExpression _target = target;
-
-        protected override Expression VisitParameter(ParameterExpression node)
-            => node == _source ? _target : base.VisitParameter(node);
     }
 }

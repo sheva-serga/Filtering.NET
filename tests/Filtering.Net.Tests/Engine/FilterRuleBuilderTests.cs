@@ -46,6 +46,19 @@ public class FilterRuleBuilderTests
     }
 
     [Fact]
+    public void For_CalledTwice_ThrowsConfigurationException()
+    {
+        // Arrange
+        var builder = new FilterRuleBuilder<Person, string>().For(person => person.Name);
+
+        // Act
+        var declareSecondAccessor = () => builder.For(person => person.Department.Name);
+
+        // Assert
+        declareSecondAccessor.Should().Throw<FilterConfigurationException>().WithMessage("*For(...)*");
+    }
+
+    [Fact]
     public void Operator_DuplicateName_ThrowsConfigurationException()
     {
         // Arrange

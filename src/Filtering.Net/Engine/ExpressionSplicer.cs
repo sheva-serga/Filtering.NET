@@ -8,6 +8,9 @@ internal static class ExpressionSplicer
     public static Expression ReplaceParameter(Expression body, ParameterExpression source, Expression replacement) =>
         new ParameterReplacer(source, replacement).Visit(body)!;
 
+    // The navigation is spliced in verbatim, with no null test: EF Core translates a null navigation to a LEFT JOIN,
+    // and the [Map] path leaves dotted accessors unguarded too (FN1006 warns instead). In-memory queries over a null
+    // navigation therefore throw, exactly as the hand-written accessor would.
     public static Expression<Func<TParent, TValue>> Compose<TParent, TEntity, TValue>(
         Expression<Func<TParent, TEntity>> navigation,
         Expression<Func<TEntity, TValue>> accessor)

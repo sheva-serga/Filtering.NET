@@ -15,6 +15,9 @@ public class FilteringQueryableExtensionsTests
         public FilterValidationResult Validate(int? page, int? pageSize) => FilterValidationResult.Success;
         public FilterValidationResult Validate(FilterRequest request) => FilterValidationResult.Success;
 
+        // No schema behind this double, so an absent page size falls back to the engine's own default.
+        public int ResolvePageSize(int? requestedPageSize) => requestedPageSize ?? new FilterSettings().DefaultPageSize;
+
         public IQueryable<TestEntity> ApplyFilter(IQueryable<TestEntity> query, FilterNode? where)
         {
             if (where is FilterLeaf leaf && leaf.Field == "name" && leaf.Operator == "eq")
@@ -43,6 +46,7 @@ public class FilteringQueryableExtensionsTests
         public FilterValidationResult Validate(int? page, int? pageSize) => FilterValidationResult.Success;
         public FilterValidationResult Validate(FilterRequest request) =>
             new([new FilterValidationError("path", FilterValidationCode.UnknownField, "nope")]);
+        public int ResolvePageSize(int? requestedPageSize) => requestedPageSize ?? new FilterSettings().DefaultPageSize;
         public IQueryable<TestEntity> ApplyFilter(IQueryable<TestEntity> query, FilterNode? where) => query;
         public IQueryable<TestEntity> ApplySorting(IQueryable<TestEntity> query, IReadOnlyList<SortItem>? sortItems, int? page = null, int? pageSize = null) => query;
     }

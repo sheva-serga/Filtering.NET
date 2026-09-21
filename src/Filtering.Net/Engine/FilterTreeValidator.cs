@@ -1,4 +1,7 @@
 #pragma warning disable IDE0130 // Namespace does not match folder structure
+
+using System.Text.Json;
+
 namespace Filtering.Net;
 
 internal static class FilterTreeValidator
@@ -10,9 +13,9 @@ internal static class FilterTreeValidator
         if (where is null) return FilterValidationResult.Success;
 
         var validationErrors = new List<FilterValidationError>();
-        var valueContext = new FilterValueContext(schema.SerializerOptions);
+        var serializerOptions = schema.SerializerOptions;
         var leafCount = 0;
-        ValidateNode(schema, where, RootPath, depth: 1, ref leafCount, validationErrors, valueContext);
+        ValidateNode(schema, where, RootPath, depth: 1, ref leafCount, validationErrors, serializerOptions);
 
         if (leafCount > schema.Settings.MaxLeafConditions)
         {
@@ -32,12 +35,31 @@ internal static class FilterTreeValidator
         for (var sortIndex = 0; sortIndex < sortItems.Count; sortIndex++)
         {
             var sortItem = sortItems[sortIndex];
-            if (schema.TryGetProperty(sortItem.Field, out var property) && property.Sortable) continue;
-            validationErrors.Add(new FilterValidationError(
-                $"sort[{sortIndex}].field",
-                FilterValidationCode.NotSortable,
-                $"Field '{sortItem.Field}' is not configured as sortable.",
-                Field: sortItem.Field));
+            if (string.IsNullOrEmpty(sortItem.Field))
+            {
+                validationErrors.Add(new FilterValidationError(
+                    $"sort[{sortIndex}].field",
+                    FilterValidationCode.NotSortable,
+                    "A sort item must name a field."));
+                continue;
+            }
+            if (!schema.TryGetProperty(sortItem.Field, out var property) || !property.Sortable)
+            {
+                validationErrors.Add(new FilterValidationError(
+                    $"sort[{sortIndex}].field",
+                    FilterValidationCode.NotSortable,
+                    $"Field '{sortItem.Field}' is not configured as sortable.",
+                    Field: sortItem.Field));
+                continue;
+            }
+            if (sortItem.Dir is { } requestedDirection && requestedDirection is not (SortDir.Asc or SortDir.Desc))
+            {
+                validationErrors.Add(new FilterValidationError(
+                    $"sort[{sortIndex}].dir",
+                    FilterValidationCode.InvalidSortDirection,
+                    $"Sort direction '{(int)requestedDirection}' is not Asc or Desc.",
+                    Field: sortItem.Field));
+            }
         }
         return ToResult(validationErrors);
     }
@@ -49,11 +71,11 @@ internal static class FilterTreeValidator
         int depth,
         ref int leafCount,
         List<FilterValidationError> errors,
-        FilterValueContext valueContext)
+        JsonSerializerOptions? serializerOptions)
     {
         if (depth > schema.Settings.MaxNestingDepth)
         {
-            // Reported once at the first node past the limit; its subtree is not walked.
+            // Reported per node that crosses the limit; that node's subtree is not walked.
             errors.Add(new FilterValidationError(
                 path,
                 FilterValidationCode.NestingTooDeep,
@@ -68,17 +90,32 @@ internal static class FilterTreeValidator
                 errors.Add(new FilterValidationError(path, FilterValidationCode.GroupEmpty, "Group has no children."));
                 return;
             }
+            if (group.Op is not (LogicalOp.And or LogicalOp.Or or LogicalOp.Not))
+            {
+                errors.Add(new FilterValidationError(
+                    path,
+                    FilterValidationCode.InvalidNodeShape,
+                    $"Group combinator '{(int)group.Op}' is not And, Or, or Not."));
+                return;
+            }
+            if (group.Op == LogicalOp.Not && group.Children.Count != 1)
+            {
+                errors.Add(new FilterValidationError(
+                    path,
+                    FilterValidationCode.InvalidNodeShape,
+                    $"A 'not' group requires exactly one child, got {group.Children.Count}."));
+                return;
+            }
             var combinatorSegment = group.Op switch
             {
                 LogicalOp.And => "and",
                 LogicalOp.Or => "or",
-                LogicalOp.Not => "not",
-                _ => "unknown"
+                _ => "not"
             };
             for (var childIndex = 0; childIndex < group.Children.Count; childIndex++)
             {
                 var childPath = $"{path}.{combinatorSegment}[{childIndex}]";
-                ValidateNode(schema, group.Children[childIndex], childPath, depth + 1, ref leafCount, errors, valueContext);
+                ValidateNode(schema, group.Children[childIndex], childPath, depth + 1, ref leafCount, errors, serializerOptions);
             }
             return;
         }
@@ -88,7 +125,7 @@ internal static class FilterTreeValidator
             leafCount++;
             if (schema.TryGetProperty(leaf.Field, out var property))
             {
-                property.ValidateLeaf(leaf, path, errors, valueContext);
+                property.ValidateLeaf(leaf, path, errors, serializerOptions);
                 return;
             }
             errors.Add(new FilterValidationError(
@@ -99,7 +136,10 @@ internal static class FilterTreeValidator
             return;
         }
 
-        errors.Add(new FilterValidationError(path, FilterValidationCode.InvalidValueType, "Unknown FilterNode subtype."));
+        errors.Add(new FilterValidationError(
+            path,
+            FilterValidationCode.InvalidNodeShape,
+            $"'{node.GetType().Name}' is not a FilterGroup or FilterLeaf."));
     }
 
     private static FilterValidationResult ToResult(List<FilterValidationError> validationErrors) =>

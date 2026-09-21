@@ -65,14 +65,26 @@ public class AttributeShapeTests
     }
 
     [Fact]
-    public void PageSettingsAttribute_InitializedWithLimits_StoresLimits()
+    public void PageSettingsAttribute_Uninitialized_LeavesBothLimitsAtZeroMeaningInherit()
     {
         // Arrange
-        var attribute = new PageSettingsAttribute { DefaultPageSize = 25, MaxPageSize = 200 };
+        var attribute = new PageSettingsAttribute();
+
+        // Act + Assert
+        attribute.DefaultPageSize.Should().Be(0);
+        attribute.MaxPageSize.Should().Be(0);
+    }
+
+    [Fact]
+    public void PageSettingsAttribute_InitializedWithLimits_StoresLimits()
+    {
+        // Arrange — values differ from each other and from every default so a swapped or missing
+        // init setter cannot pass.
+        var attribute = new PageSettingsAttribute { DefaultPageSize = 25, MaxPageSize = 100 };
 
         // Act + Assert
         attribute.DefaultPageSize.Should().Be(25);
-        attribute.MaxPageSize.Should().Be(200);
+        attribute.MaxPageSize.Should().Be(100);
     }
 
     [Fact]
@@ -106,13 +118,29 @@ public class AttributeShapeTests
     }
 
     [Fact]
-    public void FilterDefaultsAttribute_InitializedWithLimits_StoresLimits()
+    public void FilterDefaultsAttribute_Uninitialized_ExposesTheDocumentedDefaults()
     {
         // Arrange
-        var attribute = new FilterDefaultsAttribute { DefaultPageSize = 50, MaxPageSize = 200, MaxNestingDepth = 10, MaxLeafConditions = 50 };
+        var attribute = new FilterDefaultsAttribute();
 
         // Act + Assert
         attribute.DefaultPageSize.Should().Be(50);
         attribute.MaxPageSize.Should().Be(200);
+        attribute.MaxNestingDepth.Should().Be(10);
+        attribute.MaxLeafConditions.Should().Be(50);
+    }
+
+    [Fact]
+    public void FilterDefaultsAttribute_InitializedWithLimits_StoresLimits()
+    {
+        // Arrange — every value differs from that property's own default, so an init setter writing
+        // into the wrong backing field cannot pass.
+        var attribute = new FilterDefaultsAttribute { DefaultPageSize = 5, MaxPageSize = 15, MaxNestingDepth = 3, MaxLeafConditions = 7 };
+
+        // Act + Assert
+        attribute.DefaultPageSize.Should().Be(5);
+        attribute.MaxPageSize.Should().Be(15);
+        attribute.MaxNestingDepth.Should().Be(3);
+        attribute.MaxLeafConditions.Should().Be(7);
     }
 }

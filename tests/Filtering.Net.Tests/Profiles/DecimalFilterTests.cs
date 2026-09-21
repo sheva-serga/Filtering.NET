@@ -23,6 +23,22 @@ public class DecimalFilterTests
     }
 
     [Fact]
+    public void TryGetValue_FromExponentString_MatchesTheEquivalentJsonNumber()
+    {
+        // Arrange — clients that send decimals as strings to avoid float rounding still use scientific notation.
+        var stringElement = JsonDocument.Parse("\"1E+5\"").RootElement;
+        var numberElement = JsonDocument.Parse("1e5").RootElement;
+
+        // Act
+        var stringSuccess = DecimalFilter.TryGetValue(stringElement, out var fromString, out var error);
+        DecimalFilter.TryGetValue(numberElement, out var fromNumber, out _);
+
+        // Assert
+        stringSuccess.Should().BeTrue(because: error);
+        fromString.Should().Be(fromNumber);
+    }
+
+    [Fact]
     public void TryGetArray_FromJsonArray_ReturnsAllDecimals()
     {
         // Arrange

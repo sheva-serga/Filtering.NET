@@ -47,29 +47,6 @@ public static class EnumExtractor
 
     /// <summary>Extracts a <typeparamref name="TEnum"/>[] from a JSON Array; each element parsed via <see cref="TryGetValue{TEnum}"/>.</summary>
     public static bool TryGetArray<TEnum>(JsonElement element, out TEnum[] values, out string error)
-        where TEnum : struct, Enum
-    {
-        if (element.ValueKind != JsonValueKind.Array)
-        {
-            values = [];
-            error = $"Expected JSON Array for enum array, got {element.ValueKind}.";
-            return false;
-        }
-        var collected = new List<TEnum>();
-        var elementIndex = 0;
-        foreach (var item in element.EnumerateArray())
-        {
-            if (!TryGetValue<TEnum>(item, out var itemValue, out var itemError))
-            {
-                values = [];
-                error = $"Array element [{elementIndex}]: {itemError}";
-                return false;
-            }
-            collected.Add(itemValue);
-            elementIndex++;
-        }
-        values = [.. collected];
-        error = string.Empty;
-        return true;
-    }
+        where TEnum : struct, Enum =>
+        NumericExtractor.TryGetArray<TEnum>(element, TryGetValue, out values, out error);
 }
