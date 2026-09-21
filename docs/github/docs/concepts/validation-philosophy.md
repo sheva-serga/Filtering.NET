@@ -13,24 +13,32 @@ When the resulting `FilterValidationResult.IsValid` is `false`, the orchestrator
 
 ## Structured errors with paths
 
-Each `FilterValidationError` has three fields:
+Each `FilterValidationError` carries three fields that are always populated:
 
 - **`Code`** — a `FilterValidationCode` enum value (see the list below).
-- **`Path`** — a JSON-pointer-style path into the request (`/where/and/0/operator`, `/sort/1/dir`, `/pageSize`). Clients use it to highlight the offending field.
+- **`Path`** — a dotted path into the request. The filter tree is rooted at `where`, each group appends its combinator and the child index (`where.and[0]`, `where.or[1].not[0]`), and a leaf error appends the member that failed (`.op` or `.value`). Sort errors are `sort[<index>].field` / `sort[<index>].dir`, and paging errors are the bare `page` / `pageSize`. Clients use the path to highlight the offending field.
 - **`Message`** — a human-readable description.
+
+`FilterValidationError` also carries `Field` and `OperatorName` for leaf-level errors, so a client can key on those instead of parsing the path.
 
 A response payload after a controller maps `invalid.Result` to `BadRequest` looks like:
 
 ```json
 {
+  "isValid": false,
   "errors": [
-    { "code": "OperatorNotAllowed", "path": "/where/and/0/operator",
-      "message": "Operator 'fuzzy' is not allowed on field 'Name'." },
-    { "code": "UnknownField", "path": "/where/and/1/field",
-      "message": "Field 'isActive2' is not configured for filtering." }
+    { "path": "where.and[0].op", "code": "OperatorNotAllowed",
+      "message": "Operator 'fuzzy' is not supported on field 'Name'.",
+      "field": "Name", "operatorName": "fuzzy" },
+    { "path": "where.and[1]", "code": "UnknownField",
+      "message": "Field 'isActive2' is not configured for filtering.",
+      "field": "isActive2" }
   ]
 }
 ```
+
+!!! note
+    `Code` is a plain C# enum and the library registers no converter for it, so System.Text.Json writes it as its numeric value. Register `JsonStringEnumConverter` on your app's `JsonSerializerOptions` if you want the names shown above on the wire.
 
 ## Codes you'll see at runtime
 
@@ -38,18 +46,19 @@ A response payload after a controller maps `invalid.Result` to `BadRequest` look
 
 - **`UnknownField`** — field name not configured for filtering.
 - **`OperatorNotAllowed`** — operator not in the property's profile, or excluded by `Only` / `Except`.
-- **`InvalidValueType`** — wrong `JsonValueKind` (e.g., bool where number expected).
-- **`InvalidValueFormat`** — right kind, wrong format (e.g., `"abc"` for an invariant decimal).
-- **`EmptyInArray`** — `in` operator with an empty array.
+- **`InvalidValueType`** — the value could not be read for the operator: a wrong `JsonValueKind` (bool where a number was expected, a non-array for `in`), a string that does not parse (`"abc"` for a decimal, a bad GUID or enum name), a value sent to an operator that takes none, or a JSON `null` for an operator that takes a typed value.
 - **`InterceptorRejected`** — an `[InterceptValue]` method threw `FilterValidationException`.
-- **`NotSortable`** — sort field is not configured as `Sortable = true`.
-- **`InvalidSortDirection`** — `dir` value not `Asc` or `Desc`.
-- **`PageInvalid`** — `page < 1`.
+- **`NotSortable`** — sort field is missing, unknown, or not configured as `Sortable = true`.
+- **`InvalidSortDirection`** — `dir` value is outside the `SortDir` enum (not `Asc` or `Desc`).
+- **`PageInvalid`** — `page < 1`, or a `page` so large that the rows it skips do not fit in an `int`.
 - **`PageSizeTooLarge`** — `pageSize > MaxPageSize`.
 - **`PageSizeInvalid`** — `pageSize < 1`.
 - **`NestingTooDeep`** — filter nesting depth exceeds `MaxNestingDepth` (assembly-level `[FilterDefaults]`, default 10).
 - **`TooManyConditions`** — total leaf count exceeds `MaxLeafConditions` (assembly-level `[FilterDefaults]`, default 50).
-- **`GroupEmpty`** — `and: []` or `or: []` with zero children.
+- **`GroupEmpty`** — `and: []`, `or: []`, or `not: []` with zero children.
+- **`InvalidNodeShape`** — a node the engine cannot interpret: a `not` group with a child count other than one, a combinator outside `LogicalOp`, or a `FilterNode` subtype that is neither `FilterGroup` nor `FilterLeaf`.
+
+Two members of the enum, `InvalidValueFormat` and `EmptyInArray`, are declared but never produced: a malformed value is reported as `InvalidValueType`, and an empty `in` array is accepted (it matches nothing). Don't branch on them.
 
 ## How to surface this in HTTP APIs
 

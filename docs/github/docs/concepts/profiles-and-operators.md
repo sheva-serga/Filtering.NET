@@ -7,7 +7,7 @@ description: How [FilterProfile<T>] groups operators by column type, and how cus
 
 ## What a profile is
 
-A *profile* is a static class decorated with `[FilterProfile<TColumn>]` that names a set of operators applicable to a column of CLR type `TColumn`. Operators are exposed as `[FilterOperator("name")]`-decorated methods that return `Expression<Func<TColumn, TValue, bool>>` (binary) or `Expression<Func<TColumn, bool>>` (unary).
+A *profile* is a static class decorated with `[FilterProfile<TColumn>]` that names a set of operators applicable to a column of CLR type `TColumn`. Operators are exposed as `public static` `[FilterOperator("name")]`-decorated members — properties or methods — whose type is `Expression<Func<TColumn, TValue, bool>>` (binary) or `Expression<Func<TColumn, bool>>` (unary). A member of any other type is `FN0028`.
 
 Every profile also has a runtime form, `FilterProfile<TColumn>`. Built-in profiles expose it as `StringFilter.Profile` and friends; for your own profiles the generator emits the instance. You only deal with it directly when [building a definition by hand](../guides/hand-built-definitions.md).
 
@@ -17,14 +17,16 @@ Profiles decouple "which operators exist" from "which property uses them". A pro
 
 Filtering.Net ships profiles for every common scalar in `src/Filtering.Net/Profiles/`:
 
-- **`StringFilter`** — `eq`, `contains`, `startsWith`, `endsWith`, `in`, `isNull`, `notNull`.
-- **`Numeric/Int32Filter`, `Int64Filter`, `DecimalFilter`, `DoubleFilter`, `SingleFilter`, `Int16Filter`, `ByteFilter`, `SByteFilter`, `UInt16Filter`, `UInt32Filter`, `UInt64Filter`** — `eq`, `lt`, `lte`, `gt`, `gte`, `in`, `between`, `isNull`, `notNull`.
-- **`BoolFilter`** — `eq`, `isNull`, `notNull`.
-- **`GuidFilter`** — `eq`, `in`, `isNull`, `notNull`.
-- **`DateTimeFilter`** and the matching `Temporal/*` profiles for `DateOnly`, `TimeOnly`, `DateTimeOffset`, `TimeSpan` — `eq`, `lt`, `lte`, `gt`, `gte`, `between`, `isNull`, `notNull`.
-- **Auto-emitted `<EnumName>Filter`** — for every enum referenced by a `[GenerateFilter<T>]` graph, the generator emits an `[FilterProfile<TEnum>]` static class with `eq`, `in`, `isNull`, `notNull`.
+- **`StringFilter`** — `eq`, `ne`, `contains`, `startsWith`, `endsWith`, `in`, `isNull`.
+- **`Numeric/Int32Filter`, `Int64Filter`, `Int16Filter`, `ByteFilter`, `DecimalFilter`, `DoubleFilter`, `SingleFilter`** — `eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `in`, `isNull`.
+- **`BoolFilter`** — `eq`, `isNull`.
+- **`GuidFilter`** — `eq`, `ne`, `in`, `isNull`.
+- **`DateTimeFilter`** and the `Temporal/*` profiles for `DateTimeOffset`, `DateOnly`, and `TimeOnly` — `eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `isNull`.
+- **Auto-emitted `<EnumName>Filter`** — for every enum referenced by a `[GenerateFilter<T>]` graph, the generator emits a `[FilterProfile<TEnum>]` static class with `eq`, `ne`, `in`, `isNull`.
 
-The emitted SQL matches what you would write by hand: `LIKE` for `contains` / `startsWith` / `endsWith`, `IN` for `in`, `BETWEEN` for `between`, `IS NULL` / `IS NOT NULL` for the unary forms.
+There is no `between` and no `notNull`; a two-value operator is a [`[PropertyMap]` override](../guides/property-map-overrides.md), and "not null" is a `not` group wrapped around an `isNull` leaf. `DateOnlyFilter` and `TimeOnlyFilter` ship in the package's `net8.0` asset only — `DateOnly` and `TimeOnly` do not exist under `netstandard2.0`.
+
+The emitted SQL matches what you would write by hand: `LIKE` for `contains` / `startsWith` / `endsWith`, `IN` for `in`, `IS NULL` for `isNull`.
 
 ## Profile resolution
 
@@ -35,7 +37,7 @@ When `[Map]` does not specify `Profile = typeof(...)`, the generator runs `Profi
 - Multiple matches → emit `FN0012` and require the consumer to pick one explicitly.
 - No match → emit `FN0006` and require `Profile = typeof(...)`.
 
-Setting `Profile = typeof(MyProfile)` overrides the resolver entirely and bypasses both ambiguity and unmatched-type diagnostics. The chosen profile's `TColumn` must be assignment-compatible with the property's CLR type, or `FN0004` fires.
+Setting `Profile = typeof(MyProfile)` overrides the resolver entirely and bypasses both ambiguity and unmatched-type diagnostics. The named type must itself be marked `[FilterProfile<TColumn>]`, or `FN0022` fires; when it is a built-in profile, its `TColumn` must match the property's CLR type, or `FN0004` fires.
 
 ## Custom profiles inherit via BasedOn
 

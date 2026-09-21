@@ -7,7 +7,7 @@ description: Pair AddFiltering with a JsonSerializerContext to silence IL2026/IL
 
 ## What this does
 
-Typed-value JSON deserialization — used when a custom `[FilterOperator]` returns `Expression<Func<TColumn, TValue, bool>>` where `TValue` is a non-primitive type, or when a `[PropertyMap]` override declares a typed value — calls into `JsonSerializer`'s reflection-based APIs by default. Those APIs are incompatible with `PublishAot` and aggressive trimming, surfacing as `IL2026` / `IL3050` warnings at build time. Passing a `JsonSerializerContext` to `AddFiltering(IJsonTypeInfoResolver)` switches deserialization to source-generated converters, eliminating the reflection.
+Typed-value JSON deserialization — used by every value operator declared on a user `[FilterProfile<T>]`, whatever its `TValue`, and by every `[PropertyMap]` operator that takes an argument — calls into `JsonSerializer`'s reflection-based APIs by default. Those APIs are incompatible with `PublishAot` and aggressive trimming, surfacing as `IL2026` / `IL3050` warnings at build time. Passing a `JsonSerializerContext` to `AddFiltering(IJsonTypeInfoResolver)` switches deserialization to source-generated converters, eliminating the reflection.
 
 ## When to use
 
@@ -50,7 +50,7 @@ app.Run();
 
 ## Variations
 
-- **Multiple `[JsonSerializable]` lines** — declare one per typed value used by your custom operators. A custom operator with `Expression<Func<DateTime, MyDateRange, bool>>` requires `[JsonSerializable(typeof(MyDateRange))]` on the context.
+- **Multiple `[JsonSerializable]` lines** — declare one per typed value used by your custom operators, including the primitive ones. The sample app's `fuzzy` operator is `Expression<Func<string, string, bool>>`, which is why its context registers `typeof(string)`; a custom operator with `Expression<Func<DateTime, MyDateRange, bool>>` needs `[JsonSerializable(typeof(MyDateRange))]` as well.
 - **Reuse an existing app-level context** — if your app already has a `JsonSerializerContext` for ASP.NET Core JSON serialization, you can pass that same instance to `AddFiltering`. Just ensure every typed value used by filter operators is registered on it.
 - **Combine multiple contexts** — use `JsonTypeInfoResolver.Combine(...)` to merge an app context and a filter-specific context if you prefer keeping them separate.
 

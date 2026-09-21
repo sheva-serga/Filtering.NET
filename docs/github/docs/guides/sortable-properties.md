@@ -18,13 +18,13 @@ Any property your UI exposes as a sortable column. The `sort` field of a request
 ```csharp
 [GenerateFilter<User>]
 [Map(nameof(User.Id), Sortable = true)]
-// DefaultSortDirection.Desc — a SortItem with no Direction lands newest-first.
+// DefaultSortDirection.Desc — a SortItem with no dir lands newest-first.
 [Map(nameof(User.CreatedAt), Sortable = true, DefaultSortDirection = SortDir.Desc)]
 [Map(nameof(User.Age), Sortable = true, DefaultSortDirection = SortDir.Desc)]
 public partial class UserFilter { }
 ```
 
-A consumer requesting `{ "sort": [{ "field": "createdAt" }, { "field": "id", "direction": "asc" }] }` gets `OrderByDescending(u => u.CreatedAt).ThenBy(u => u.Id)`.
+A consumer requesting `{ "sort": [{ "field": "createdAt" }, { "field": "id", "dir": 0 }] }` gets `OrderByDescending(u => u.CreatedAt).ThenBy(u => u.Id)`.
 
 ## Variations
 
@@ -36,6 +36,8 @@ A consumer requesting `{ "sort": [{ "field": "createdAt" }, { "field": "id", "di
 
 - Only one `[Map]` per property is allowed (regardless of `Sortable` setting). Duplicates trigger `FN0001 DuplicateMapping`.
 - Properties with sortable-looking CLR types (numbers, dates) that are not marked `Sortable = true` raise `FN1002` as a friendly nudge.
+- `dir` is a numeric enum on the wire (`0` = ascending, `1` = descending). No string-enum converter is registered, so `"dir": "asc"` does not bind — the member stays null and the property's `DefaultSortDirection` is used instead. A number outside the enum fails validation with `InvalidSortDirection` at `sort[<index>].dir`.
+- A sort item with a missing or empty `field` fails validation with `NotSortable`.
 
 ## See also
 

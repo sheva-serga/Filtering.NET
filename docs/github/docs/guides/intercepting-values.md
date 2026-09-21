@@ -37,11 +37,11 @@ A request with `{ "field": "email", "op": "eq", "value": "Alice@Example.com" }` 
 - **Per-operator branching.** `InterceptContext.Operator` carries the operator name, so one interceptor can treat `eq` and `contains` differently.
 - **Array values.** An interceptor whose value parameter is an array, for example `string[]`, applies to array operators such as `in`.
 - **Raw JSON mode.** `[InterceptValue(nameof(...), Raw = true)]` makes the method receive the raw `JsonElement` and return the typed value, replacing the built-in parsing for scalar operators.
-- **Rejecting a value.** Throw `FilterValidationException` from the interceptor. Validation reports it as `InterceptorRejected` with your first error message.
+- **Rejecting a value.** Throw `FilterValidationException` from the interceptor. Validation reports it as `InterceptorRejected` with your first error message. Any other exception type is treated as a bug in the interceptor and propagates out of `Validate` unchanged rather than being turned into a validation error.
 
 ## Pitfalls
 
-- The method must be `static`. Any accessibility works, including `private`.
+- The method must be `static`, take `(InterceptContext context, TValue value)`, and return `TValue` — `JsonElement` in place of `TValue` when `Raw = true`. Any accessibility works, including `private`. A signature the generated `CreateSchema` cannot call is the compile error `FN0029`, so an interceptor never silently fails to run.
 - Only one `[InterceptValue]` per property is allowed. A second one fires `FN0007`.
 - An `[InterceptValue]` whose property name matches no `[Map]` on the same class raises `FN0011`.
 - Interceptors apply to values parsed by the profile. Custom operators with typed values, which are deserialized through the JSON resolver, are not intercepted.

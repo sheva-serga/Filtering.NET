@@ -56,17 +56,20 @@ The `sort` array carries `{ field, dir }` items where `dir` is `0` for ascending
 
 ## What happens on validation failure
 
-`Apply` and `ApplyPagedAsync` always run validation before they touch the underlying `IQueryable<T>`. On any validation error, they throw `FilterValidationException` whose `Result` property carries a `FilterValidationResult` — a structured list of `FilterValidationError` items with codes and JSON-pointer-style paths.
+`Apply` and `ApplyPagedAsync` always run validation before they touch the underlying `IQueryable<T>`. On any validation error, they throw `FilterValidationException` whose `Result` property carries a `FilterValidationResult` — a structured list of `FilterValidationError` items with codes and dotted paths into the request.
 
 The controller above catches the exception and returns the result as the HTTP 400 body. Clients then see a typed error payload like:
 
 ```json
 {
+  "isValid": false,
   "errors": [
     {
+      "path": "where.and[0].op",
       "code": "OperatorNotAllowed",
-      "path": "/where/and/0/operator",
-      "message": "Operator 'fuzzy' is not allowed on field 'Name'."
+      "message": "Operator 'fuzzy' is not supported on field 'Name'.",
+      "field": "Name",
+      "operatorName": "fuzzy"
     }
   ]
 }

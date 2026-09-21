@@ -2,7 +2,7 @@
 
 The runtime: request types, profiles, and the filter engine. Generated filter classes derive from `FilterDefinition<TEntity>` and only supply a schema. The engine composes predicates per request from typed, compiler-checked lambdas. No reflection over consumer types, no `MakeGenericMethod`, no `Compile()`.
 
-**Target:** `netstandard2.0`. Polyfilled via `PolySharp`. Ships as the `Filtering.Net` NuGet package.
+**Target:** `netstandard2.0;net8.0`. The netstandard2.0 asset is polyfilled via `PolySharp` and carries the `System.Text.Json` package reference; the net8.0 asset needs neither and is the only one that compiles `Profiles/Temporal/DateOnlyFilter.cs` / `TimeOnlyFilter.cs` (both `#if NET6_0_OR_GREATER`). Ships as the `Filtering.Net` NuGet package.
 
 ## What lives here
 
@@ -25,15 +25,15 @@ The runtime: request types, profiles, and the filter engine. Generated filter cl
 
 1. At property construction each allowed operator is *bound*: its column parameter is replaced by the property's accessor body. Unary operators are finished at this point.
 2. Per request the parsed value is wrapped in `FilterValueHolder<T>` and spliced in as a member access on a constant. Query providers parameterize that shape; a bare `ConstantExpression` would be inlined into SQL.
-3. `MapNullable` properties go through `NullableColumnLifter`, which rebuilds comparisons as lifted comparisons (`liftToNull: false`) and re-targets `values.Contains(column)` to the nullable array form. That reproduces what the C# compiler emits for `entity.NullableColumn == value`.
+3. `MapNullable` properties go through `NullableColumnLifter`, which rebuilds comparisons as lifted comparisons (`liftToNull: false`) and re-targets `values.Contains(column)` to the nullable array form. That reproduces what the C# compiler emits for `entity.NullableColumn == value`. Anything else — `column.Year`, `column % 2`, a second use of the value array alongside `Contains` — falls back to unwrapping the accessor to `TColumn`, and the whole lifted body is then wrapped in `accessor.HasValue && …` so null rows are excluded instead of throwing in memory (`IS NOT NULL` for providers). The re-targeting is dropped entirely when the predicate also reads the value array outside the matched `Contains`, so no free parameter can survive.
 
 ## Circular nesting
 
-`FilterNestingContext` is the path of nestings a schema is being built through. `AddNested` enters a nesting only while its `MaxDepth` is not used up on that path, and throws `FilterConfigurationException` when an unbounded nesting repeats with no bounded nesting in between. `NestedFilterResolver` in the generator applies the same two rules at compile time (FN0015); keep them in step.
+`FilterNestingContext` is the path of nestings a schema is being built through, each identified by the nesting key the generator emits: `<declaring filter class FQN>.<navigation property>`, plus `@<prefix>` when `Prefix` differs from the navigation name. `AddNested` enters a nesting only while its `MaxDepth` is not used up on that path, and throws `FilterConfigurationException` when an unbounded nesting repeats with no bounded nesting in between. `NestedFilterResolver` in the generator applies the same two rules at compile time (FN0014); keep them in step.
 
 ## Editing rules
 
-- **Public API contract.** Generated code calls `FilterProperty.Map/MapNullable/MapRule`, `FilterPropertyBuilder`, `FilterSchemaBuilder` (`Add`, `AddNested`), `FilterNestingContext.Root`, `FilterSchema.LiftInto`, `FilterProfile.Create/Extend`, `FilterOperator.*`, and each built-in's `Profile`. Renames require updating `Emission/` in the generator and re-blessing snapshots.
+- **Public API contract.** Generated code calls `FilterProperty.Map/MapNullable/MapRule`, `FilterPropertyBuilder`, `FilterSchemaBuilder` (`Add`, `AddNested`), `FilterNestingContext.Root`, `FilterSchema.LiftInto`, `FilterProfile.Create/Extend/ExtendWithOverrides`, `FilterOperator.*`, and each built-in's `Profile`. Renames require updating `Emission/` in the generator and re-blessing snapshots.
 - **Validation paths, codes, and messages are pinned** by end-to-end tests. Change them deliberately.
 - **Adding an operator to a built-in profile** means adding the `[FilterOperator]` template and listing it in that class's `Profile` initializer. `FilterProfileTests` fails if the two drift.
 - **Value extraction rule.** Operators on built-in and auto-emitted enum profiles parse through `TryGetValue` / `TryGetArray`. Value operators declared on user profiles, and every `[PropertyMap]` value operator, deserialize through System.Text.Json with the definition's resolver.

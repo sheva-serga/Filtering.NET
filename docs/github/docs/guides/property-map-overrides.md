@@ -44,6 +44,7 @@ public partial class ArticleFilter
 - **Computed accessors.** `For(u => u.FirstName + " " + u.LastName)`.
 - **Operators without a value.** `.Operator("isEmpty", tags => tags.Count == 0)`.
 - **Mixed argument types.** Chain `.Operator<string>(...)` and `.Operator<string[]>(...)` on the same builder.
+- **Statement bodies.** The method does not have to be one fluent `return` chain. Building the rule across several statements — a local for the builder, conditional `.Operator(...)` calls, then `return builder;` — works, and the analyzer reads operators from the whole body.
 
 ## Typed values and the JSON resolver
 
@@ -53,9 +54,9 @@ A rule that only has value-less operators needs no resolver.
 
 ## Pitfalls
 
-- The method must be `static`, take one `FilterRuleBuilder<TEntity, TValue>`, and return `FilterRule<TEntity, TValue>`. Any accessibility works.
+- The method must be `static`, take one `FilterRuleBuilder<TEntity, TValue>`, and return `FilterRule<TEntity, TValue>`. Any accessibility works. A signature the generated `CreateSchema` cannot call is the compile error `FN0023` rather than a property that silently vanishes from the schema.
 - A property cannot be carried by both `[Map]` and `[PropertyMap]`. Declaring both raises `FN0002`.
-- Forgetting `For(...)`, or declaring the same operator name twice, throws `FilterConfigurationException` when the filter is constructed.
+- Forgetting `For(...)`, calling it twice, or declaring the same operator name twice (case-insensitively) throws `FilterConfigurationException` when the filter is constructed. `For(...)` is deliberately not idempotent: a second call would silently re-point the operators declared before it.
 - The method runs once per filter instance. Do not put per-request logic in it.
 
 ## See also

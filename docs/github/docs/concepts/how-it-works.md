@@ -24,12 +24,14 @@ partial class UserFilter : FilterDefinition<User>
             .Add(FilterProperty.Map("Name", (User entity) => entity.Name, StringFilter.Profile)
                 .Sortable()
                 .Build())
-            .AddNested(nestingContext, "UserFilter.MapDepartment", maxDepth: 0,
+            .AddNested(nestingContext, "Sample.UserFilter.Department", maxDepth: 0,
                 nestedContext => DepartmentFilter.CreateSchema(serializerOptions, nestedContext),
-                (User entity) => entity.Department, "Department")
+                (User entity) => entity.Department, "Department", only: null, except: null, disableSorting: false)
             .Build();
 }
 ```
+
+The second argument to `AddNested` is the *nesting key*: `<filter class fully-qualified name>.<navigation property>`, plus `@<prefix>` when `Prefix` differs from the navigation name. `FilterNestingContext` counts entries per key, which is what bounds `MaxDepth` in a circular filter graph.
 
 ## How a predicate is built
 
@@ -47,10 +49,11 @@ Predicates are composed per request. The per-property work that does not depend 
 
 ## The generator pipeline
 
-`FilterGenerator.cs` registers two `ForAttributeWithMetadataName` pipelines:
+`FilterGenerator.cs` registers one compilation-wide index node plus two `ForAttributeWithMetadataName` pipelines:
 
-1. **`[GenerateFilter<TEntity>]` branch.** Extracts a `FilterClassModel`, reports per-class diagnostics, and emits one source file per class. A collected view drives the assembly-wide `services.AddFiltering()` extension, the per-enum profiles, and `FilteringProfiles.g.cs`, which holds a runtime `FilterProfile<T>` instance for every custom profile your filters reference.
-2. **`[FilterProfile<T>]` branch.** Extracts profile models and reports per-profile diagnostics such as `FN0008`, `FN0013`, `FN1001`, and `FN1007`.
+0. **The generator index.** One pass over the compilation collects the `[FilterProfile<T>]` types and their operators, the enums that need an auto-emitted profile, the assembly-level `[FilterDefaults]`, and whether the DI abstractions are referenced. Every other node combines with it, so nothing downstream has to read compilation-global state from a syntax transform.
+1. **`[GenerateFilter<TEntity>]` branch.** A syntax transform reads the class's own tree into a declaration, a resolver combines that with the index into a `FilterClassModel`, and a nesting pass splices `[MapNested]` targets together. The emitter writes one source file per class. A collected view drives the assembly-wide `services.AddFiltering()` extension, the per-enum profiles, and `FilteringProfiles.g.cs`, which holds a runtime `FilterProfile<T>` instance for every custom profile your filters reference.
+2. **`[FilterProfile<T>]` branch.** Extracts profile models and reports per-profile diagnostics such as `FN0008`, `FN0010`, `FN0013`, `FN0028`, `FN1001`, and `FN1007`.
 
 Cross-pipeline diagnostics, `FN1003 ProfileUnused` and `FN1004 OperatorUnused`, join both outputs.
 

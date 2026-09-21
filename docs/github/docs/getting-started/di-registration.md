@@ -26,14 +26,16 @@ For trim or native-AOT scenarios where reflection-based JSON polymorphism is una
 builder.Services.AddFiltering(SampleJsonContext.Default);
 ```
 
-`SampleJsonContext` is a `[JsonSerializable]`-annotated `JsonSerializerContext` declared by the consumer that lists every typed `FilterLeaf` value type in use. The sample app under `samples/UserManagement.WebApi/` includes a working `SampleJsonContext.Default` you can copy from.
+`SampleJsonContext` is a `[JsonSerializable]`-annotated `JsonSerializerContext` declared by the consumer that lists every typed operator value in use. The sample app under `samples/UserManagement.WebApi/` includes a working `SampleJsonContext.Default` you can copy from.
 
-The resolver is plumbed through to the polymorphic `FilterNodeJsonConverter` so leaf values deserialize without reflection.
+The resolver is handed to each generated filter's constructor and ends up on the schema, where it is used to deserialize *typed operator values* — the arguments of value operators declared on your own `[FilterProfile<T>]` classes and of `[PropertyMap]` rules. Polymorphic `FilterNode` deserialization does not use it: `FilterNodeJsonConverter` reads a leaf's `value` as a raw `JsonElement` and never reflects over value types.
+
+A third overload takes a `Func<IServiceProvider, IJsonTypeInfoResolver>` for cases where the resolver chain has to be composed from DI-resolved services.
 
 See the AOT-clean setup [guide](../guides/aot-clean-setup.md) for the full pattern.
 
-!!! warning
-    Without the resolver overload in AOT builds, polymorphic `FilterLeaf` deserialization will fail at runtime when the trimmer removes the reflection metadata. Always pass an explicit `JsonSerializerContext` for trim / AOT builds.
+!!! note
+    The resolver overload is only needed for filter classes that declare a typed-value operator or a `[PropertyMap]` rule — and for any filter that nests one. Classes whose properties only use built-in or auto-emitted enum profiles do not even get the resolver-accepting constructor, so the parameterless `AddFiltering()` is AOT-clean for them.
 
 ## See also
 

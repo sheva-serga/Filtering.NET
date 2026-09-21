@@ -7,7 +7,7 @@ description: Common gotchas and questions.
 
 ## Why is FN0012 firing on my string properties?
 
-Declaring any custom `string` profile (e.g., a `[FilterProfile<string>(BasedOn = typeof(StringFilter))]`) makes profile resolution for `string` properties ambiguous: both the built-in `StringFilter` and your custom profile match. The generator refuses to guess. Fix it by specifying `Profile = typeof(...)` on every `string`-typed `[Map]`. The sample app's `UserFilter` does exactly this on `MapName`, `MapEmail`, and `MapDepartmentName`. See FN0014 in the [diagnostics catalogue](diagnostics/index.md) and [Built-in profiles](guides/built-in-profiles.md).
+Declaring any custom `string` profile (e.g., a `[FilterProfile<string>(BasedOn = typeof(StringFilter))]`) makes profile resolution for `string` properties ambiguous: both the built-in `StringFilter` and your custom profile match. The generator refuses to guess. Fix it by specifying `Profile = typeof(...)` on every `string`-typed `[Map]`. The sample app's `UserFilter` does exactly this on its `User.Name` and `User.Email` maps. See FN0012 in the [diagnostics catalogue](diagnostics/index.md) and [Built-in profiles](guides/built-in-profiles.md).
 
 ## How do I filter through a navigation property?
 
@@ -27,7 +27,7 @@ Callers send `{ "field": "departmentName", ... }`. See [Navigation paths and ali
 
 ## Can I use this with Dapper / Marten / EF6?
 
-No. The library targets EF Core 8 / 9. The runtime types build expression trees the way the EF Core LINQ provider expects; non-EF-Core query providers (Dapper, Marten, EF6, raw `IEnumerable<T>` with custom translation) are out of scope.
+No. The EF helpers package targets EF Core 8 / 9 / 10. The runtime types build expression trees the way the EF Core LINQ provider expects; non-EF-Core query providers (Dapper, Marten, EF6, raw `IEnumerable<T>` with custom translation) are out of scope.
 
 ## Does the source generator work in Native AOT?
 
@@ -35,7 +35,11 @@ Yes. The generated schema and the runtime engine use no reflection over your typ
 
 ## How do I add a custom operator that takes two values (e.g., "between")?
 
-A built-in `between` operator already exists for numerics and temporals. For other multi-value custom operators you'll need to write a `[PropertyMap]` override that builds the expression manually — `[FilterOperator]` lambdas are single-value by design. See [Per-property override (PropertyMap)](guides/property-map-overrides.md).
+There is no built-in `between`: the numeric and temporal profiles ship `gt` / `gte` / `lt` / `lte` and nothing wider. An operator template takes one column and one value, but that value can be composite, so "two values" is a matter of picking the right value type:
+
+- Send two leaves in an `and` group — `{"and": [{"field":"Age","op":"gte","value":18}, {"field":"Age","op":"lte","value":65}]}` needs no library change at all.
+- Declare the operator on a custom profile with a two-element value: `[FilterOperator("between")] public static Expression<Func<int, int[], bool>> Between => (column, bounds) => column >= bounds[0] && column <= bounds[1];` on a `[FilterProfile<int>(BasedOn = typeof(Int32Filter))]`. Clients then post `"value": [18, 65]`. See [Custom profiles](guides/custom-profiles.md).
+- Or use a [`[PropertyMap]` override](guides/property-map-overrides.md) with `.Operator<int[]>("between", ...)` when only one property needs it.
 
 ## Can my interceptor method be `private`?
 

@@ -6,7 +6,7 @@ Targets `net8.0`, `net9.0`, and `net10.0`.
 
 ## What it solves
 
-`Filtering.Net` itself stays `netstandard2.0` and avoids any EF Core dependency, so it can load inside the analyzer process and on every consumer TFM. EF-specific async sequencing (`CountAsync` + `ToListAsync` + `PageResult<T>` packaging) lives in this package — install it when your call site is an EF Core controller / handler that wants a one-call paged response.
+`Filtering.Net` itself targets `netstandard2.0` / `net8.0` and avoids any EF Core dependency, so it can load inside the analyzer process and on every consumer TFM. EF-specific async sequencing (`CountAsync` + `ToListAsync` + `PageResult<T>` packaging) lives in this package — install it when your call site is an EF Core controller / handler that wants a one-call paged response.
 
 ## Install
 
@@ -48,7 +48,7 @@ public sealed class UsersController : ControllerBase
 }
 ```
 
-`ApplyPagedAsync` validates the request, applies filter + sort, runs `CountAsync` + `ToListAsync` against the EF provider, and packages the results into a `PageResult<T>`.
+`ApplyPagedAsync` validates the request, applies filter + sort, runs `CountAsync` + `ToListAsync` against the EF provider, and packages the results into a `PageResult<T>`. A request that carries `page` or `pageSize` is paged; `PageResult<T>.PageSize` reports the size the engine actually applied, via `IFilterDefinition<T>.ResolvePageSize(...)`. A request with neither is not paged: every matching row comes back as one page, and `PageSize` equals `TotalCount`.
 
 ## Key types
 
@@ -70,7 +70,7 @@ Bumping these is intentional — the integration tests run against both, so a fl
 - [Documentation site](https://sheva-serga.github.io/Filtering.NET/) — full guides, API reference, diagnostics catalogue.
 - [Repo on GitHub](https://github.com/sheva-serga/Filtering.NET) — source, issue tracker, contribution notes.
 - [`Filtering.Net`](https://www.nuget.org/packages/Filtering.Net/) — runtime request types.
-- [`Filtering.Net.Generator`](https://www.nuget.org/packages/Filtering.Net.Generator/) — source generator + 29-rule analyzer.
+- [`Filtering.Net.Generator`](https://www.nuget.org/packages/Filtering.Net.Generator/) — source generator + 37-rule analyzer.
 
 ## License
 

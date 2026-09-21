@@ -15,6 +15,8 @@ dotnet add package Filtering.Net.Generator   # the source generator (compile-tim
 
 If you only install `Filtering.Net`, you get the request types and the `IQueryable.Apply` extension, but you'll need to write `IFilterDefinition<T>` implementations by hand. Add the generator package to skip that work.
 
+The package targets `netstandard2.0` and `net8.0`. `DateOnlyFilter` and `TimeOnlyFilter` ship in the `net8.0` asset only, because `DateOnly` / `TimeOnly` do not exist in `netstandard2.0`.
+
 ## Quickstart
 
 Declare your entity and a `[GenerateFilter<T>]` partial:
@@ -39,12 +41,16 @@ public partial class UserFilter { }
 Apply a request to an `IQueryable<User>`:
 
 ```csharp
+using System.Text.Json;
+
+// A leaf's value is the raw JSON value, so it is a JsonElement. Requests that arrive over HTTP
+// are deserialized into this shape by FilterNodeJsonConverter; built by hand it looks like this.
 var request = new FilterRequest
 {
     Where = new FilterGroup(LogicalOp.And,
     [
-        new FilterLeaf("Name",     "contains", "ali"),
-        new FilterLeaf("IsActive", "eq",       true),
+        new FilterLeaf("Name",     "contains", JsonDocument.Parse("\"ali\"").RootElement),
+        new FilterLeaf("IsActive", "eq",       JsonDocument.Parse("true").RootElement),
     ]),
     Sort     = [new SortItem("Age", SortDir.Asc)],
     Page     = 1,
@@ -59,10 +65,10 @@ IQueryable<User> result = users.Apply(userFilter, request);
 ## Key types
 
 - **`FilterRequest`** — `where` (`FilterNode`), `sort` (`SortItem[]`), `page`, `pageSize`. Polymorphic JSON via `FilterNodeJsonConverter`.
-- **`FilterNode`** — base; `FilterGroup` (`and`/`or` of children) and `FilterLeaf` (`field` + `op` + `value`).
-- **`SortItem`** — `field` + `dir` (`Asc` / `Desc`).
-- **`IFilterDefinition<T>`** — composite interface every generated filter class implements: `Validate(...)`, `ApplyFilter(...)`, `ApplySorting(...)`.
-- **`FilterValidationResult` / `FilterValidationError`** — structured error shape with JSON-pointer-style paths and codes.
+- **`FilterNode`** — base; `FilterGroup` (`and` / `or` / `not` of children) and `FilterLeaf` (`field` + `op` + `value`, the value a `JsonElement`).
+- **`SortItem`** — `field` + `dir` (`Asc` / `Desc`, nullable: an omitted `dir` uses the property's default direction).
+- **`IFilterDefinition<T>`** — composite interface every generated filter class implements: `Validate(...)`, `ResolvePageSize(...)`, `ApplyFilter(...)`, `ApplySorting(...)`.
+- **`FilterValidationResult` / `FilterValidationError`** — structured error shape with dotted request paths (`where.and[0].op`, `sort[1].field`, `pageSize`) and codes.
 - **`FilterValidationException`** — thrown by `Apply` when validation fails; carries the `Result` for HTTP 400 conversion.
 - **Built-in profiles** — `StringFilter`, `BoolFilter`, `GuidFilter`, `DateTimeFilter`, plus `Numeric/*` and `Temporal/*` per primitive. The generator picks one automatically based on the property's CLR type; override with `[Map(..., Profile = typeof(MyProfile))]`.
 - **Attributes** — `[GenerateFilter<T>]`, `[Map]`, `[PropertyMap]`, `[FilterProfile<T>]`, `[FilterOperator]`, `[InterceptValue]`, `[FilterDefaults]`, `[PageSettings]`.
@@ -75,7 +81,7 @@ IQueryable<User> result = users.Apply(userFilter, request);
 
 - [Documentation site](https://sheva-serga.github.io/Filtering.NET/) — full guides, API reference, diagnostics catalogue.
 - [Repo on GitHub](https://github.com/sheva-serga/Filtering.NET) — source, issue tracker, contribution notes.
-- [`Filtering.Net.Generator`](https://www.nuget.org/packages/Filtering.Net.Generator/) — source generator + 29-rule analyzer that emits the `IFilterDefinition<T>` glue.
+- [`Filtering.Net.Generator`](https://www.nuget.org/packages/Filtering.Net.Generator/) — source generator + 37-rule analyzer that emits the typed filter schema.
 - [`Filtering.Net.EntityFrameworkCore`](https://www.nuget.org/packages/Filtering.Net.EntityFrameworkCore/) — async `ApplyPagedAsync` + `PageResult<T>`.
 - Sample ASP.NET Core 9 + PostgreSQL app: [`samples/UserManagement.WebApi/`](https://github.com/sheva-serga/Filtering.NET/tree/main/samples/UserManagement.WebApi) on GitHub.
 

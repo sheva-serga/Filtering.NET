@@ -34,8 +34,8 @@ A `FilterRequest` is a typed JSON document that carries everything a client need
 
 `FilterNode` is the abstract base. Two concrete shapes derive from it:
 
-- **`FilterGroup`** — `{ "and": [...] }` or `{ "or": [...] }`. Carries a list of child nodes and a `LogicalOp` (`And = 0`, `Or = 1`). Groups can nest arbitrarily deep, bounded by `MaxNestingDepth` from the assembly-level `[FilterDefaults]` (default 10). A request may hold at most `MaxLeafConditions` leaves (default 50).
-- **`FilterLeaf`** — `{ "field": "...", "op": "...", "value": ... }`. The value's JSON kind is checked against the operator's expected shape during validation.
+- **`FilterGroup`** — `{ "and": [...] }`, `{ "or": [...] }`, or `{ "not": [...] }`. Carries a list of child nodes and a `LogicalOp` (`And = 0`, `Or = 1`, `Not = 2`). A `not` group takes exactly one child; any other count is a `JsonException` on deserialization and `InvalidNodeShape` when a hand-built group is validated. Groups can nest arbitrarily deep, bounded by `MaxNestingDepth` from the assembly-level `[FilterDefaults]` (default 10). A request may hold at most `MaxLeafConditions` leaves (default 50).
+- **`FilterLeaf`** — `{ "field": "...", "op": "...", "value": ... }`. The value is kept as a raw `JsonElement` and checked against the operator's expected shape during validation. `value` may be omitted entirely, which is how a unary operator such as `isNull` is sent.
 
 A nested example combining both groups:
 
@@ -57,25 +57,39 @@ A nested example combining both groups:
 
 This selects users who are inactive *or* who are at least 18 *and* whose name starts with `A`.
 
+Negation wraps a single child:
+
+```json
+{
+  "where": {
+    "not": [
+      { "field": "Status", "op": "eq", "value": "Banned" }
+    ]
+  }
+}
+```
+
+Combining `not` with `isNull` is how you express "is not null", since no profile ships a `notNull` operator.
+
 ## Polymorphic deserialization
 
 `FilterNodeJsonConverter` discriminates on the shape of the JSON object:
 
-- Presence of `field` (with sibling `op` and `value`) → deserialize as `FilterLeaf`.
-- Presence of `and` or `or` → deserialize as `FilterGroup`.
+- Presence of `field` (with sibling `op` and optional `value`) → deserialize as `FilterLeaf`.
+- Presence of `and`, `or`, or `not` → deserialize as `FilterGroup`. More than one of the three, or one of them alongside `field`, is a `JsonException`.
 
 There is no `$type` discriminator and no `JsonPolymorphic` attribute. Clients post the natural shape and the converter picks the right runtime type.
 
-For typed leaf values in trim / AOT scenarios, the converter consults a `JsonSerializerContext` passed via the `services.AddFiltering(IJsonTypeInfoResolver)` overload. Every value type that appears on the wire — `string`, `int`, `Guid`, custom structs, etc. — must be registered with `[JsonSerializable]` on that context.
+The converter itself reads a leaf's `value` as a raw `JsonElement` and uses no reflection, so it needs no `JsonSerializerContext`. The resolver passed to `services.AddFiltering(IJsonTypeInfoResolver)` is used later, when an operator that takes a *typed* value deserializes that element — see [Trim / AOT-clean setup](../guides/aot-clean-setup.md).
 
 ## SortItem and SortDir
 
 `SortItem` is a flat record:
 
 - `field` — string name of a property declared `Sortable = true` in its `[Map]`.
-- `dir` — `SortDir` enum: `Asc = 0`, `Desc = 1`. Clients post the integer; the converter reads it as the enum. When `dir` is omitted, the property's `DefaultSortDirection` applies.
+- `dir` — `SortDir` enum: `Asc = 0`, `Desc = 1`. It is nullable; clients post the integer, and no string-enum converter is registered, so `"asc"` does not bind. When `dir` is omitted the property's `DefaultSortDirection` applies; a value outside the enum fails validation with `InvalidSortDirection`.
 
-The same numeric-enum convention applies to `LogicalOp` (`And = 0`, `Or = 1`) — that's the value behind a `FilterGroup.Op` field, though most clients use the JSON `and` / `or` keys directly and never see the enum on the wire.
+The same numeric-enum convention applies to `LogicalOp` (`And = 0`, `Or = 1`, `Not = 2`) — that's the value behind a `FilterGroup.Op` field, though most clients use the JSON `and` / `or` / `not` keys directly and never see the enum on the wire.
 
 !!! tip
     Validation rejects sort entries whose field is not `Sortable = true` with the `NotSortable` code, and rejects unknown fields anywhere in the tree with `UnknownField`. See [Validation philosophy](validation-philosophy.md) for the full code list.

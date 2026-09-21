@@ -1,11 +1,11 @@
 ---
 title: Diagnostics catalogue
-description: 30 analyzer rules — 22 errors (FN0001–FN0022) and 8 warnings (FN1001–FN1008).
+description: 37 analyzer rules — 29 errors (FN0001–FN0029) and 8 warnings (FN1001–FN1008).
 ---
 
 # Diagnostics catalogue
 
-Filtering.Net ships 30 compile-time analyzer rules — 22 errors (`FN0001`–`FN0022`) and 8 warnings (`FN1001`–`FN1008`). Both `dotnet build` and the IDE surface them; the rule's `helpLinkUri` brings you back to this page.
+Filtering.Net ships 37 compile-time analyzer rules — 29 errors (`FN0001`–`FN0029`) and 8 warnings (`FN1001`–`FN1008`). Both `dotnet build` and the IDE surface them; the rule's `helpLinkUri` brings you back to this page.
 
 ## Errors
 
@@ -15,7 +15,7 @@ Filtering.Net ships 30 compile-time analyzer rules — 22 errors (`FN0001`–`FN
 | FN0002 | MapAndPropertyMapBoth | Property has both `[Map]` and `[PropertyMap]`. Use one or the other. |
 | FN0003 | PropertyNotFound | Property does not exist on the entity type passed to `[GenerateFilter<T>]`. |
 | FN0004 | IncompatibleProfile | Profile cannot be applied to the property's CLR type. |
-| FN0005 | UnknownOperator | Operator name is not declared by the resolved profile. |
+| FN0005 | UnknownOperator | Operator named in `[Map(Only = ...)]` / `[Map(Except = ...)]` is not declared by the resolved profile. |
 | FN0006 | NoInferableProfile | Property's CLR type has no built-in primitive profile; specify `Profile = typeof(...)` explicitly. |
 | FN0007 | DuplicateInterceptor | Property has multiple `[InterceptValue]` declarations. |
 | FN0008 | NonStaticOperator | `[FilterOperator]` member must be `public static`. |
@@ -23,16 +23,23 @@ Filtering.Net ships 30 compile-time analyzer rules — 22 errors (`FN0001`–`FN
 | FN0010 | InvalidBaseProfile | `[FilterProfile(BasedOn = typeof(X))]` references a type not marked with `[FilterProfile]`. |
 | FN0011 | InterceptorWithoutMap | `[InterceptValue]` declared without a matching `[Map]` for the property. |
 | FN0012 | AmbiguousProfile | Property's CLR type matches multiple profiles; use `[Map(typeof(...))]` to pick one. |
-| FN0013 | ProfileMissingExtractor | Standalone `[FilterProfile]` is missing required extractor methods (`TryGetValue` / `TryGetArray`). |
-| FN0014 | DuplicateOperatorOnProfile | Operator name is declared more than once on the same profile. |
-| FN0015 | NestedCycle | `[MapNested]` graph contains a cycle in which no nesting declares `MaxDepth` (e.g. `User.Manager: User`). Set `MaxDepth` on one of them to allow it. |
-| FN0016 | NestedCrossAssembly | `[MapNested<T>]` references a filter class declared outside the current compilation. |
-| FN0017 | NestedAmbiguous | Auto-resolve `[MapNested(nameof(...))]` finds two or more `[GenerateFilter<TNav>]` candidates. |
-| FN0018 | NestedTargetNotFound | Auto-resolve finds zero `[GenerateFilter<TNav>]` candidates for the navigation target type. |
-| FN0019 | NestedNavigationInvalid | Named property doesn't exist, isn't a reference type, or is a primitive/value type. |
-| FN0020 | NestedCollectionUnsupported | Named navigation is a collection type; collection navigations are deferred to a future version. |
-| FN0021 | FilterClassHasBaseType | The `[GenerateFilter]` partial declares a base class. The generated part derives from `FilterDefinition<TEntity>`, so the class cannot have another base. |
-| FN0022 | NestedMaxDepthInvalid | `[MapNested]` declares a negative `MaxDepth`. Use a positive value to bound the nesting, or omit it. |
+| FN0013 | DuplicateOperatorOnProfile | Operator name is declared more than once on the same profile (names are compared case-insensitively). |
+| FN0014 | NestedCycle | `[MapNested]` graph contains a cycle in which no nesting declares `MaxDepth` (e.g. `User.Manager: User`). Set `MaxDepth` on one of them to allow it. |
+| FN0015 | NestedFilterClassUnusable | `[MapNested<T>]` does not name a `[GenerateFilter<TNavigation>]` partial in this compilation — `T` is not a filter class, targets a different entity, or lives in a referenced assembly. |
+| FN0016 | NestedAmbiguous | Auto-resolve `[MapNested(nameof(...))]` finds two or more `[GenerateFilter<TNav>]` candidates. |
+| FN0017 | NestedTargetNotFound | Auto-resolve finds zero `[GenerateFilter<TNav>]` candidates for the navigation target type. |
+| FN0018 | NestedNavigationInvalid | Named property doesn't exist, isn't a reference type, or is a primitive/value type. |
+| FN0019 | NestedCollectionUnsupported | Named navigation is a collection type; collection navigations are deferred to a future version. |
+| FN0020 | FilterClassHasBaseType | The `[GenerateFilter]` partial declares a base class. The generated part derives from `FilterDefinition<TEntity>`, so the class cannot have another base. |
+| FN0021 | NestedMaxDepthInvalid | `[MapNested]` declares a `MaxDepth` outside 1–64. Use a value in range to bound the nesting, or omit it. |
+| FN0022 | ProfileTypeNotAProfile | `[Map(Profile = typeof(X))]` references a type not marked with `[FilterProfile<TColumn>]`. |
+| FN0023 | PropertyMapSignatureInvalid | `[PropertyMap]` method is not `static`, does not take exactly one `FilterRuleBuilder<TEntity, TValue>`, or does not return `FilterRule<TEntity, TValue>`. |
+| FN0024 | NullableValueTypeInPath | A dotted `[Map]` path reads a member through a `Nullable<T>` segment (e.g. `"Created.Year"` on a `DateTime?`), which does not expose it. |
+| FN0025 | NestedPrefixBlank | `[MapNested(Prefix = "")]` (or whitespace). Omit `Prefix` to dispatch under the navigation name. |
+| FN0026 | NestedPathFilterUnknown | A dotless `[MapNested]` `Only` / `Except` entry names a path the nested filter class does not map. |
+| FN0027 | FilterClassPlacementInvalid | The `[GenerateFilter]` partial is nested in another type or declares type parameters. The generated half is a top-level partial in the class's namespace. |
+| FN0028 | OperatorMemberShapeInvalid | A `[FilterOperator]` member is not an `Expression<Func<TColumn, bool>>` / `Expression<Func<TColumn, TValue, bool>>` template, so no operator can be built from it. |
+| FN0029 | InterceptorSignatureInvalid | `[InterceptValue]` method is not `static`, does not take `(InterceptContext, TValue)`, or does not return the value type it receives (`JsonElement` for `Raw = true`). |
 
 ## Warnings
 

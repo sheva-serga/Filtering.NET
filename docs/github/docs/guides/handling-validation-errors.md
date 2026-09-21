@@ -48,7 +48,7 @@ The `FilterValidationResult` serializes to JSON cleanly, so passing it straight 
     {
       "path": "where.and[0].value",
       "code": "InvalidValueType",
-      "message": "Expected number for operator 'gt' on field 'age'.",
+      "message": "Expected JSON Number or String for int, got True.",
       "field": "age",
       "operatorName": "gt"
     }
@@ -66,7 +66,8 @@ The `FilterValidationResult` serializes to JSON cleanly, so passing it straight 
 
 - The `catch` must be specific to `FilterValidationException`. **Never** catch the broader `Exception` and return 400 — that hides genuine bugs (database failures, NREs, programming errors) behind a misleading status code.
 - Don't swallow `OperationCanceledException` in the same catch block. Cancellation is not a validation failure; it's the client disconnecting. Let it propagate so the host can short-circuit the response.
-- The `FilterValidationCode` enum (`UnknownField`, `OperatorNotAllowed`, `InvalidValueType`, `InvalidValueFormat`, `EmptyInArray`, `InterceptorRejected`, `NotSortable`, `InvalidSortDirection`, `PageInvalid`, `PageSizeTooLarge`, `PageSizeInvalid`, `NestingTooDeep`, `TooManyConditions`, `GroupEmpty`) is the canonical list — UI translations and per-error help links should switch on these codes, not on the human-readable message.
+- The codes the validator actually produces are `UnknownField`, `OperatorNotAllowed`, `InvalidValueType`, `InterceptorRejected`, `NotSortable`, `InvalidSortDirection`, `PageInvalid`, `PageSizeTooLarge`, `PageSizeInvalid`, `NestingTooDeep`, `TooManyConditions`, `GroupEmpty`, and `InvalidNodeShape`. UI translations and per-error help links should switch on these codes, not on the human-readable message. The enum also declares `InvalidValueFormat` and `EmptyInArray`, which no code path emits — a malformed value arrives as `InvalidValueType`, and an empty `in` array validates clean and matches nothing.
+- `FilterValidationCode` is a plain enum with no converter registered, so System.Text.Json writes it as a number. Register `JsonStringEnumConverter` on your app's options if the client expects the names.
 
 ## See also
 

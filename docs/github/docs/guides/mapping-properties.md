@@ -7,11 +7,11 @@ description: Use [Map] to expose a property as filterable.
 
 ## What this does
 
-Placing `[Map(nameof(Entity.Property))]` on a `[GenerateFilter<TEntity>]` partial class exposes that property as filterable. Add one `[Map]` per property. The source generator emits the dispatch and predicate code (per-leaf validation, JSON value extraction, typed `Where` predicate) for each `[Map]`-decorated method at compile time.
+Placing `[Map(nameof(Entity.Property))]` on a `[GenerateFilter<TEntity>]` partial class exposes that property as filterable. Add one `[Map]` per property. The source generator emits one schema entry per `[Map]` — a typed accessor lambda, the resolved profile, and the options you set — and the runtime engine does the per-leaf validation, value extraction, and predicate composition from that schema.
 
 ## When to use
 
-Any column you want consumers to filter on. The four-method partial below is the minimum viable filter class — declare one `[Map]` per filterable column on the entity.
+Any column you want consumers to filter on. The partial below is the minimum viable filter class — declare one `[Map]` per filterable column on the entity.
 
 ## Minimal code
 
@@ -47,11 +47,12 @@ Navigation paths use dotted strings: `[Map("Department.Name", Alias = "departmen
 
 ## Pitfalls
 
-- The filter class must be `partial` and must not declare a base class (`FN0021`): the generated part derives from `FilterDefinition<TEntity>`.
+- The filter class must be `partial` and must not declare a base class (`FN0020`): the generated part derives from `FilterDefinition<TEntity>`. It must also sit directly in a namespace and take no type parameters, because the generated half is emitted as a top-level partial — a nested or generic declaration is `FN0027`.
 - A property may be carried by either `[Map]` or `[PropertyMap]`, never both — `FN0002` flags the conflict.
-- Two `[Map]` attributes that point at the same property name (or the same alias) collide with `FN0001`.
+- Any two mappings that produce the same effective path or the same wire key — two `[Map]`s, a `[Map]` and a `[PropertyMap]`, or a `[Map]` and a path contributed by `[MapNested]` — collide with `FN0001`, which reports every conflicting site.
 - The string passed to `[Map(...)]` must resolve to a real property on the entity, otherwise `FN0003` fires.
 - Aliases must be unique across the whole filter class (case-insensitive), or `FN0009` fires.
+- `Profile = typeof(X)` must name a type marked `[FilterProfile<TColumn>]`, or `FN0022` fires.
 
 ## See also
 

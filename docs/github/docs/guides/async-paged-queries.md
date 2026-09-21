@@ -9,6 +9,8 @@ description: One-call validate + filter + sort + count + page that returns PageR
 
 `IQueryable<TEntity>.ApplyPagedAsync(IFilterDefinition<TEntity>, FilterRequest, CancellationToken)` is the EF Core async one-shot. It validates the request, applies the filter expression and sort/paging, runs `CountAsync` over the filtered query and `ToListAsync` over the paginated query, and packages the results into a `PageResult<TEntity>` carrying `Items`, `TotalCount`, `Page`, and `PageSize`. Source: `src/Filtering.Net.EntityFrameworkCore/FilteringEntityFrameworkExtensions.cs`.
 
+A request is paged when it carries `page`, `pageSize`, or both. `PageResult<T>.PageSize` then reports the size the engine actually applied — `IFilterDefinition<T>.ResolvePageSize(request.PageSize)`, which fills in the class's `DefaultPageSize` and clamps to `MaxPageSize` — so a request with `page` but no `pageSize` reports the real page size rather than the number of rows that happened to come back on a partial page. A request with neither is not paged at all: every matching row is returned as a single page, and `PageSize` equals `TotalCount`, which keeps `TotalPages` at 1.
+
 ## When to use
 
 Every EF Core endpoint returning paged data. The extension lives in `Filtering.Net.EntityFrameworkCore`; reference that package whenever you want async EF integration on top of the synchronous `IQueryable<T>.Apply(...)` extension.
@@ -37,7 +39,10 @@ public sealed class UsersController(AppDbContext dbContext, IFilterDefinition<Us
     {
         try
         {
+            // Read-only endpoint: AsNoTracking skips the change-tracker entries EF would
+            // otherwise build for every materialised row.
             var pageResult = await _dbContext.Users
+                .AsNoTracking()
                 .Include(user => user.Department)
                 .ApplyPagedAsync(_userFilter, request, cancellationToken);
 
@@ -59,7 +64,9 @@ public sealed class UsersController(AppDbContext dbContext, IFilterDefinition<Us
 
 ## Pitfalls
 
+- **Paging without a sort is non-deterministic.** `Skip`/`Take` over an unordered SQL query has no defined row order, so the same `page` can return overlapping or missing rows between calls. The library does not add a default sort and does not reject the request — it is the caller's job to make the endpoint's contract deterministic, either by requiring a `sort` entry or by appending a stable tie-breaker (a unique key) to every sort the endpoint accepts.
 - `ApplyPagedAsync` runs **two** SQL queries: a `COUNT` over the filtered query, then a paginated `SELECT`. For very large result sets where the count itself is expensive, consider keyset/cursor pagination — but that's outside this library's scope today.
+- Use `AsNoTracking()` on read-only endpoints. `ApplyPagedAsync` materializes with `ToListAsync`, so without it EF Core builds change-tracking entries for every returned row.
 - The exception that escapes `ApplyPagedAsync` for invalid input is `FilterValidationException`. `OperationCanceledException` may also escape on cancellation — handle it separately (typically you let it propagate so ASP.NET Core returns a 499/499-equivalent).
 - The validation step happens *before* the database is opened. A request with bad operators or unknown fields will not consume a connection.
 - `Items` is materialized in memory; the paged query is fully realized into a `List<T>`. Don't call `ApplyPagedAsync` and then `.AsEnumerable()` it back into a streaming pipeline — that's the wrong shape for this method.

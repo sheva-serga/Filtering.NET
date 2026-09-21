@@ -32,11 +32,12 @@ A request that sends `{ "field": "email", "op": "startsWith", "value": "..." }` 
 
 - Deny-list form — `Except = new[] { "contains" }` keeps everything from the profile except the named operators.
 - Both at once — `Only` is applied first, then `Except` subtracts. Useful when a custom profile inherits a wide surface and you want a curated subset minus a few items.
-- Cross-property defaults — declare `[FilterDefaults(Only = new[] { ... })]` at the class level to apply the allow-list to every property unless overridden.
+- Shared surfaces — there is no cross-property allow-list. `Only` and `Except` are per-`[Map]` only; the assembly-level `[FilterDefaults]` carries page and request limits, not operator lists. To give several properties the same curated surface, declare a `[FilterProfile<T>]` that exposes exactly those operators and point each `[Map]` at it with `Profile = typeof(...)`.
 
 ## Pitfalls
 
 - `Only` and `Except` combined into an empty effective set raises `FN1005`. The property still exists, but every leaf targeting it will fail validation. Either widen the lists or remove the `[Map]` entirely.
+- An entry naming an operator the resolved profile does not declare is `FN0005` at compile time, and `FilterConfigurationException` from `Build()` in a hand-built schema.
 
 ## See also
 

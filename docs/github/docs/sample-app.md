@@ -5,7 +5,7 @@ description: ASP.NET Core 9 + EF Core 9 + PostgreSQL walkthrough.
 
 # Sample app
 
-A minimal ASP.NET Core 9 Web API showing how to wire `Filtering.Net` end-to-end against an EF Core 9 + PostgreSQL backend. The sample is structured as a feature catalog — each grouping in `Filters/UserFilter.cs` demonstrates one library feature.
+A minimal ASP.NET Core 9 Web API showing how to wire `Filtering.Net` end-to-end against an EF Core 9 + PostgreSQL backend. The sample is structured as a feature catalog — each class-level `[Map]` / `[MapNested]` group on `Filters/UserFilter.cs` demonstrates one library feature. The class body holds only the `[InterceptValue]` method; every mapping is an attribute on the class.
 
 ## Where to find it
 
@@ -17,14 +17,14 @@ A minimal ASP.NET Core 9 Web API showing how to wire `Filtering.Net` end-to-end 
 |---------|---------------------|
 | `[GenerateFilter<T>]` partial class + DI registration | `Filters/UserFilter.cs`, `Program.cs` |
 | Built-in primitive profiles (Int32, String, Bool, DateTime, Guid) | `Filters/UserFilter.cs` (Id, Age, IsActive, CreatedAt, ExternalId) |
-| `[Map(Sortable = true, DefaultSortDirection = SortDir.Desc)]` | `MapAge`, `MapCreatedAt` |
-| `[Map(Only = new[] { ... })]` operator allow-list | `MapEmail` (eq / contains / isNull only) |
+| `[Map(Sortable = true, DefaultSortDirection = SortDir.Desc)]` | `[Map(nameof(User.Age), ...)]`, `[Map(nameof(User.CreatedAt), ...)]` |
+| `[Map(Only = new[] { ... })]` operator allow-list | `[Map(nameof(User.Email), Only = ...)]` (eq / contains / isNull only) |
 | Custom `[FilterProfile<T>(BasedOn = ...)]` with custom `[FilterOperator]` | `Filters/StringFilterPlus.cs` — adds `fuzzy` and `ilike` to string columns |
 | `EF.Functions.*` inside an operator expression | `Filters/StringFilterPlus.cs` — the `ilike` operator calls `EF.Functions.ILike` (Npgsql ILIKE) |
 | Typed-value JSON deserialization + `JsonSerializerContext` wiring | `Json/SampleJsonContext.cs`, `Program.cs` `AddFiltering(SampleJsonContext.Default)` |
-| `[InterceptValue]` pre-validation hook | `MapEmail` — lowercases the value via `NormalizeEmail` |
-| Auto-emitted enum profile | `MapStatus` (the generator emits `Filtering.Net.Generated.UserStatusFilter` automatically) |
-| Navigation path with friendly alias | `MapDepartmentName` — maps `Department.Name` as `departmentName` |
+| `[InterceptValue]` pre-validation hook | `NormalizeEmail` — lowercases the value for the `User.Email` map |
+| Auto-emitted enum profile | `[Map(nameof(User.Status), ...)]` (the generator emits `Filtering.Net.Generated.UserStatusFilter` automatically) |
+| `[MapNested]` filter inlining | `[MapNested(nameof(User.Department))]` — auto-resolves `DepartmentFilter` and exposes `department.id`, `department.name` |
 | Three controller endpoints | `Controllers/UsersController.cs` |
 
 ## Endpoints
@@ -92,12 +92,20 @@ curl -X POST http://localhost:5000/users/search \
      -d '{ "where": { "field": "Name", "op": "ilike", "value": "ali%" } }'
 ```
 
-Aliased navigation path — targets the related `Department.Name` column under the friendly key `departmentName`:
+Nested filter via `[MapNested]` — `DepartmentFilter`'s mappings are reused under the `department.` prefix:
 
 ```sh
 curl -X POST http://localhost:5000/users/search \
      -H "Content-Type: application/json" \
-     -d '{ "where": { "field": "departmentName", "op": "eq", "value": "Engineering" } }'
+     -d '{ "where": { "field": "department.name", "op": "eq", "value": "Engineering" } }'
+```
+
+Sort by the same nested column (`Sortable` propagates from `DepartmentFilter`'s own `[Map]`):
+
+```sh
+curl -X POST http://localhost:5000/users/search \
+     -H "Content-Type: application/json" \
+     -d '{ "sort": [{ "field": "department.name", "dir": 0 }] }'
 ```
 
 Enum match on the auto-emitted `UserStatus` profile:
@@ -124,7 +132,7 @@ samples/UserManagement.WebApi/
 ├── Models/                      # User + Department EF entities (User carries a UserStatus enum)
 ├── Filters/
 │   ├── UserFilter.cs            # [GenerateFilter<User>] partial — feature-by-feature catalogue
-│   └── StringFilterPlus.cs      # custom [FilterProfile<string>] adding the fuzzy operator
+│   └── StringFilterPlus.cs      # custom [FilterProfile<string>] adding fuzzy + ilike
 ├── Json/SampleJsonContext.cs    # JsonSerializerContext for trim/AOT-clean typed-value deserialization
 ├── Data/
 │   ├── AppDbContext.cs          # EF Core context
@@ -142,7 +150,7 @@ Swap `UseNpgsql(...)` in `Program.cs` for `UseSqlServer`, `UseSqlite`, etc. The 
 
 ## Trim / AOT
 
-The sample uses `AddFiltering(SampleJsonContext.Default)` rather than the parameterless overload so the typed-value deserialization in `MapName` (via the `fuzzy` operator) doesn't trigger IL2026 / IL3050 warnings under `PublishAot=true`. Filter classes whose properties only need element-extracted values (no custom operators with typed values, no `[PropertyMap]` overrides) don't emit the resolver-accepting constructor at all — the generator gates that emission per class.
+The sample uses `AddFiltering(SampleJsonContext.Default)` rather than the parameterless overload so the typed-value deserialization on the `User.Name` map (via the `fuzzy` operator) doesn't trigger IL2026 / IL3050 warnings under `PublishAot=true`. Filter classes whose properties only need element-extracted values (no custom operators with typed values, no `[PropertyMap]` overrides) don't emit the resolver-accepting constructor at all — the generator gates that emission per class.
 
 ## See also
 

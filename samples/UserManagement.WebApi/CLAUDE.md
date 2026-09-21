@@ -1,16 +1,16 @@
 # CLAUDE.md — UserManagement.WebApi sample
 
-A minimal ASP.NET Core 9 + EF Core 9 + PostgreSQL Web API that exercises `Filtering.Net` end-to-end. Treat this as the canonical "how would I wire this in production" reference, and as a feature catalogue — each grouping in `Filters/UserFilter.cs` demonstrates one feature with a comment explaining its purpose.
+A minimal ASP.NET Core 9 + EF Core 9 + PostgreSQL Web API that exercises `Filtering.Net` end-to-end. Treat this as the canonical "how would I wire this in production" reference, and as a feature catalogue — each class-level `[Map]` / `[MapNested]` grouping on `Filters/UserFilter.cs` demonstrates one feature with a comment explaining its purpose.
 
 **Target:** `net9.0`. References `Filtering.Net`, `Filtering.Net.Generator` (analyzer), `Filtering.Net.EntityFrameworkCore`, `Microsoft.EntityFrameworkCore`, `Npgsql.EntityFrameworkCore.PostgreSQL`.
 
 ## What it demonstrates
 
-- **`[GenerateFilter<User>]` partial** — `Filters/UserFilter.cs`. Each `[Map]` group inside is a feature demo (primitives, custom-profile, operator restriction, interceptor, enum, navigation alias).
-- **Custom profile with typed-value operator** — `Filters/StringFilterPlus.cs`. `[FilterProfile<string>(BasedOn = typeof(StringFilter))]` + two custom operators: `[FilterOperator("fuzzy")]` (substring) and `[FilterOperator("ilike")]` (calls `EF.Functions.ILike` directly — the canonical example of a `[FilterOperator]` lambda invoking a provider-specific EF function). Adding any `string`-typed custom profile makes `string` an ambiguous match for built-in resolution, so every string-typed `[Map]` in `UserFilter` specifies `Profile = typeof(...)` explicitly (this is the FN0014 contract).
-- **`[InterceptValue]`** — `NormalizeEmail` lowercases the email value before predicate building. Interceptors must be `internal` or `public` (the generator's per-property class is `file`-scoped, separate compilation unit).
+- **`[GenerateFilter<User>]` partial** — `Filters/UserFilter.cs`. Each class-level `[Map]` group is a feature demo (primitives, custom-profile, operator restriction, interceptor, enum, nested filter).
+- **Custom profile with typed-value operator** — `Filters/StringFilterPlus.cs`. `[FilterProfile<string>(BasedOn = typeof(StringFilter))]` + two custom operators: `[FilterOperator("fuzzy")]` (case-insensitive substring) and `[FilterOperator("ilike")]` (calls `EF.Functions.ILike` directly — the canonical example of a `[FilterOperator]` lambda invoking a provider-specific EF function). Adding any `string`-typed custom profile makes `string` an ambiguous match for built-in resolution, so every string-typed `[Map]` in `UserFilter` specifies `Profile = typeof(...)` explicitly (this is the FN0012 contract).
+- **`[InterceptValue]`** — `NormalizeEmail` lowercases the email value before predicate building. The method is `private`: interceptors are spliced into the filter class's own generated half, so any accessibility works as long as they are `static`.
 - **Auto-emitted enum profile** — `User.Status` is a `UserStatus` enum; the generator scans the property graph and emits `Filtering.Net.Generated.UserStatusFilter` automatically.
-- **Navigation path + alias** — `[Map("Department.Name", Alias = "departmentName")]` exposes the related column under a friendly key.
+- **`[MapNested]`** — `[MapNested(nameof(User.Department))]` auto-resolves `DepartmentFilter` and reuses its mappings under the `department.` prefix (`department.id`, `department.name`), sortable flags included.
 - **`AddFiltering(IJsonTypeInfoResolver)` overload** — `Program.cs` passes `SampleJsonContext.Default` so typed-value deserialization is trim/AOT-clean.
 - **Three controller endpoints** in `Controllers/UsersController.cs`:
   - `POST /users/search` — validate + filter + page via `IQueryable<User>.ApplyPagedAsync(...)`.
@@ -24,7 +24,7 @@ samples/UserManagement.WebApi/
 ├── Models/                      # User + Department EF entities (User carries a UserStatus enum)
 ├── Filters/
 │   ├── UserFilter.cs            # [GenerateFilter<User>] partial — feature catalogue
-│   └── StringFilterPlus.cs      # custom [FilterProfile<string>] adding the fuzzy operator
+│   └── StringFilterPlus.cs      # custom [FilterProfile<string>] adding fuzzy + ilike
 ├── Json/SampleJsonContext.cs    # JsonSerializerContext for trim/AOT-clean typed-value deserialization
 ├── Data/
 │   ├── AppDbContext.cs          # EF Core context

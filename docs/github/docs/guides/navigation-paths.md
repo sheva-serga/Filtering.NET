@@ -15,8 +15,6 @@ Any time the filterable surface needs columns that live on a related table — t
 
 ## Minimal code
 
-Lifted from `samples/UserManagement.WebApi/Filters/UserFilter.cs`:
-
 ```csharp
 [GenerateFilter<User>]
 // Exposes Department.Name as 'departmentName' in the JSON request.
@@ -32,6 +30,8 @@ Sample request leaf:
 
 EF Core translates the predicate into a SQL join through the `Department` navigation.
 
+The sample app reaches the same columns with [`[MapNested]`](nested-filters.md) instead, because `Department` already has its own filter class. Use a dotted `[Map]` when you want one or two columns of a related entity and there is no filter class to reuse.
+
 ## Variations
 
 - **Multi-segment paths** — `[Map("OrgUnit.Department.Name", Alias = "departmentName")]` walks two navigations. Each segment must be a real navigation property on the preceding entity type.
@@ -40,7 +40,8 @@ EF Core translates the predicate into a SQL join through the `Department` naviga
 
 ## Pitfalls
 
-- Paths through a nullable navigation produce `FN1006` (potential null-propagation surprise). The generated predicate uses C# `?.` semantics, but providers translate that with their own null-handling — review the generated SQL or supply a custom mapping with explicit null guards if the default behaviour is wrong for your domain.
+- Paths through a nullable navigation produce `FN1006`. The emitted accessor is a plain member chain (`user => user.Department.Name`) with no `?.` anywhere — null handling is entirely the query provider's. EF Core turns it into a LEFT JOIN whose comparison simply does not match when the related row is missing, which is usually what you want; in-memory LINQ over the same lambda throws a `NullReferenceException`. If you need different semantics, carry the column with a [`[PropertyMap]` rule](property-map-overrides.md) whose accessor spells out the guard.
+- A dotted path may not read a member *through* a `Nullable<T>` segment — `"Created.Year"` on a `DateTime?` is `FN0024`, because `Nullable<DateTime>` does not expose `Year`. Use a `[PropertyMap]` rule for that.
 - Aliases must be unique across the filter class — a duplicate fires `FN0009` (case-insensitive comparison).
 - The path must resolve against the entity model. A typo (`"Departement.Name"`) fires `FN0003`.
 - The leaf type at the end of the path (`Department.Name` is a `string`) is what the profile must accept. The same profile-resolution rules apply to navigation paths as to top-level properties.

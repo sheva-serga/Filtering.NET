@@ -50,13 +50,14 @@ public sealed class UsersController(IFilterDefinition<User> userFilter) : Contro
 ## Variations
 
 - **`AddFiltering(IJsonTypeInfoResolver)`** — overload that accepts a `JsonSerializerContext` for AOT/trim-clean typed-value JSON deserialization. The sample app uses `builder.Services.AddFiltering(SampleJsonContext.Default);`. See [Trim / AOT-clean setup](aot-clean-setup.md).
+- **`AddFiltering(Func<IServiceProvider, IJsonTypeInfoResolver>)`** — same thing, but the resolver chain is built at filter-construction time from DI-resolved services.
 - **Multiple consumer assemblies** — the generator emits one `AddFiltering` per assembly. If you split filter classes across assemblies, call `AddFiltering` once per assembly.
 - **Manual registration** — if you need a non-singleton lifetime or a decorator, register `IFilterDefinition<T>` manually and skip `AddFiltering()` for that type.
 
 ## Pitfalls
 
 - The `AddFiltering` extension is only emitted when the consumer assembly references `Microsoft.Extensions.DependencyInjection.Abstractions`. Without that reference, `services.AddFiltering()` won't compile and you'd register filters by hand. This is intentional — the generator avoids forcing a DI dependency on consumers that don't want one.
-- The extension lives in the assembly's root namespace by default. If two consumer assemblies both define `AddFiltering` and you reference both, resolve the ambiguity by qualifying the call site (or moving filter classes into a single assembly).
+- The extension is emitted as `Filtering.Net.FilteringServiceCollectionExtensions`, so `using Filtering.Net;` brings it into scope. If two referenced assemblies each emit one, the call is ambiguous — qualify it (`Filtering.Net.FilteringServiceCollectionExtensions.AddFiltering(services)`) or keep filter classes in a single assembly.
 - `AddFiltering` does not register `DbContext` or any data-access services for you. Wire those separately as the sample shows.
 
 ## See also

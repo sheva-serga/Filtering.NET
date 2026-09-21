@@ -11,14 +11,14 @@ When `[Map]` does not specify `Profile = typeof(...)`, the generator's `ProfileR
 
 ## When to use
 
-Always, unless you have a reason to opt out. Letting the resolver pick is the lowest-friction path: you declare `[Map(nameof(User.Age))]` on an `int` property and get `eq`, `gt`, `lt`, `in`, `between`, and friends for free. Reach for `Profile = typeof(MyProfile)` only when you need operators the built-in does not provide, or when multiple profiles match the same CLR type and you must disambiguate.
+Always, unless you have a reason to opt out. Letting the resolver pick is the lowest-friction path: you declare `[Map(nameof(User.Age))]` on an `int` property and get `eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `in`, and `isNull` for free. Reach for `Profile = typeof(MyProfile)` only when you need operators the built-in does not provide, or when multiple profiles match the same CLR type and you must disambiguate.
 
 ## CLR type mapping
 
 | CLR type | Profile | Operators |
 |----------|---------|-----------|
 | `string` | `StringFilter` | `eq`, `ne`, `contains`, `startsWith`, `endsWith`, `in`, `isNull` |
-| `int`, `long`, `short`, `byte`, `sbyte`, `ushort`, `uint`, `ulong` | `Numeric/Int32Filter`, `Int64Filter`, etc. | `eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `in`, `isNull` |
+| `int`, `long`, `short`, `byte` | `Numeric/Int32Filter`, `Int64Filter`, `Int16Filter`, `ByteFilter` | `eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `in`, `isNull` |
 | `decimal`, `double`, `float` | `DecimalFilter`, `DoubleFilter`, `SingleFilter` | `eq`, `ne`, `gt`, `gte`, `lt`, `lte`, `in`, `isNull` |
 | `bool` | `BoolFilter` | `eq`, `isNull` |
 | `Guid` | `GuidFilter` | `eq`, `ne`, `in`, `isNull` |
@@ -29,6 +29,8 @@ Always, unless you have a reason to opt out. Letting the resolver pick is the lo
 | any `enum` | auto-emitted `<EnumName>Filter` | `eq`, `ne`, `in`, `isNull` |
 
 Nullable reference and value-typed columns share the underlying type's profile — `string?` resolves to `StringFilter`, `int?` resolves to `Int32Filter`. The `isNull` operator uses the nullable form internally.
+
+`sbyte`, `ushort`, `uint`, and `ulong` have no built-in profile: mapping one of those without `Profile = typeof(...)` raises `FN0006`. `DateOnlyFilter` and `TimeOnlyFilter` live in the package's `net8.0` asset only, so a project consuming the `netstandard2.0` asset does not see them.
 
 ## Variations
 

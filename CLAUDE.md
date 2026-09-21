@@ -6,7 +6,7 @@ Filter / sort / page library for `IQueryable<T>` and EF Core. Consumers declare 
 
 | Path | Role |
 |------|------|
-| `src/Filtering.Net/` | Runtime: attributes, request types, the `FilterDefinition<TEntity>` engine with `FilterSchema` / `FilterProperty` / `FilterProfile` / `FilterOperator`, built-in profiles, `IQueryable.Apply(...)` extension. `netstandard2.0`. |
+| `src/Filtering.Net/` | Runtime: attributes, request types, the `FilterDefinition<TEntity>` engine with `FilterSchema` / `FilterProperty` / `FilterProfile` / `FilterOperator`, built-in profiles, `IQueryable.Apply(...)` extension. Multi-targets `netstandard2.0`/`net8.0`; `DateOnlyFilter` / `TimeOnlyFilter` are net8.0-only. |
 | `src/Filtering.Net.Generator/` | Roslyn incremental source generator + analyzer. Templates live as embedded `.scriban` resources under `Emission/Templates/`. `netstandard2.0`. |
 | `src/Filtering.Net.EntityFrameworkCore/` | EF async helpers (`ApplyPagedAsync`, `PageResult<T>`). Multi-targets `net8.0`/`net9.0`/`net10.0`. |
 | `samples/UserManagement.WebApi/` | ASP.NET Core 9 + EF Core 9 + PostgreSQL end-to-end demo. |
@@ -36,10 +36,10 @@ dotnet test tests/Filtering.Net.Generator.Tests --filter "FullyQualifiedName~Com
 ## Source generator architecture
 
 - **Split of responsibilities.** The generator emits only a schema: `CreateSchema` with one `FilterProperty.Map(...)` entry per mapping, constructors, and the `FilterDefinition<TEntity>` base. All filtering logic is generic runtime code. Consumer lambdas (`[FilterOperator]` members, `[PropertyMap]` methods, interceptors) are referenced and run as written, never parsed for emission. See `src/Filtering.Net/CLAUDE.md` for how predicates are spliced.
-- **Pipeline branches** in `FilterGenerator.cs`: branch 1 walks `[GenerateFilter<TEntity>]` partials → emits filter classes, `FilteringProfiles.g.cs` (runtime instances of user profiles), enum profiles, and the DI extension; branch 2 walks `[FilterProfile<T>]` classes → emits per-profile diagnostics. Cross-pipeline diagnostics (FN1003 / FN1004) join both `.Collect()` outputs.
+- **Pipeline branches** in `FilterGenerator.cs`: a `GeneratorIndex` node over `CompilationProvider` is the one place compilation-global state is read (profile index, enum profiles, assembly `[FilterDefaults]`, DI-reference flag, FN1008 registrations) and every other node combines with it; branch 1 walks `[GenerateFilter<TEntity>]` partials in two phases (syntax-only extraction, then resolution against the index) → emits filter classes, `FilteringProfiles.g.cs` (runtime instances of user profiles), enum profiles, and the DI extension; branch 2 walks `[FilterProfile<T>]` classes → emits per-profile diagnostics. Cross-pipeline diagnostics (FN1003 / FN1004) join both `.Collect()` outputs.
 - **Model extraction** is in `ModelExtraction/` and produces `EquatableList<T>`-based records so the Roslyn cache can deduplicate compilations cheaply.
 - **Emission** uses Scriban templates source-embedded into the analyzer DLL (`PackageScribanIncludeSource`). Each emitter exposes `BuildView(model) → record` plus `Emit(model) → string` that delegates to `ScribanRuntime.Render`. `SourceEmitter.cs` builds the schema entries for `FilterClass.scriban`.
-- **Analyzer rules** are catalogued in `Diagnostics/DiagnosticDescriptors.cs`. Errors are `FN0001`–`FN0022`, warnings are `FN1001`–`FN1008`. Every descriptor's `helpLinkUri` points at the single catalogue page on the mkdocs-material site (`https://sheva-serga.github.io/Filtering.NET/diagnostics/`); add a new rule by registering its descriptor here and appending a row to `docs/github/docs/diagnostics/index.md`.
+- **Analyzer rules** are catalogued in `Diagnostics/DiagnosticDescriptors.cs`. Errors are `FN0001`–`FN0029`, warnings are `FN1001`–`FN1008`. Every descriptor's `helpLinkUri` points at the single catalogue page on the mkdocs-material site (`https://sheva-serga.github.io/Filtering.NET/diagnostics/`); add a new rule by registering its descriptor here and appending a row to `docs/github/docs/diagnostics/index.md`.
 
 ## Snapshot-test workflow
 

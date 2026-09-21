@@ -7,7 +7,7 @@ Thin EF Core async layer over `Filtering.Net`. Two public surfaces and nothing e
 ## Public surface
 
 - **`PageResult<T>`** (`PageResult.cs`) — record returned by `ApplyPagedAsync`. Carries `Items`, `TotalCount`, `Page`, `PageSize`. `TotalPages`, `HasPrevious`, and `HasNext` are derived; don't store them.
-- **`FilteringEntityFrameworkExtensions`** — adds `ApplyPagedAsync(IFilterDefinition<T>, FilterRequest, CancellationToken)` to `IQueryable<T>`. Validates the request, applies filter + sort, runs `CountAsync` + `ToListAsync` against the EF provider, packages into `PageResult<T>`. Throws `FilterValidationException` when validation fails — callers convert to HTTP 400 (or domain equivalent).
+- **`FilteringEntityFrameworkExtensions`** — adds `ApplyPagedAsync(IFilterDefinition<T>, FilterRequest, CancellationToken)` to `IQueryable<T>`. Validates the request, applies filter + sort, runs `CountAsync` + `ToListAsync` against the EF provider, packages into `PageResult<T>`. Throws `FilterValidationException` when validation fails — callers convert to HTTP 400 (or domain equivalent). The reported `PageSize` comes from `IFilterDefinition<T>.ResolvePageSize(request.PageSize)` when the request is paged (it carries `page` or `pageSize`), never from `items.Count`, which is wrong on every partial page; an unpaged request reports `TotalCount`. Paging without a sort is non-deterministic in SQL and stays the caller's responsibility: no default sort is added and nothing throws.
 
 ## EF version pinning
 
