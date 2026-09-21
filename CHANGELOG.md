@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.2.0] - 2026-09-20
+## [0.2.0] - 2026-09-21
 
 The filter engine moved from generated code into the runtime. The generator now emits a small typed schema per filter class, and `FilterDefinition<TEntity>` validates requests, composes predicates, and applies sorting for every filter. A filter with two string properties went from 347 emitted lines to about 25. `[Map]` and `[MapNested]` moved from marker methods onto the filter class, so a filter no longer needs any empty partial methods.
 
