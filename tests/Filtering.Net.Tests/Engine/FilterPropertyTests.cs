@@ -132,7 +132,7 @@ public class FilterPropertyTests
     public void Validate_InterceptorThrowsValidationException_ReportsInterceptorRejectedWithFirstMessage()
     {
         // Arrange
-        var rejection = new FilterValidationResult([new FilterValidationError("ignored", FilterValidationCode.InvalidValueFormat, "Name is banned.")]);
+        var rejection = new FilterValidationResult([new FilterValidationError("ignored", FilterValidationCode.InvalidValueType, "Name is banned.")]);
         var definition = Definition(properties:
         [
             FilterProperty.Map<Person, string>("Name", person => person.Name, StringFilter.Profile)

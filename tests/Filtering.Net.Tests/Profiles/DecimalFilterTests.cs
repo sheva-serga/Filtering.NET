@@ -22,20 +22,20 @@ public class DecimalFilterTests
         value.Should().Be(123.45m);
     }
 
-    [Fact]
-    public void TryGetValue_FromExponentString_MatchesTheEquivalentJsonNumber()
+    [Theory]
+    [InlineData("\"1E+5\"")]
+    [InlineData("\"1,000.5\"")]
+    public void TryGetValue_FromExponentOrThousandsSeparatedString_ReturnsFormatError(string valueJson)
     {
-        // Arrange — clients that send decimals as strings to avoid float rounding still use scientific notation.
-        var stringElement = JsonDocument.Parse("\"1E+5\"").RootElement;
-        var numberElement = JsonDocument.Parse("1e5").RootElement;
+        // Arrange
+        var element = JsonDocument.Parse(valueJson).RootElement;
 
         // Act
-        var stringSuccess = DecimalFilter.TryGetValue(stringElement, out var fromString, out var error);
-        DecimalFilter.TryGetValue(numberElement, out var fromNumber, out _);
+        var success = DecimalFilter.TryGetValue(element, out _, out var error);
 
         // Assert
-        stringSuccess.Should().BeTrue(because: error);
-        fromString.Should().Be(fromNumber);
+        success.Should().BeFalse();
+        error.Should().Contain("is not a valid invariant decimal");
     }
 
     [Fact]

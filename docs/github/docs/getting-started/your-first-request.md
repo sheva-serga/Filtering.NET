@@ -46,7 +46,7 @@ Clients post a `FilterRequest` as JSON. The `where` field is a polymorphic `Filt
       { "field": "IsActive", "op": "eq", "value": true }
     ]
   },
-  "sort": [{ "field": "Age", "dir": 1 }],
+  "sort": [{ "field": "Age", "dir": "desc" }],
   "page": 1,
   "pageSize": 25
 }

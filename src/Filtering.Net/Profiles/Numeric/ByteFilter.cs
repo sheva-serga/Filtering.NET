@@ -48,7 +48,7 @@ public static class ByteFilter
         NumericExtractor.TryGetValue(
             element,
             (JsonElement e, out byte v) => e.TryGetByte(out v),
-            (string s, out byte v) => byte.TryParse(s, NumericExtractor.InvariantNumberStyles, CultureInfo.InvariantCulture, out v),
+            (string s, out byte v) => byte.TryParse(s, NumericExtractor.IntegerNumberStyles, CultureInfo.InvariantCulture, out v),
             "byte",
             out value, out error);
 

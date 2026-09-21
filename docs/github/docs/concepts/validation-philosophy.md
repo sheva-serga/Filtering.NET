@@ -38,7 +38,7 @@ A response payload after a controller maps `invalid.Result` to `BadRequest` look
 ```
 
 !!! note
-    `Code` is a plain C# enum and the library registers no converter for it, so System.Text.Json writes it as its numeric value. Register `JsonStringEnumConverter` on your app's `JsonSerializerOptions` if you want the names shown above on the wire.
+    `FilterValidationCode` carries a `JsonStringEnumConverter`, so System.Text.Json writes `code` as the member name shown above with no setup in your app.
 
 ## Codes you'll see at runtime
 
@@ -58,7 +58,7 @@ A response payload after a controller maps `invalid.Result` to `BadRequest` look
 - **`GroupEmpty`** — `and: []`, `or: []`, or `not: []` with zero children.
 - **`InvalidNodeShape`** — a node the engine cannot interpret: a `not` group with a child count other than one, a combinator outside `LogicalOp`, or a `FilterNode` subtype that is neither `FilterGroup` nor `FilterLeaf`.
 
-Two members of the enum, `InvalidValueFormat` and `EmptyInArray`, are declared but never produced: a malformed value is reported as `InvalidValueType`, and an empty `in` array is accepted (it matches nothing). Don't branch on them.
+A value in a format the column type rejects is reported as `InvalidValueType`, and an empty `in` array is accepted (it matches nothing); there are no separate codes for either.
 
 ## How to surface this in HTTP APIs
 

@@ -79,7 +79,7 @@ A request body looks like:
       { "field": "IsActive", "op": "eq", "value": true }
     ]
   },
-  "sort": [{ "field": "Age", "dir": 1 }],
+  "sort": [{ "field": "Age", "dir": "desc" }],
   "page": 1,
   "pageSize": 25
 }

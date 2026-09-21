@@ -24,7 +24,7 @@ A `FilterRequest` is a typed JSON document that carries everything a client need
       { "field": "IsActive", "op": "eq", "value": true }
     ]
   },
-  "sort": [{ "field": "Age", "dir": 1 }],
+  "sort": [{ "field": "Age", "dir": "desc" }],
   "page": 1,
   "pageSize": 25
 }
@@ -87,9 +87,9 @@ The converter itself reads a leaf's `value` as a raw `JsonElement` and uses no r
 `SortItem` is a flat record:
 
 - `field` — string name of a property declared `Sortable = true` in its `[Map]`.
-- `dir` — `SortDir` enum: `Asc = 0`, `Desc = 1`. It is nullable; clients post the integer, and no string-enum converter is registered, so `"asc"` fails deserialization with a `JsonException`. When `dir` is omitted the property's `DefaultSortDirection` applies; a value outside the enum fails validation with `InvalidSortDirection`.
+- `dir` — `SortDir` enum, sent as `"asc"` / `"desc"` (any casing; the numbers `0` / `1` are accepted too) and written back as `"Asc"` / `"Desc"`. It is nullable. A name that is not a member is a `JsonException` on deserialization. When `dir` is omitted the property's `DefaultSortDirection` applies; a number outside the enum fails validation with `InvalidSortDirection`.
 
-The same numeric-enum convention applies to `LogicalOp` (`And = 0`, `Or = 1`, `Not = 2`) — that's the value behind a `FilterGroup.Op` field, though most clients use the JSON `and` / `or` / `not` keys directly and never see the enum on the wire.
+`LogicalOp` (`And`, `Or`, `Not`) follows the same name-on-the-wire convention, though it is the value behind a `FilterGroup.Op` field and clients use the JSON `and` / `or` / `not` keys, so they never see the enum itself.
 
 !!! tip
     Validation rejects sort entries whose field is not `Sortable = true` with the `NotSortable` code, and rejects unknown fields anywhere in the tree with `UnknownField`. See [Validation philosophy](validation-philosophy.md) for the full code list.

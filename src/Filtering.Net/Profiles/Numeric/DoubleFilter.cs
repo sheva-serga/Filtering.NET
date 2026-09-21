@@ -48,7 +48,7 @@ public static class DoubleFilter
         NumericExtractor.TryGetValue(
             element,
             (JsonElement e, out double v) => e.TryGetDouble(out v),
-            (string s, out double v) => double.TryParse(s, NumericExtractor.InvariantNumberStyles, CultureInfo.InvariantCulture, out v),
+            (string s, out double v) => double.TryParse(s, NumericExtractor.FloatingPointNumberStyles, CultureInfo.InvariantCulture, out v),
             "double",
             out value, out error);
 

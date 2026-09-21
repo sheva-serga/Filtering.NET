@@ -33,10 +33,10 @@ internal static class ProfileResolver
     {
         var visited = new HashSet<string>(StringComparer.Ordinal);
         // Operator name -> declaring profile full name; derived-profile overwrites win.
-        var operatorDeclarers = new Dictionary<string, string>(StringComparer.Ordinal);
+        var operatorDeclarers = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         // Operator name -> custom-operator metadata (only present when the declaring member
         // is on a non-built-in profile and the lambda body could be extracted).
-        var operatorMetadata = new Dictionary<string, CustomOperatorModel>(StringComparer.Ordinal);
+        var operatorMetadata = new Dictionary<string, CustomOperatorModel>(StringComparer.OrdinalIgnoreCase);
         // Insertion order preserves the user's declaration order in the snapshot output.
         var operatorOrder = new List<string>();
 

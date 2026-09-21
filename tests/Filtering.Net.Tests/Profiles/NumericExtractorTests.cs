@@ -95,10 +95,11 @@ public class NumericExtractorTests
     }
 
     [Theory]
-    [InlineData("\"1E+5\"", 100000)]
-    [InlineData("\"1,000\"", 1000)]
-    [InlineData("\" 42 \"", 42)]
-    public void TryGetValue_FromStringsUsingTheSharedInvariantStyles_ReturnsParsedValue(string valueJson, int expected)
+    [InlineData("\"1E+5\"")]
+    [InlineData("\"1,000\"")]
+    [InlineData("\" 42 \"")]
+    [InlineData("\"4.0\"")]
+    public void TryGetValue_FromStringOutsideTheIntegerStyles_ReturnsFormatError(string valueJson)
     {
         // Arrange
         var element = JsonDocument.Parse(valueJson).RootElement;
@@ -107,7 +108,30 @@ public class NumericExtractorTests
         var success = NumericExtractor.TryGetValue(
             element,
             (JsonElement e, out int v) => e.TryGetInt32(out v),
-            (string s, out int v) => int.TryParse(s, NumericExtractor.InvariantNumberStyles, CultureInfo.InvariantCulture, out v),
+            (string s, out int v) => int.TryParse(s, NumericExtractor.IntegerNumberStyles, CultureInfo.InvariantCulture, out v),
+            "int",
+            out _,
+            out var error);
+
+        // Assert
+        success.Should().BeFalse();
+        error.Should().Contain("is not a valid invariant int");
+    }
+
+    [Theory]
+    [InlineData("\"42\"", 42)]
+    [InlineData("\"-42\"", -42)]
+    [InlineData("\"+42\"", 42)]
+    public void TryGetValue_FromSignedDigitString_ReturnsParsedValue(string valueJson, int expected)
+    {
+        // Arrange
+        var element = JsonDocument.Parse(valueJson).RootElement;
+
+        // Act
+        var success = NumericExtractor.TryGetValue(
+            element,
+            (JsonElement e, out int v) => e.TryGetInt32(out v),
+            (string s, out int v) => int.TryParse(s, NumericExtractor.IntegerNumberStyles, CultureInfo.InvariantCulture, out v),
             "int",
             out var value,
             out _);

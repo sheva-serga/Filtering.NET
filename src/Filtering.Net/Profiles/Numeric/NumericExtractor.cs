@@ -6,12 +6,14 @@ namespace Filtering.Net;
 /// <summary>Generic JSON-to-numeric extraction shared by every per-CLR-type numeric profile.</summary>
 public static class NumericExtractor
 {
-    /// <summary>
-    /// The one string-parsing contract every numeric profile uses, so the same literal is accepted on every numeric
-    /// column type and a value accepted as a JSON Number is also accepted as the equivalent JSON String.
-    /// Allows surrounding whitespace, a sign, a decimal point, thousands separators and an exponent.
-    /// </summary>
-    public const NumberStyles InvariantNumberStyles = NumberStyles.Number | NumberStyles.AllowExponent;
+    /// <summary>String form accepted by the integer profiles: an optional leading sign and digits. No whitespace, no thousands separators, no exponent.</summary>
+    public const NumberStyles IntegerNumberStyles = NumberStyles.AllowLeadingSign;
+
+    /// <summary>String form accepted by <see cref="DecimalFilter"/>: <see cref="IntegerNumberStyles"/> plus a decimal point.</summary>
+    public const NumberStyles DecimalNumberStyles = NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint;
+
+    /// <summary>String form accepted by the floating-point profiles: <see cref="DecimalNumberStyles"/> plus an exponent.</summary>
+    public const NumberStyles FloatingPointNumberStyles = DecimalNumberStyles | NumberStyles.AllowExponent;
 
     /// <summary>Per-CLR-type JSON Number reader (e.g. <c>JsonElement.TryGetInt32</c>).</summary>
     public delegate bool TryGetFromJson<T>(JsonElement element, out T value);

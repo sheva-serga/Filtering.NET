@@ -1,36 +1,36 @@
+using System.Text.Json.Serialization;
+
 namespace Filtering.Net;
 
-/// <summary>Categorizes a <see cref="FilterValidationError"/>.</summary>
+/// <summary>Categorizes a <see cref="FilterValidationError"/>. Written to JSON as the member name; the numeric values are pinned for callers that persisted them.</summary>
+[JsonConverter(typeof(JsonStringEnumConverter<FilterValidationCode>))]
 public enum FilterValidationCode
 {
     /// <summary>Field name not configured for filtering.</summary>
-    UnknownField,
+    UnknownField = 0,
     /// <summary>Operator not in the property's profile / excluded by Only/Except.</summary>
-    OperatorNotAllowed,
-    /// <summary>Wrong JsonValueKind (e.g., bool where number expected).</summary>
-    InvalidValueType,
-    /// <summary>Right kind, wrong format (e.g., "abc" for invariant decimal).</summary>
-    InvalidValueFormat,
-    /// <summary>"in" operator with empty array.</summary>
-    EmptyInArray,
+    OperatorNotAllowed = 1,
+    /// <summary>Value the operator cannot read: wrong JsonValueKind, or the right kind in a format the column type rejects.</summary>
+    InvalidValueType = 2,
+    // 3 and 4 were InvalidValueFormat and EmptyInArray, which nothing produced; the gap keeps the other values stable.
     /// <summary>Interceptor threw FilterValidationException.</summary>
-    InterceptorRejected,
+    InterceptorRejected = 5,
     /// <summary>Sort item names no field, or names one that is not configured as sortable.</summary>
-    NotSortable,
+    NotSortable = 6,
     /// <summary>Sort direction value not Asc/Desc.</summary>
-    InvalidSortDirection,
+    InvalidSortDirection = 7,
     /// <summary>page &lt; 1, or a page so large that the rows to skip overflow an <see cref="int"/>.</summary>
-    PageInvalid,
+    PageInvalid = 8,
     /// <summary>pageSize &gt; MaxPageSize.</summary>
-    PageSizeTooLarge,
+    PageSizeTooLarge = 9,
     /// <summary>pageSize &lt; 1.</summary>
-    PageSizeInvalid,
+    PageSizeInvalid = 10,
     /// <summary>Filter nesting depth exceeds MaxNestingDepth.</summary>
-    NestingTooDeep,
+    NestingTooDeep = 11,
     /// <summary>Total leaf count exceeds MaxLeafConditions.</summary>
-    TooManyConditions,
+    TooManyConditions = 12,
     /// <summary>A group (and, or, not) with zero children.</summary>
-    GroupEmpty,
+    GroupEmpty = 13,
     /// <summary>Node the engine cannot interpret: a not group with more than one child, a combinator outside <see cref="LogicalOp"/>, or an unrecognized <see cref="FilterNode"/> subtype.</summary>
-    InvalidNodeShape
+    InvalidNodeShape = 14
 }

@@ -191,10 +191,11 @@ internal static class PropertyMappingExtractor
         }
 
         // -------- Compute allowed operators --------
-        var profileOperatorSet = new HashSet<string>(resolvedProfile.Operators);
+        // Operator names are case-insensitive at runtime (FilterProfile, FilterPropertyBuilder.Only/Except).
+        var profileOperatorSet = new HashSet<string>(resolvedProfile.Operators, StringComparer.OrdinalIgnoreCase);
 
-        var onlySet = declaration.HasOnly ? new HashSet<string>(declaration.OnlyOperators) : null;
-        var exceptSet = declaration.HasExcept ? new HashSet<string>(declaration.ExceptOperators) : null;
+        var onlySet = declaration.HasOnly ? new HashSet<string>(declaration.OnlyOperators, StringComparer.OrdinalIgnoreCase) : null;
+        var exceptSet = declaration.HasExcept ? new HashSet<string>(declaration.ExceptOperators, StringComparer.OrdinalIgnoreCase) : null;
 
         // FN0005: any name in Only/Except that isn't on the profile is an error.
         ReportUnknownOperators(onlySet, profileOperatorSet, declaration, resolvedProfile, diagnostics);
@@ -219,7 +220,7 @@ internal static class PropertyMappingExtractor
         }
 
         // Drop metadata for operators excluded by Only/Except — the dispatcher will never invoke them.
-        var allowedSet = new HashSet<string>(allowedOperators, StringComparer.Ordinal);
+        var allowedSet = new HashSet<string>(allowedOperators, StringComparer.OrdinalIgnoreCase);
         var filteredCustomOperators = resolvedProfile.CustomOperators
             .Where(customOperator => allowedSet.Contains(customOperator.OperatorName))
             .ToList();

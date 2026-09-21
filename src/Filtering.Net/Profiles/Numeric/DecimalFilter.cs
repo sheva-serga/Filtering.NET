@@ -48,7 +48,7 @@ public static class DecimalFilter
         NumericExtractor.TryGetValue(
             element,
             (JsonElement e, out decimal v) => e.TryGetDecimal(out v),
-            (string s, out decimal v) => decimal.TryParse(s, NumericExtractor.InvariantNumberStyles, CultureInfo.InvariantCulture, out v),
+            (string s, out decimal v) => decimal.TryParse(s, NumericExtractor.DecimalNumberStyles, CultureInfo.InvariantCulture, out v),
             "decimal",
             out value, out error);
 

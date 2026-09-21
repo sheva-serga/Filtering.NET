@@ -38,17 +38,17 @@ public class Int32FilterTests
     }
 
     [Fact]
-    public void TryGetValue_FromExponentString_ParsesLikeTheFloatingPointProfiles()
+    public void TryGetValue_FromExponentString_ReturnsFormatError()
     {
         // Arrange
         var element = JsonDocument.Parse("\"1E+5\"").RootElement;
 
         // Act
-        var success = Int32Filter.TryGetValue(element, out var value, out var error);
+        var success = Int32Filter.TryGetValue(element, out _, out var error);
 
         // Assert
-        success.Should().BeTrue(because: error);
-        value.Should().Be(100000);
+        success.Should().BeFalse();
+        error.Should().Contain("is not a valid invariant int");
     }
 
     [Fact]

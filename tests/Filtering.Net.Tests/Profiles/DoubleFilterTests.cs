@@ -23,17 +23,31 @@ public class DoubleFilterTests
     }
 
     [Fact]
-    public void TryGetValue_FromThousandsSeparatedString_ParsesLikeTheIntegerProfiles()
+    public void TryGetValue_FromThousandsSeparatedString_ReturnsFormatError()
     {
         // Arrange
         var element = JsonDocument.Parse("\"1,000\"").RootElement;
+
+        // Act
+        var success = DoubleFilter.TryGetValue(element, out _, out var error);
+
+        // Assert
+        success.Should().BeFalse();
+        error.Should().Contain("is not a valid invariant double");
+    }
+
+    [Fact]
+    public void TryGetValue_FromExponentString_ReturnsParsedValue()
+    {
+        // Arrange
+        var element = JsonDocument.Parse("\"1E+5\"").RootElement;
 
         // Act
         var success = DoubleFilter.TryGetValue(element, out var value, out var error);
 
         // Assert
         success.Should().BeTrue(because: error);
-        value.Should().Be(1000d);
+        value.Should().Be(100000d);
     }
 
     [Fact]

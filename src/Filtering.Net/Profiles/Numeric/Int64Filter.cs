@@ -48,7 +48,7 @@ public static class Int64Filter
         NumericExtractor.TryGetValue(
             element,
             (JsonElement e, out long v) => e.TryGetInt64(out v),
-            (string s, out long v) => long.TryParse(s, NumericExtractor.InvariantNumberStyles, CultureInfo.InvariantCulture, out v),
+            (string s, out long v) => long.TryParse(s, NumericExtractor.IntegerNumberStyles, CultureInfo.InvariantCulture, out v),
             "long",
             out value, out error);
 

@@ -48,7 +48,7 @@ public static class Int16Filter
         NumericExtractor.TryGetValue(
             element,
             (JsonElement e, out short v) => e.TryGetInt16(out v),
-            (string s, out short v) => short.TryParse(s, NumericExtractor.InvariantNumberStyles, CultureInfo.InvariantCulture, out v),
+            (string s, out short v) => short.TryParse(s, NumericExtractor.IntegerNumberStyles, CultureInfo.InvariantCulture, out v),
             "short",
             out value, out error);
 

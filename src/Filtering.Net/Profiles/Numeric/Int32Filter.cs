@@ -48,7 +48,7 @@ public static class Int32Filter
         NumericExtractor.TryGetValue(
             element,
             (JsonElement e, out int v) => e.TryGetInt32(out v),
-            (string s, out int v) => int.TryParse(s, NumericExtractor.InvariantNumberStyles, CultureInfo.InvariantCulture, out v),
+            (string s, out int v) => int.TryParse(s, NumericExtractor.IntegerNumberStyles, CultureInfo.InvariantCulture, out v),
             "int",
             out value, out error);
 

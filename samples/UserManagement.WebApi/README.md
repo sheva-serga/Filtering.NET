@@ -61,7 +61,7 @@ curl -X POST http://localhost:5000/users/search \
      -H "Content-Type: application/json" \
      -d '{
        "where": { "field": "Name", "op": "contains", "value": "ali" },
-       "sort":  [{ "field": "Name", "dir": 0 }],
+       "sort":  [{ "field": "Name", "dir": "asc" }],
        "page": 1,
        "pageSize": 10
      }'
@@ -96,7 +96,7 @@ Sort by the same nested column (sortable propagates from `DepartmentFilter`'s `[
 ```sh
 curl -X POST http://localhost:5000/users/search \
      -H "Content-Type: application/json" \
-     -d '{ "sort": [{ "field": "department.name", "dir": 0 }] }'
+     -d '{ "sort": [{ "field": "department.name", "dir": "asc" }] }'
 ```
 
 Enum match on the auto-emitted `UserStatus` profile:
