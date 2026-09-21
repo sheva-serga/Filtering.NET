@@ -40,8 +40,10 @@ internal static class ProfileExtractor
         var profileFullName = profileSymbol.ToDisplayString();
         var operatorNames = new List<string>();
         // Tracks first-occurrence location per operator name so a subsequent duplicate diagnostic
-        // can point at the original declaration via additionalLocations.
-        var firstOperatorLocation = new Dictionary<string, Location?>(StringComparer.Ordinal);
+        // can point at the original declaration via additionalLocations. Case-insensitive because
+        // FilterProfile<TColumn> keys its operator dictionary that way, so two names differing only
+        // in case are one operator at runtime.
+        var firstOperatorLocation = new Dictionary<string, Location?>(StringComparer.OrdinalIgnoreCase);
 
         // When EF Core is referenced, any EF.Functions.* call is translatable — including custom
         // extensions like npgsql's TrigramsAreSimilar that aren't in the static allow-list.
@@ -49,7 +51,6 @@ internal static class ProfileExtractor
 
         // FN0010: BasedOn must itself carry [FilterProfile].
         var profileAttribute = context.Attributes.FirstOrDefault();
-        var hasBasedOn = profileAttribute is not null && HasBasedOnNamedArg(profileAttribute);
         if (profileAttribute is not null)
         {
             ValidateBasedOnNamedArg(profileSymbol, profileAttribute, diagnostics);
@@ -76,6 +77,21 @@ internal static class ProfileExtractor
                 && operatorAttribute.ConstructorArguments[0].Value is string operatorName)
             {
                 var memberLocation = member.Locations.FirstOrDefault();
+
+                // FN0028: a member the generator cannot read a predicate shape from contributes no
+                // FilterOperator entry, so it would otherwise be advertised by AllowedOperators and
+                // then rejected at request time as an unknown operator.
+                if (OperatorPredicateSignature.TryRead(member) is null)
+                {
+                    diagnostics.Add(DiagnosticInfo.From(
+                        DiagnosticDescriptors.OperatorMemberShapeInvalid,
+                        memberLocation,
+                        $"{profileFullName}.{member.Name}",
+                        operatorName));
+                    ScanOperatorBody(member, diagnostics, cancellationToken, efIsReferenced);
+                    continue;
+                }
+
                 if (!firstOperatorLocation.ContainsKey(operatorName))
                 {
                     operatorNames.Add(operatorName);
@@ -100,13 +116,6 @@ internal static class ProfileExtractor
             ScanOperatorBody(member, diagnostics, cancellationToken, efIsReferenced);
         }
 
-        // FN0013: standalone profiles (no BasedOn) must own their extractor methods;
-        // profiles with BasedOn delegate to the base, which is checked separately.
-        if (!hasBasedOn && operatorNames.Count > 0)
-        {
-            ReportMissingExtractors(profileSymbol, profileFullName, operatorNames, diagnostics);
-        }
-
         var model = new ProfileModel(
             ProfileFullName: profileFullName,
             OperatorNames: new EquatableList<string>(operatorNames),
@@ -115,63 +124,6 @@ internal static class ProfileExtractor
         return new ProfileModelWithDiagnostics(
             Model: model,
             Diagnostics: new EquatableList<DiagnosticInfo>(diagnostics));
-    }
-
-    private static bool HasBasedOnNamedArg(AttributeData profileAttribute)
-    {
-        foreach (var namedArgument in profileAttribute.NamedArguments)
-        {
-            if (namedArgument.Key != "BasedOn") continue;
-            if (namedArgument.Value.Value is INamedTypeSymbol) return true;
-        }
-        return false;
-    }
-
-    private static void ReportMissingExtractors(
-        INamedTypeSymbol profileSymbol,
-        string profileFullName,
-        IReadOnlyList<string> operatorNames,
-        List<DiagnosticInfo> diagnostics)
-    {
-        var hasScalarOperator = false;
-        var hasArrayOperator = false;
-        foreach (var operatorName in operatorNames)
-        {
-            if (operatorName == "isNull") continue;
-            if (operatorName == "in") hasArrayOperator = true;
-            else hasScalarOperator = true;
-        }
-
-        var missingMethods = new List<string>();
-        if (hasScalarOperator && !ProfileDeclaresPublicStaticMethod(profileSymbol, "TryGetValue"))
-        {
-            missingMethods.Add("TryGetValue");
-        }
-        if (hasArrayOperator && !ProfileDeclaresPublicStaticMethod(profileSymbol, "TryGetArray"))
-        {
-            missingMethods.Add("TryGetArray");
-        }
-        if (missingMethods.Count == 0) return;
-
-        diagnostics.Add(DiagnosticInfo.From(
-            DiagnosticDescriptors.ProfileMissingExtractor,
-            profileSymbol.Locations.FirstOrDefault(),
-            profileFullName,
-            string.Join(", ", missingMethods)));
-    }
-
-    private static bool ProfileDeclaresPublicStaticMethod(INamedTypeSymbol profileSymbol, string methodName)
-    {
-        foreach (var member in profileSymbol.GetMembers(methodName))
-        {
-            if (member is IMethodSymbol method
-                && method.IsStatic
-                && method.DeclaredAccessibility == Accessibility.Public)
-            {
-                return true;
-            }
-        }
-        return false;
     }
 
     private static void ValidateBasedOnNamedArg(

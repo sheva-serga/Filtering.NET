@@ -9,7 +9,7 @@ internal static class DiagnosticDescriptors
     // Single help-link target — every rule's "More info" goes to the catalogue table.
     private const string HelpLink = "https://sheva-serga.github.io/Filtering.NET/diagnostics/";
 
-    // ---------- Errors (FN0001 - FN0022) ----------
+    // ---------- Errors (FN0001 - FN0029) ----------
 
     public static readonly DiagnosticDescriptor DuplicateMapping = new(
         id: "FN0001",
@@ -120,17 +120,8 @@ internal static class DiagnosticDescriptors
         isEnabledByDefault: true,
         helpLinkUri: HelpLink);
 
-    public static readonly DiagnosticDescriptor ProfileMissingExtractor = new(
-        id: "FN0013",
-        title: "Standalone filter profile is missing a required extractor method",
-        messageFormat: "Profile '{0}' has no [FilterProfile.BasedOn] and is missing required extractor method(s): {1}. Either declare these public static methods on the profile or set BasedOn = typeof(...) to inherit them from a profile that does.",
-        category: Category,
-        defaultSeverity: DiagnosticSeverity.Error,
-        isEnabledByDefault: true,
-        helpLinkUri: HelpLink);
-
     public static readonly DiagnosticDescriptor DuplicateOperatorOnProfile = new(
-        id: "FN0014",
+        id: "FN0013",
         title: "Duplicate operator declaration on profile",
         messageFormat: "Operator '{0}' is declared more than once on profile '{1}'. Each operator name must appear at most once per profile.",
         category: Category,
@@ -139,7 +130,7 @@ internal static class DiagnosticDescriptors
         helpLinkUri: HelpLink);
 
     public static readonly DiagnosticDescriptor NestedCycle = new(
-        id: "FN0015",
+        id: "FN0014",
         title: "Cycle in [MapNested] graph",
         messageFormat: "Cycle detected in [MapNested] graph involving filter classes: {0}. Set MaxDepth on at least one [MapNested] in the cycle to allow it.",
         category: Category,
@@ -148,17 +139,18 @@ internal static class DiagnosticDescriptors
         description: "A [MapNested] cycle is only allowed when at least one nesting in it declares MaxDepth, which makes the expansion finite.",
         helpLinkUri: HelpLink);
 
-    public static readonly DiagnosticDescriptor NestedCrossAssembly = new(
-        id: "FN0016",
-        title: "[MapNested<T>] references a filter class outside the current compilation",
-        messageFormat: "[MapNested<{0}>] references a filter class declared in another assembly. Cross-assembly nesting is not supported in v1.",
+    public static readonly DiagnosticDescriptor NestedFilterClassUnusable = new(
+        id: "FN0015",
+        title: "[MapNested<T>] does not name a usable filter class for the navigation",
+        messageFormat: "[MapNested<{0}>] on navigation '{1}' does not name a [GenerateFilter<{2}>] partial in this compilation. Name a filter class that targets '{2}', or drop the type argument to auto-resolve it; a filter class from another assembly cannot be nested in v1.",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
+        description: "The explicit type argument must resolve to a [GenerateFilter<TNavigation>] partial in the same compilation: a type that is not a filter class, targets a different entity, or lives in a referenced assembly all reach this rule.",
         helpLinkUri: HelpLink);
 
     public static readonly DiagnosticDescriptor NestedAmbiguous = new(
-        id: "FN0017",
+        id: "FN0016",
         title: "Auto-resolve [MapNested] is ambiguous",
         messageFormat: "[MapNested(nameof({0}))] is ambiguous: {1} candidate filter classes target '{2}'. Use the generic form [MapNested<TFilter>] to pick one.",
         category: Category,
@@ -167,7 +159,7 @@ internal static class DiagnosticDescriptors
         helpLinkUri: HelpLink);
 
     public static readonly DiagnosticDescriptor NestedTargetNotFound = new(
-        id: "FN0018",
+        id: "FN0017",
         title: "[MapNested] target filter class not found",
         messageFormat: "[MapNested(nameof({0}))] cannot resolve a filter class for '{1}': no [GenerateFilter<{1}>] partial in this compilation.",
         category: Category,
@@ -176,7 +168,7 @@ internal static class DiagnosticDescriptors
         helpLinkUri: HelpLink);
 
     public static readonly DiagnosticDescriptor NestedNavigationInvalid = new(
-        id: "FN0019",
+        id: "FN0018",
         title: "[MapNested] navigation property is not a single-target reference navigation",
         messageFormat: "[MapNested(nameof({0}))] target property does not exist on '{1}', is a primitive/value type, or is not a single-target reference navigation.",
         category: Category,
@@ -185,7 +177,7 @@ internal static class DiagnosticDescriptors
         helpLinkUri: HelpLink);
 
     public static readonly DiagnosticDescriptor NestedCollectionUnsupported = new(
-        id: "FN0020",
+        id: "FN0019",
         title: "[MapNested] on collection navigation is not supported in v1",
         messageFormat: "[MapNested(nameof({0}))] target is a collection navigation; collection navigations require Any/All quantifier semantics and are deferred to a future version.",
         category: Category,
@@ -194,7 +186,7 @@ internal static class DiagnosticDescriptors
         helpLinkUri: HelpLink);
 
     public static readonly DiagnosticDescriptor FilterClassHasBaseType = new(
-        id: "FN0021",
+        id: "FN0020",
         title: "[GenerateFilter] class declares a base class",
         messageFormat: "Filter class '{0}' derives from '{1}'. The generated part derives from FilterDefinition<TEntity>, so the class cannot declare another base class.",
         category: Category,
@@ -203,12 +195,89 @@ internal static class DiagnosticDescriptors
         helpLinkUri: HelpLink);
 
     public static readonly DiagnosticDescriptor NestedMaxDepthInvalid = new(
-        id: "FN0022",
-        title: "[MapNested] MaxDepth must not be negative",
-        messageFormat: "[MapNested(nameof({0}))] has MaxDepth = {1}. Use a positive value to bound the nesting, or omit it for an unbounded one.",
+        id: "FN0021",
+        title: "[MapNested] MaxDepth is out of range",
+        messageFormat: "[MapNested(nameof({0}))] has MaxDepth = {1}. Use a value between 1 and {2} to bound the nesting, or omit it for an unbounded one.",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,
+        description: "MaxDepth bounds how often one nesting may be followed along a single path. A negative value is meaningless, and a value above the supported ceiling would expand into an unusable number of filter paths.",
+        helpLinkUri: HelpLink);
+
+    public static readonly DiagnosticDescriptor ProfileTypeNotAProfile = new(
+        id: "FN0022",
+        title: "[Map(Profile = ...)] references a non-profile type",
+        messageFormat: "[Map(\"{0}\", Profile = typeof({1}))] references a type that is not marked with [FilterProfile<TColumn>]. Mark '{1}' with [FilterProfile<TColumn>] or point Profile at a profile class.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLink);
+
+    public static readonly DiagnosticDescriptor PropertyMapSignatureInvalid = new(
+        id: "FN0023",
+        title: "[PropertyMap] method has an unusable signature",
+        messageFormat: "[PropertyMap(\"{0}\")] method '{1}' cannot be called from generated code: {2}. Declare it as 'public static FilterRule<TEntity, TValue> {1}(FilterRuleBuilder<TEntity, TValue> builder)'.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        description: "A [PropertyMap] method whose signature the generated CreateSchema cannot call would silently drop the property from the schema.",
+        helpLinkUri: HelpLink);
+
+    public static readonly DiagnosticDescriptor NullableValueTypeInPath = new(
+        id: "FN0024",
+        title: "Mapped path reads a member through a nullable value type",
+        messageFormat: "Path '{0}' reads member '{1}' through nullable value type '{2}', which does not expose it. Map the member with a [PropertyMap] rule instead.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLink);
+
+    public static readonly DiagnosticDescriptor NestedPrefixBlank = new(
+        id: "FN0025",
+        title: "[MapNested] Prefix is blank",
+        messageFormat: "[MapNested(nameof({0}))] declares a blank Prefix. Omit Prefix to dispatch under the navigation name, or give it a non-blank value.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLink);
+
+    public static readonly DiagnosticDescriptor NestedPathFilterUnknown = new(
+        id: "FN0026",
+        title: "[MapNested] Only/Except names a path the nested filter does not map",
+        messageFormat: "[MapNested(nameof({0}))] {1} names '{2}', which the filter class '{3}' does not map. Nested paths contributed by a further [MapNested] must be spelled with a dot.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        helpLinkUri: HelpLink);
+
+    public static readonly DiagnosticDescriptor FilterClassPlacementInvalid = new(
+        id: "FN0027",
+        title: "[GenerateFilter] class is nested or generic",
+        messageFormat: "Filter class '{0}' cannot be generated because {1}. Declare [GenerateFilter<TEntity>] on a non-generic partial class that sits directly in a namespace.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        description: "The generated half of a filter class is emitted as a top-level partial in the class's namespace, so a nested or generic declaration would never be joined with it.",
+        helpLinkUri: HelpLink);
+
+    public static readonly DiagnosticDescriptor OperatorMemberShapeInvalid = new(
+        id: "FN0028",
+        title: "[FilterOperator] member is not an operator template",
+        messageFormat: "Member '{0}' declares operator '{1}' but its type is not Expression<Func<TColumn, bool>> or Expression<Func<TColumn, TValue, bool>>, so no operator can be built from it.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        description: "A [FilterOperator] member the generator cannot read a predicate shape from contributes nothing to the emitted profile, and requests naming that operator would be rejected as unknown.",
+        helpLinkUri: HelpLink);
+
+    public static readonly DiagnosticDescriptor InterceptorSignatureInvalid = new(
+        id: "FN0029",
+        title: "[InterceptValue] method has an unusable signature",
+        messageFormat: "[InterceptValue(\"{0}\")] method '{1}' cannot be called from generated code: {2}. Declare it as 'static TValue {1}(InterceptContext context, TValue value)'.",
+        category: Category,
+        defaultSeverity: DiagnosticSeverity.Error,
+        isEnabledByDefault: true,
+        description: "An interceptor that is not static is spliced into the static CreateSchema as a method group and fails to compile; one with the wrong parameter shape is dropped and silently never runs.",
         helpLinkUri: HelpLink);
 
     // ---------- Warnings (FN1001 - FN1008) ----------

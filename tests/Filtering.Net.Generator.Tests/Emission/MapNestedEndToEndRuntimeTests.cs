@@ -10,7 +10,6 @@ public class MapNestedEndToEndRuntimeTests
     private const string TwoLevelSource = """
         using Filtering.Net;
         namespace Sample;
-        public class Country { public string Code { get; set; } = ""; }
         public class Company { public string Country { get; set; } = ""; }
         public class Department
         {
@@ -61,6 +60,118 @@ public class MapNestedEndToEndRuntimeTests
         {
         }
         """;
+
+    private const string ExceptRestrictedSource = """
+        using Filtering.Net;
+        namespace Sample;
+        public class Department
+        {
+            public int Id { get; set; }
+            public string Name { get; set; } = "";
+            public string InternalNotes { get; set; } = "";
+        }
+        public class User { public Department Department { get; set; } = new(); }
+        [Map(nameof(Department.Id))]
+        [Map(nameof(Department.Name))]
+        [Map(nameof(Department.InternalNotes))]
+        [GenerateFilter<Department>] public partial class DepartmentFilter
+        {
+        }
+        [GenerateFilter<User>]
+        [MapNested(nameof(User.Department), Except = new[] { "InternalNotes" })]
+        public partial class UserFilter
+        {
+        }
+        """;
+
+    [Fact]
+    public void Filter_ExceptRestricted_RejectsTheExcludedPathAndKeepsTheRest()
+    {
+        // Arrange — Except is the only half of FilterSchema.IsPathAllowed that the snapshots cannot
+        // observe: they pin the emitted argument, not the path set the schema ends up exposing.
+        var assembly = RuntimeLoader.LoadGeneratedAssembly(ExceptRestrictedSource);
+        var userFilterType = assembly.GetType("Sample.UserFilter")!;
+        var instance = Activator.CreateInstance(userFilterType)!;
+        var validateNodeMethod = userFilterType.GetMethods()
+            .First(m => m.Name == "Validate" && m.GetParameters().Length == 1
+                        && m.GetParameters()[0].ParameterType == typeof(FilterNode));
+
+        // Act
+        var excludedResult = (FilterValidationResult)validateNodeMethod.Invoke(instance,
+            [new FilterLeaf("department.internalNotes", "eq", JsonDocument.Parse("\"secret\"").RootElement)])!;
+        var keptResult = (FilterValidationResult)validateNodeMethod.Invoke(instance,
+            [new FilterLeaf("department.name", "eq", JsonDocument.Parse("\"Sales\"").RootElement)])!;
+
+        // Assert
+        excludedResult.Errors.Should().ContainSingle(error => error.Code == FilterValidationCode.UnknownField);
+        keptResult.IsValid.Should().BeTrue();
+    }
+
+    private const string NullableNavigationSource = """
+        using Filtering.Net;
+        namespace Sample;
+        public class Department { public string Name { get; set; } = ""; }
+        public class User { public string Login { get; set; } = ""; public Department? Department { get; set; } }
+        [Map(nameof(Department.Name))]
+        [GenerateFilter<Department>] public partial class DepartmentFilter
+        {
+        }
+        [GenerateFilter<User>]
+        [Map(nameof(User.Login))]
+        [MapNested(nameof(User.Department))]
+        public partial class UserFilter
+        {
+        }
+        """;
+
+    [Fact]
+    public void Filter_NullNavigationInMemory_ThrowsBecauseLinqToObjectsDereferencesTheNavigation()
+    {
+        // Arrange — the spliced predicate reads entity.Department.Name with no null guard, which is
+        // exactly what makes it a LEFT JOIN on a database provider. Over LINQ-to-Objects there is no
+        // such translation, so a null navigation dereferences. Pinned so the difference between the
+        // two execution models is deliberate rather than discovered in production.
+        var assembly = RuntimeLoader.LoadGeneratedAssembly(NullableNavigationSource);
+        var userFilterType = assembly.GetType("Sample.UserFilter")!;
+        var userType = assembly.GetType("Sample.User")!;
+        var departmentType = assembly.GetType("Sample.Department")!;
+        var instance = Activator.CreateInstance(userFilterType)!;
+        var userWithDepartment = CreateUserWithOptionalDepartment(userType, departmentType, "alice", "Sales");
+        var userWithoutDepartment = CreateUserWithOptionalDepartment(userType, departmentType, "bob", departmentName: null);
+        var typedQueryable = BuildTypedQueryable(userType, [userWithDepartment, userWithoutDepartment]);
+        var leaf = new FilterLeaf("department.name", "eq", JsonDocument.Parse("\"Sales\"").RootElement);
+
+        // Act
+        var filteredQuery = userFilterType.GetMethod("ApplyFilter")!.Invoke(instance, [typedQueryable, (object?)leaf])!;
+        var materialiseAllRows = () => MaterializeLogins(filteredQuery, userType);
+
+        // Assert
+        materialiseAllRows.Should().Throw<NullReferenceException>();
+    }
+
+    [Fact]
+    public void Filter_NullNavigationOnRowsThatAllHaveOne_MatchesNormally()
+    {
+        // Arrange
+        var assembly = RuntimeLoader.LoadGeneratedAssembly(NullableNavigationSource);
+        var userFilterType = assembly.GetType("Sample.UserFilter")!;
+        var userType = assembly.GetType("Sample.User")!;
+        var departmentType = assembly.GetType("Sample.Department")!;
+        var instance = Activator.CreateInstance(userFilterType)!;
+        var typedQueryable = BuildTypedQueryable(userType,
+        [
+            CreateUserWithOptionalDepartment(userType, departmentType, "alice", "Sales"),
+            CreateUserWithOptionalDepartment(userType, departmentType, "bob", "Engineering"),
+        ]);
+        var leaf = new FilterLeaf("department.name", "eq", JsonDocument.Parse("\"Sales\"").RootElement);
+
+        // Act
+        var filteredQuery = userFilterType.GetMethod("ApplyFilter")!.Invoke(instance, [typedQueryable, (object?)leaf])!;
+        var matchedLogins = MaterializeLogins(filteredQuery, userType);
+
+        // Assert
+        matchedLogins.Should().Equal(["alice"]);
+    }
 
     private const string DisableSortingSource = """
         using Filtering.Net;
@@ -467,6 +578,19 @@ public class MapNestedEndToEndRuntimeTests
         departmentType.GetProperty("Name")!.SetValue(department, departmentName);
         var user = Activator.CreateInstance(userType)!;
         userType.GetProperty("Department")!.SetValue(user, department);
+        return user;
+    }
+
+    private static object CreateUserWithOptionalDepartment(Type userType, Type departmentType, string login, string? departmentName)
+    {
+        var user = Activator.CreateInstance(userType)!;
+        userType.GetProperty("Login")!.SetValue(user, login);
+        if (departmentName is not null)
+        {
+            var department = Activator.CreateInstance(departmentType)!;
+            departmentType.GetProperty("Name")!.SetValue(department, departmentName);
+            userType.GetProperty("Department")!.SetValue(user, department);
+        }
         return user;
     }
 

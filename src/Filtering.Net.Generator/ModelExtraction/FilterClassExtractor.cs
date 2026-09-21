@@ -1,23 +1,21 @@
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Filtering.Net.Generator;
 
+// Phase one of filter-class extraction: everything the class's own syntax tree says. Nothing here
+// reads compilation-global state, so Roslyn's per-tree caching of this transform cannot serve a
+// model that went stale because the change landed in another file. FilterClassResolver finishes the
+// job once the GeneratorIndex is combined in.
 internal static class FilterClassExtractor
 {
     private const string MapAttributeFullName = "Filtering.Net.MapAttribute";
     private const string InterceptValueAttributeFullName = "Filtering.Net.InterceptValueAttribute";
     private const string PropertyMapAttributeFullName = "Filtering.Net.PropertyMapAttribute";
     private const string PageSettingsAttributeFullName = "Filtering.Net.PageSettingsAttribute";
-    private const string FilterDefaultsAttributeFullName = "Filtering.Net.FilterDefaultsAttribute";
+    private const string InterceptContextFullName = "Filtering.Net.InterceptContext";
+    private const string JsonElementFullName = "System.Text.Json.JsonElement";
 
-    private const int FallbackDefaultPageSize = 50;
-    private const int FallbackMaxPageSize = 200;
-    private const int FallbackMaxNestingDepth = 10;
-    private const int FallbackMaxLeafConditions = 50;
-
-    public static FilterClassModelWithDiagnostics Extract(
+    public static FilterClassDeclarationWithDiagnostics Extract(
         GeneratorAttributeSyntaxContext context,
         CancellationToken cancellationToken)
     {
@@ -25,27 +23,35 @@ internal static class FilterClassExtractor
 
         if (context.TargetSymbol is not INamedTypeSymbol classSymbol)
         {
-            return new FilterClassModelWithDiagnostics(Model: null, Diagnostics: new EquatableList<DiagnosticInfo>(diagnostics));
+            return new FilterClassDeclarationWithDiagnostics(Declaration: null, Diagnostics: new EquatableList<DiagnosticInfo>(diagnostics));
         }
 
         var attributeData = context.Attributes.FirstOrDefault();
         if (attributeData?.AttributeClass is null || attributeData.AttributeClass.TypeArguments.Length != 1)
         {
-            return new FilterClassModelWithDiagnostics(Model: null, Diagnostics: new EquatableList<DiagnosticInfo>(diagnostics));
+            return new FilterClassDeclarationWithDiagnostics(Declaration: null, Diagnostics: new EquatableList<DiagnosticInfo>(diagnostics));
         }
 
         if (attributeData.AttributeClass.TypeArguments[0] is not INamedTypeSymbol entityType)
         {
-            return new FilterClassModelWithDiagnostics(Model: null, Diagnostics: new EquatableList<DiagnosticInfo>(diagnostics));
+            return new FilterClassDeclarationWithDiagnostics(Declaration: null, Diagnostics: new EquatableList<DiagnosticInfo>(diagnostics));
         }
 
         cancellationToken.ThrowIfCancellationRequested();
 
-        // -------- Page settings (class override + assembly default) --------
-        var (defaultPageSize, maxPageSize) = ResolvePageSettings(classSymbol, context.SemanticModel.Compilation.Assembly);
-        var (maxNestingDepth, maxLeafConditions) = ResolveRequestLimits(context.SemanticModel.Compilation.Assembly);
+        // FN0027: the generated half is a top-level partial in the class's namespace, so a nested or
+        // generic declaration would get a phantom partner instead of its base class and constructors.
+        if (DescribePlacementProblem(classSymbol) is { } placementProblem)
+        {
+            diagnostics.Add(DiagnosticInfo.From(
+                DiagnosticDescriptors.FilterClassPlacementInvalid,
+                classSymbol.Locations.FirstOrDefault(),
+                classSymbol.Name,
+                placementProblem));
+            return new FilterClassDeclarationWithDiagnostics(Declaration: null, Diagnostics: new EquatableList<DiagnosticInfo>(diagnostics));
+        }
 
-        // FN0021: the generated part declares FilterDefinition<TEntity> as the base class.
+        // FN0020: the generated part declares FilterDefinition<TEntity> as the base class.
         if (classSymbol.BaseType is { SpecialType: not SpecialType.System_Object } declaredBaseType)
         {
             diagnostics.Add(DiagnosticInfo.From(
@@ -53,18 +59,13 @@ internal static class FilterClassExtractor
                 classSymbol.Locations.FirstOrDefault(),
                 classSymbol.Name,
                 declaredBaseType.ToDisplayString()));
-            return new FilterClassModelWithDiagnostics(Model: null, Diagnostics: new EquatableList<DiagnosticInfo>(diagnostics));
+            return new FilterClassDeclarationWithDiagnostics(Declaration: null, Diagnostics: new EquatableList<DiagnosticInfo>(diagnostics));
         }
 
-        var compilation = context.SemanticModel.Compilation;
+        var (classDefaultPageSize, classMaxPageSize) = ReadClassPageSettings(classSymbol);
 
-        // Feed virtual enum profiles so the index can detect collisions between hand-written
-        // [FilterProfile<MyEnum>] and auto-emitted Filtering.Net.Generated.<EnumName>Filter (FN0012).
-        var virtualEnumProfiles = EnumTypeCollector.Collect(compilation);
-        var profileIndex = ProfileIndexBuilder.Build(compilation, virtualEnumProfiles);
-
-        // -------- Walk methods --------
-        var properties = new List<PropertyMappingModel>();
+        // -------- Walk declarations --------
+        var properties = new List<PropertyDeclarationModel>();
         var interceptors = new List<InterceptorModel>();
         var overrides = new List<PropertyOverrideModel>();
 
@@ -81,8 +82,6 @@ internal static class FilterClassExtractor
                 classSymbol,
                 entityType,
                 classAttribute,
-                compilation,
-                profileIndex,
                 diagnostics,
                 properties,
                 mappedPropertyFirstLocation);
@@ -111,21 +110,25 @@ internal static class FilterClassExtractor
             if (propertyMapAttribute is not null)
             {
                 ExtractPropertyOverrideMethod(
+                    classSymbol,
                     methodSymbol,
                     propertyMapAttribute,
-                    compilation,
+                    context.SemanticModel,
+                    diagnostics,
                     overrides,
                     propertyMapFirstLocation);
             }
         }
 
-        // -------- Cross-method validations --------
+        // -------- Cross-member validations --------
 
         // FN0002: same property name appearing in both [Map] and [PropertyMap].
         // Primary squiggle on the [PropertyMap] site (more naturally available — it's the override
         // shadowing the regular [Map]); additional points at the colliding [Map] method.
+        var shadowedByMap = new HashSet<string>(StringComparer.Ordinal);
         foreach (var sharedPropertyName in mappedPropertyFirstLocation.Keys.Intersect(propertyMapFirstLocation.Keys, StringComparer.Ordinal))
         {
+            shadowedByMap.Add(sharedPropertyName);
             propertyMapFirstLocation.TryGetValue(sharedPropertyName, out var propertyMapLocation);
             mappedPropertyFirstLocation.TryGetValue(sharedPropertyName, out var mapLocation);
             var additionalLocations = mapLocation is not null
@@ -138,9 +141,19 @@ internal static class FilterClassExtractor
                 sharedPropertyName));
         }
 
-        DetectAliasCollisions(properties, classSymbol, entityType, diagnostics);
-
-        DetectMissingSortable(properties, classSymbol, diagnostics);
+        // FN0023: an override the generated CreateSchema cannot call would otherwise vanish from the
+        // schema without a word. A name already shadowed by a [Map] is FN0002's business.
+        foreach (var propertyOverride in overrides)
+        {
+            if (propertyOverride.SignatureProblem is null) continue;
+            if (shadowedByMap.Contains(propertyOverride.PropertyName)) continue;
+            diagnostics.Add(DiagnosticInfo.From(
+                DiagnosticDescriptors.PropertyMapSignatureInvalid,
+                propertyOverride.DeclarationLocation,
+                propertyOverride.PropertyName,
+                propertyOverride.MethodName,
+                propertyOverride.SignatureProblem));
+        }
 
         foreach (var interceptedEntry in interceptedPropertyFirstLocation)
         {
@@ -157,45 +170,49 @@ internal static class FilterClassExtractor
             ? string.Empty
             : classSymbol.ContainingNamespace.ToDisplayString();
 
-        // Class-level flag: any custom operator with a non-null value type needs typed JSON
-        // deserialisation; the emitter uses it to decide whether to thread JsonSerializerOptions.
-        var hasAnyTypedValueProperty =
-            properties.Exists(propertyMappingModel => propertyMappingModel.HasTypedValueOperator)
-            || overrides.Exists(propertyOverrideModel => propertyOverrideModel.HasTypedValueOperator);
+        var nestedMappings = MapNestedExtractor.Extract(classSymbol, entityType, diagnostics, cancellationToken);
 
-        var nestedMappings = MapNestedExtractor.Extract(classSymbol, cancellationToken);
-
-        var model = new FilterClassModel(
+        var declaration = new FilterClassDeclaration(
             Namespace: classNamespace,
             ClassName: classSymbol.Name,
             FullEntityTypeName: entityType.ToDisplayString(),
-            MaxPageSize: maxPageSize,
-            DefaultPageSize: defaultPageSize,
-            MaxNestingDepth: maxNestingDepth,
-            MaxLeafConditions: maxLeafConditions,
-            Properties: new EquatableList<PropertyMappingModel>(properties),
+            ClassDefaultPageSize: classDefaultPageSize,
+            ClassMaxPageSize: classMaxPageSize,
+            Properties: new EquatableList<PropertyDeclarationModel>(properties),
             Interceptors: new EquatableList<InterceptorModel>(interceptors),
             Overrides: new EquatableList<PropertyOverrideModel>(overrides),
             Location: LocationInfo.FromLocation(classSymbol.Locations.FirstOrDefault()),
-            HasAnyTypedValueProperty: hasAnyTypedValueProperty,
             NestedMappings: nestedMappings);
 
-        return new FilterClassModelWithDiagnostics(
-            Model: model,
+        return new FilterClassDeclarationWithDiagnostics(
+            Declaration: declaration,
             Diagnostics: new EquatableList<DiagnosticInfo>(diagnostics));
+    }
+
+    // Returns null when the class can carry a generated top-level partial, else why it cannot.
+    private static string? DescribePlacementProblem(INamedTypeSymbol classSymbol)
+    {
+        var problems = new List<string>(2);
+        if (classSymbol.ContainingType is { } containingType)
+        {
+            problems.Add($"it is nested in '{containingType.ToDisplayString()}'");
+        }
+        if (classSymbol.TypeParameters.Length > 0)
+        {
+            problems.Add("it declares type parameters");
+        }
+        return problems.Count == 0 ? null : string.Join(" and ", problems);
     }
 
     private static void ExtractMapAttribute(
         INamedTypeSymbol classSymbol,
         INamedTypeSymbol entityType,
         AttributeData mapAttribute,
-        Compilation compilation,
-        ProfileIndex profileIndex,
         List<DiagnosticInfo> diagnostics,
-        List<PropertyMappingModel> properties,
+        List<PropertyDeclarationModel> properties,
         Dictionary<string, Location?> mappedPropertyFirstLocation)
     {
-        var extractionResult = PropertyMappingExtractor.Extract(entityType, mapAttribute, compilation, profileIndex);
+        var extractionResult = PropertyMappingExtractor.ExtractDeclaration(entityType, mapAttribute);
         diagnostics.AddRange(extractionResult.Diagnostics);
 
         // A failed extraction still claims its name so a second [Map] for the same name fires FN0001.
@@ -205,16 +222,11 @@ internal static class FilterClassExtractor
         var attributeLocation = mapAttribute.ApplicationSyntaxReference?.GetSyntax().GetLocation();
         if (mappedPropertyFirstLocation.TryGetValue(propertyName!, out var previousLocation))
         {
-            var hostFqn = classSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat).Replace("global::", "");
-            var additionalLocations = previousLocation is not null
-                ? new[] { previousLocation }
-                : Array.Empty<Location>();
-            diagnostics.Add(DiagnosticInfo.From(
-                DiagnosticDescriptors.DuplicateMapping,
+            diagnostics.Add(DuplicateMapping(
+                classSymbol,
                 attributeLocation,
-                additionalLocations,
+                previousLocation,
                 propertyName!,
-                hostFqn,
                 "[Map] " + propertyName + ", [Map] " + propertyName));
             return;
         }
@@ -223,96 +235,25 @@ internal static class FilterClassExtractor
         if (extractionResult.Model is not null) properties.Add(extractionResult.Model);
     }
 
-    private static void DetectAliasCollisions(
-        List<PropertyMappingModel> properties,
+    private static DiagnosticInfo DuplicateMapping(
         INamedTypeSymbol classSymbol,
-        INamedTypeSymbol entityType,
-        List<DiagnosticInfo> diagnostics)
+        Location? currentLocation,
+        Location? previousLocation,
+        string mappedPath,
+        string sourcesFormatted)
     {
-        // Tracks every site that has claimed a given case-folded name (property name or alias);
-        // a fresh collision reports every prior claimant as an additional location.
-        var nameToSites = new Dictionary<string, List<Location>>(StringComparer.OrdinalIgnoreCase);
-        foreach (var mapping in properties)
-        {
-            var propertyLocation = mapping.DeclarationLocation?.ToLocation();
-            if (!nameToSites.TryGetValue(mapping.PropertyName, out var bucket))
-            {
-                bucket = new List<Location>();
-                nameToSites[mapping.PropertyName] = bucket;
-            }
-            if (propertyLocation is not null) bucket.Add(propertyLocation);
-        }
-        foreach (var mapping in properties)
-        {
-            if (string.IsNullOrEmpty(mapping.Alias)) continue;
-            var aliasLocation = mapping.DeclarationLocation?.ToLocation();
-            if (nameToSites.TryGetValue(mapping.Alias!, out var existingSites))
-            {
-                var primaryLocation = aliasLocation ?? classSymbol.Locations.FirstOrDefault();
-                var additionalLocations = existingSites.ToArray();
-                diagnostics.Add(DiagnosticInfo.From(
-                    DiagnosticDescriptors.AliasCollision,
-                    primaryLocation,
-                    additionalLocations,
-                    mapping.Alias!,
-                    entityType.ToDisplayString()));
-                if (aliasLocation is not null) existingSites.Add(aliasLocation);
-            }
-            else
-            {
-                var bucket = new List<Location>();
-                if (aliasLocation is not null) bucket.Add(aliasLocation);
-                nameToSites[mapping.Alias!] = bucket;
-            }
-        }
+        var hostFqn = classSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat).Replace("global::", "");
+        var additionalLocations = previousLocation is not null
+            ? new[] { previousLocation }
+            : Array.Empty<Location>();
+        return DiagnosticInfo.From(
+            DiagnosticDescriptors.DuplicateMapping,
+            currentLocation,
+            additionalLocations,
+            mappedPath,
+            hostFqn,
+            sourcesFormatted);
     }
-
-    private static void DetectMissingSortable(
-        List<PropertyMappingModel> properties,
-        INamedTypeSymbol classSymbol,
-        List<DiagnosticInfo> diagnostics)
-    {
-        foreach (var mapping in properties)
-        {
-            if (mapping.Sortable) continue;
-            if (!IsLikelySortableType(mapping.PropertyClrType)) continue;
-            diagnostics.Add(DiagnosticInfo.From(
-                DiagnosticDescriptors.NotSortableLikelyOmission,
-                classSymbol.Locations.FirstOrDefault(),
-                mapping.PropertyName,
-                mapping.PropertyClrType));
-        }
-    }
-
-    private static bool IsLikelySortableType(string propertyClrType)
-    {
-        // Strip a single trailing '?' (nullable annotation in the display string).
-        var bareType = propertyClrType.EndsWith("?", StringComparison.Ordinal)
-            ? propertyClrType[..^1]
-            : propertyClrType;
-        return bareType is "System.DateTime"
-            or "System.DateTimeOffset"
-            or "System.DateOnly"
-            or "int"
-            or "long"
-            or "short"
-            or "decimal"
-            or "double"
-            or "float";
-    }
-
-    private static bool ReadSortableNamedArg(AttributeData mapAttribute)
-    {
-        foreach (var namedArgument in mapAttribute.NamedArguments)
-        {
-            if (namedArgument.Key == "Sortable" && namedArgument.Value.Value is bool sortableValue)
-            {
-                return sortableValue;
-            }
-        }
-        return false;
-    }
-
 
     private static void ExtractInterceptorMethod(
         IMethodSymbol methodSymbol,
@@ -348,99 +289,116 @@ internal static class FilterClassExtractor
         }
         interceptedPropertyFirstLocation[propertyName!] = currentLocation;
 
-        // ValueClrType is null when the interceptor has fewer than two parameters (malformed);
-        // skipping the wrapper is safer than fabricating "object" and producing wrong code.
-        var valueClrType = methodSymbol.Parameters.Length >= 2
-            ? methodSymbol.Parameters[1].Type.ToDisplayString()
-            : null;
+        // FN0029: the method group is spliced straight into the static CreateSchema, so a shape the
+        // builder overloads cannot take is a compile error inside generated code or a silent drop.
+        var signatureProblem = DescribeInterceptorSignatureProblem(methodSymbol, raw);
+        if (signatureProblem is not null)
+        {
+            diagnostics.Add(DiagnosticInfo.From(
+                DiagnosticDescriptors.InterceptorSignatureInvalid,
+                currentLocation,
+                propertyName!,
+                methodSymbol.Name,
+                signatureProblem));
+            return;
+        }
 
         interceptors.Add(new InterceptorModel(
             PropertyName: propertyName!,
             MethodName: methodSymbol.Name,
             Raw: raw,
-            ValueClrType: valueClrType));
+            ValueClrType: methodSymbol.Parameters[1].Type.ToDisplayString()));
+    }
+
+    // Returns null when the generated CreateSchema can pass the method group to Intercept /
+    // InterceptArray / InterceptRaw, else why it cannot.
+    private static string? DescribeInterceptorSignatureProblem(IMethodSymbol methodSymbol, bool raw)
+    {
+        if (!methodSymbol.IsStatic) return "it is an instance method";
+        if (methodSymbol.Parameters.Length != 2)
+        {
+            return $"it takes {methodSymbol.Parameters.Length} parameters instead of exactly two (InterceptContext, value)";
+        }
+
+        var contextParameterType = methodSymbol.Parameters[0].Type.ToDisplayString();
+        if (contextParameterType != InterceptContextFullName)
+        {
+            return $"its first parameter is '{contextParameterType}' instead of InterceptContext";
+        }
+
+        var valueParameterType = methodSymbol.Parameters[1].Type.ToDisplayString();
+        if (raw)
+        {
+            return valueParameterType == JsonElementFullName
+                ? null
+                : $"Raw = true requires a System.Text.Json.JsonElement second parameter, not '{valueParameterType}'";
+        }
+
+        var returnTypeName = methodSymbol.ReturnType.ToDisplayString();
+        return returnTypeName == valueParameterType
+            ? null
+            : $"it takes a '{valueParameterType}' but returns '{returnTypeName}'; a non-raw interceptor returns the type it receives";
     }
 
     private static void ExtractPropertyOverrideMethod(
+        INamedTypeSymbol classSymbol,
         IMethodSymbol methodSymbol,
         AttributeData propertyMapAttribute,
-        Compilation compilation,
+        SemanticModel? semanticModel,
+        List<DiagnosticInfo> diagnostics,
         List<PropertyOverrideModel> overrides,
         Dictionary<string, Location?> propertyMapFirstLocation)
     {
         var propertyName = ReadConstructorString(propertyMapAttribute, position: 0);
         if (string.IsNullOrEmpty(propertyName)) return;
 
-        if (!propertyMapFirstLocation.ContainsKey(propertyName!))
+        var attributeLocation = propertyMapAttribute.ApplicationSyntaxReference?.GetSyntax().GetLocation()
+            ?? methodSymbol.Locations.FirstOrDefault();
+
+        // FN0001: two rules for one path would both reach FilterSchema, which rejects the wire key
+        // at construction. Keep the first so the rest of the class still models correctly.
+        if (propertyMapFirstLocation.TryGetValue(propertyName!, out var firstLocation))
         {
-            propertyMapFirstLocation[propertyName!] = methodSymbol.Locations.FirstOrDefault();
+            diagnostics.Add(DuplicateMapping(
+                classSymbol,
+                attributeLocation,
+                firstLocation,
+                propertyName!,
+                "[PropertyMap] " + propertyName + ", [PropertyMap] " + propertyName));
+            return;
         }
 
-        overrides.Add(PropertyMapOverrideExtractor.Extract(methodSymbol, propertyName!, compilation));
+        propertyMapFirstLocation[propertyName!] = attributeLocation;
+
+        overrides.Add(PropertyMapOverrideExtractor.Extract(
+            methodSymbol,
+            propertyName!,
+            LocationInfo.FromLocation(attributeLocation),
+            semanticModel));
     }
 
-    private static (int DefaultPageSize, int MaxPageSize) ResolvePageSettings(
-        INamedTypeSymbol classSymbol,
-        IAssemblySymbol assemblySymbol)
+    private static (int? DefaultPageSize, int? MaxPageSize) ReadClassPageSettings(INamedTypeSymbol classSymbol)
     {
-        var defaultPageSize = FallbackDefaultPageSize;
-        var maxPageSize = FallbackMaxPageSize;
-
-        foreach (var assemblyAttribute in assemblySymbol.GetAttributes())
-        {
-            if (assemblyAttribute.AttributeClass?.ToDisplayString() != FilterDefaultsAttributeFullName) continue;
-            foreach (var namedArgument in assemblyAttribute.NamedArguments)
-            {
-                if (namedArgument.Key == "DefaultPageSize" && namedArgument.Value.Value is int dps)
-                {
-                    defaultPageSize = dps;
-                }
-                else if (namedArgument.Key == "MaxPageSize" && namedArgument.Value.Value is int mps)
-                {
-                    maxPageSize = mps;
-                }
-            }
-        }
+        int? defaultPageSize = null;
+        int? maxPageSize = null;
 
         foreach (var classAttribute in classSymbol.GetAttributes())
         {
             if (classAttribute.AttributeClass?.ToDisplayString() != PageSettingsAttributeFullName) continue;
             foreach (var namedArgument in classAttribute.NamedArguments)
             {
-                if (namedArgument.Key == "DefaultPageSize" && namedArgument.Value.Value is int dps)
+                if (namedArgument.Key == "DefaultPageSize" && namedArgument.Value.Value is int configuredDefaultPageSize)
                 {
-                    defaultPageSize = dps;
+                    defaultPageSize = configuredDefaultPageSize;
                 }
-                else if (namedArgument.Key == "MaxPageSize" && namedArgument.Value.Value is int mps)
+                else if (namedArgument.Key == "MaxPageSize" && namedArgument.Value.Value is int configuredMaxPageSize)
                 {
-                    maxPageSize = mps;
+                    maxPageSize = configuredMaxPageSize;
                 }
             }
         }
 
         return (defaultPageSize, maxPageSize);
-    }
-
-    private static (int MaxNestingDepth, int MaxLeafConditions) ResolveRequestLimits(IAssemblySymbol assemblySymbol)
-    {
-        var maxNestingDepth = FallbackMaxNestingDepth;
-        var maxLeafConditions = FallbackMaxLeafConditions;
-        foreach (var assemblyAttribute in assemblySymbol.GetAttributes())
-        {
-            if (assemblyAttribute.AttributeClass?.ToDisplayString() != FilterDefaultsAttributeFullName) continue;
-            foreach (var namedArgument in assemblyAttribute.NamedArguments)
-            {
-                if (namedArgument.Key == "MaxNestingDepth" && namedArgument.Value.Value is int configuredDepth)
-                {
-                    maxNestingDepth = configuredDepth;
-                }
-                else if (namedArgument.Key == "MaxLeafConditions" && namedArgument.Value.Value is int configuredLeafCount)
-                {
-                    maxLeafConditions = configuredLeafCount;
-                }
-            }
-        }
-        return (maxNestingDepth, maxLeafConditions);
     }
 
     private static AttributeData? FindAttribute(System.Collections.Immutable.ImmutableArray<AttributeData> attributes, string fullName)

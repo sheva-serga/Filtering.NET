@@ -4,15 +4,17 @@ using Microsoft.CodeAnalysis;
 
 namespace Filtering.Net.Generator;
 
+// Two halves of one [Map]. ExtractDeclaration reads what the attribute and the entity symbol say and
+// runs inside the syntax transform; ResolveMapping turns that into the emitted mapping once the
+// compilation-wide GeneratorIndex is combined in. Splitting them keeps the transform free of
+// compilation-global state that Roslyn does not track per syntax tree.
 internal static class PropertyMappingExtractor
 {
     private const string SortDirEnumFullName = "Filtering.Net.SortDir";
 
-    public static PropertyMappingExtractionResult Extract(
+    public static PropertyDeclarationExtractionResult ExtractDeclaration(
         INamedTypeSymbol entityType,
-        AttributeData mapAttribute,
-        Compilation compilation,
-        ProfileIndex profileIndex)
+        AttributeData mapAttribute)
     {
         var diagnostics = new List<DiagnosticInfo>();
 
@@ -22,11 +24,24 @@ internal static class PropertyMappingExtractor
         var propertyName = ReadConstructorString(mapAttribute, position: 0);
         if (string.IsNullOrEmpty(propertyName))
         {
-            return new PropertyMappingExtractionResult(Model: null, Diagnostics: diagnostics);
+            return new PropertyDeclarationExtractionResult(Model: null, Diagnostics: diagnostics);
         }
 
         // -------- Resolve property on entity --------
         var resolution = PropertyTypeResolver.ResolveWithNullableInfo(entityType, propertyName!);
+
+        // FN0024: the emitted accessor would read the next segment off a Nullable<T>, which has no such member.
+        if (resolution.NullableValueTypeSegment is not null)
+        {
+            diagnostics.Add(DiagnosticInfo.From(
+                DiagnosticDescriptors.NullableValueTypeInPath,
+                mapLocation,
+                propertyName!,
+                resolution.NullableValueTypeSegment,
+                resolution.NullableValueTypeName ?? string.Empty));
+            return new PropertyDeclarationExtractionResult(Model: null, Diagnostics: diagnostics);
+        }
+
         var propertySymbol = resolution.LeafProperty;
         if (propertySymbol is null)
         {
@@ -40,7 +55,7 @@ internal static class PropertyMappingExtractor
                 additionalLocations,
                 propertyName!,
                 entityType.ToDisplayString()));
-            return new PropertyMappingExtractionResult(Model: null, Diagnostics: diagnostics);
+            return new PropertyDeclarationExtractionResult(Model: null, Diagnostics: diagnostics);
         }
 
         // FN1006: intermediate navigation is nullable — EF may produce unintended LEFT JOIN semantics.
@@ -51,8 +66,6 @@ internal static class PropertyMappingExtractor
                 mapLocation,
                 propertyName!));
         }
-
-        var propertyClrType = propertySymbol.Type.ToDisplayString();
 
         // -------- Named args --------
         INamedTypeSymbol? explicitProfile = null;
@@ -87,138 +100,108 @@ internal static class PropertyMappingExtractor
             }
         }
 
-        // -------- Resolve profile --------
-        ResolvedProfile? resolvedProfile;
-        // Null for auto-emitted enum profiles (not yet visible to GetTypeByMetadataName).
-        INamedTypeSymbol? resolvedProfileSymbol = null;
-        if (explicitProfile is not null)
+        var declarationLocation = LocationInfo.FromLocation(mapLocation);
+
+        var model = new PropertyDeclarationModel(
+            PropertyName: propertyName!,
+            PropertyClrType: propertySymbol.Type.ToDisplayString(),
+            PropertyClrTypeKey: UnwrapNullable(propertySymbol.Type).ToDisplayString(),
+            IsNullableValueType: propertySymbol.Type is INamedTypeSymbol { ConstructedFrom.SpecialType: SpecialType.System_Nullable_T },
+            ExplicitProfileFullName: explicitProfile?.ToDisplayString(),
+            ExplicitProfileLocation: LocationInfo.FromLocation(explicitProfile?.Locations.FirstOrDefault()),
+            OnlyOperators: ToStringList(onlyOperators),
+            HasOnly: !onlyOperators.IsDefault,
+            ExceptOperators: ToStringList(exceptOperators),
+            HasExcept: !exceptOperators.IsDefault,
+            Alias: alias,
+            Sortable: sortable,
+            DefaultSortDirection: defaultSortDirection,
+            DeclarationLocation: declarationLocation,
+            LeafPropertyLocation: LocationInfo.FromLocation(propertySymbol.Locations.FirstOrDefault()));
+
+        return new PropertyDeclarationExtractionResult(Model: model, Diagnostics: diagnostics);
+    }
+
+    public static PropertyMappingExtractionResult ResolveMapping(
+        PropertyDeclarationModel declaration,
+        GeneratorIndex index)
+    {
+        var diagnostics = new List<DiagnosticInfo>();
+
+        ProfileDefinition? resolvedProfile;
+        if (declaration.ExplicitProfileFullName is { } explicitProfileFullName)
         {
-            resolvedProfile = ProfileResolver.ResolveExplicit(explicitProfile);
+            resolvedProfile = index.FindProfile(explicitProfileFullName);
+
+            // FN0022: Profile = typeof(X) where X carries no [FilterProfile<TColumn>]. Emission would
+            // otherwise reference a bridge class that is never generated.
             if (resolvedProfile is null)
             {
-                // Explicit profile didn't resolve (no [FilterOperator] members). Bail out cleanly.
+                diagnostics.Add(DiagnosticInfo.From(
+                    DiagnosticDescriptors.ProfileTypeNotAProfile,
+                    declaration.DeclarationLocation,
+                    new[] { declaration.ExplicitProfileLocation },
+                    declaration.PropertyName,
+                    explicitProfileFullName));
                 return new PropertyMappingExtractionResult(Model: null, Diagnostics: diagnostics);
             }
-            resolvedProfileSymbol = explicitProfile;
-            if (!ProfileResolver.IsCompatible(propertySymbol.Type, resolvedProfile.ProfileFullName))
+
+            if (!ProfileResolver.IsCompatible(declaration.PropertyClrTypeKey, resolvedProfile.ProfileFullName))
             {
-                var profileLocation = explicitProfile.Locations.FirstOrDefault();
-                var additionalLocations = profileLocation is not null
-                    ? new[] { profileLocation }
-                    : Array.Empty<Location>();
                 diagnostics.Add(DiagnosticInfo.From(
                     DiagnosticDescriptors.IncompatibleProfile,
-                    mapLocation,
-                    additionalLocations,
+                    declaration.DeclarationLocation,
+                    new[] { declaration.ExplicitProfileLocation },
                     resolvedProfile.ProfileFullName,
-                    propertyName!,
-                    propertyClrType));
+                    declaration.PropertyName,
+                    declaration.PropertyClrType));
             }
         }
         else
         {
-            var candidates = ProfileResolver.ResolveCandidates(propertySymbol.Type, profileIndex);
+            var candidates = index.ProfilesByClrType.Lookup(declaration.PropertyClrTypeKey);
             if (candidates.Count > 1)
             {
-                var candidateLocations = new List<Location>(candidates.Count);
-                foreach (var candidateFullName in candidates.ProfileFullNames)
+                var candidateLocations = new List<LocationInfo?>(candidates.Count);
+                foreach (var candidateFullName in candidates)
                 {
-                    var candidateSymbol = compilation.GetTypeByMetadataName(candidateFullName);
-                    var candidateLocation = candidateSymbol?.Locations.FirstOrDefault();
-                    if (candidateLocation is not null)
-                    {
-                        candidateLocations.Add(candidateLocation);
-                    }
+                    candidateLocations.Add(index.FindProfile(candidateFullName)?.DeclarationLocation);
                 }
                 diagnostics.Add(DiagnosticInfo.From(
                     DiagnosticDescriptors.AmbiguousProfile,
-                    mapLocation,
-                    candidateLocations.ToArray(),
-                    propertyName!,
-                    propertyClrType,
-                    string.Join(", ", candidates.ProfileFullNames)));
+                    declaration.DeclarationLocation,
+                    candidateLocations,
+                    declaration.PropertyName,
+                    declaration.PropertyClrType,
+                    string.Join(", ", candidates)));
                 return new PropertyMappingExtractionResult(Model: null, Diagnostics: diagnostics);
             }
 
-            resolvedProfile = null;
-            if (candidates.Count == 1)
-            {
-                var candidateProfileFullName = candidates.ProfileFullNames[0];
-                var profileSymbol = compilation.GetTypeByMetadataName(candidateProfileFullName);
-                if (profileSymbol is not null)
-                {
-                    resolvedProfile = ProfileResolver.ResolveExplicit(profileSymbol);
-                    resolvedProfileSymbol = profileSymbol;
-                }
-                else
-                {
-                    // Auto-emitted enum profiles are produced by this same generator pass and
-                    // aren't yet visible to GetTypeByMetadataName; synthesise from the full name.
-                    resolvedProfile = ProfileResolver.TryBuildVirtualEnumProfile(
-                        candidateProfileFullName, propertySymbol.Type);
-                }
-            }
-
+            resolvedProfile = candidates.Count == 1 ? index.FindProfile(candidates[0]) : null;
             if (resolvedProfile is null)
             {
-                var entityPropertyLocation = propertySymbol.Locations.FirstOrDefault();
-                var additionalLocations = entityPropertyLocation is not null
-                    ? new[] { entityPropertyLocation }
-                    : Array.Empty<Location>();
                 diagnostics.Add(DiagnosticInfo.From(
                     DiagnosticDescriptors.NoInferableProfile,
-                    mapLocation,
-                    additionalLocations,
-                    propertyName!,
-                    propertyClrType));
+                    declaration.DeclarationLocation,
+                    new[] { declaration.LeafPropertyLocation },
+                    declaration.PropertyName,
+                    declaration.PropertyClrType));
                 return new PropertyMappingExtractionResult(Model: null, Diagnostics: diagnostics);
             }
         }
 
-        // No symbol means an auto-emitted enum profile, which carries its own runtime Profile accessor.
-        var profileBridges = resolvedProfileSymbol is not null
-            ? ProfileBridgeBuilder.BuildChain(resolvedProfileSymbol)
-            : [];
-
         // -------- Compute allowed operators --------
-        var profileOperators = resolvedProfile.Operators;
-        var profileOperatorSet = new HashSet<string>(profileOperators);
+        var profileOperatorSet = new HashSet<string>(resolvedProfile.Operators);
 
-        var onlySet = ToStringSet(onlyOperators);
-        var exceptSet = ToStringSet(exceptOperators);
+        var onlySet = declaration.HasOnly ? new HashSet<string>(declaration.OnlyOperators) : null;
+        var exceptSet = declaration.HasExcept ? new HashSet<string>(declaration.ExceptOperators) : null;
 
         // FN0005: any name in Only/Except that isn't on the profile is an error.
-        if (onlySet is not null)
-        {
-            foreach (var operatorName in onlySet)
-            {
-                if (!profileOperatorSet.Contains(operatorName))
-                {
-                    diagnostics.Add(DiagnosticInfo.From(
-                        DiagnosticDescriptors.UnknownOperator,
-                        mapLocation,
-                        operatorName,
-                        resolvedProfile.ProfileFullName));
-                }
-            }
-        }
-        if (exceptSet is not null)
-        {
-            foreach (var operatorName in exceptSet)
-            {
-                if (!profileOperatorSet.Contains(operatorName))
-                {
-                    diagnostics.Add(DiagnosticInfo.From(
-                        DiagnosticDescriptors.UnknownOperator,
-                        mapLocation,
-                        operatorName,
-                        resolvedProfile.ProfileFullName));
-                }
-            }
-        }
+        ReportUnknownOperators(onlySet, profileOperatorSet, declaration, resolvedProfile, diagnostics);
+        ReportUnknownOperators(exceptSet, profileOperatorSet, declaration, resolvedProfile, diagnostics);
 
         var allowedOperators = new List<string>();
-        foreach (var operatorName in profileOperators)
+        foreach (var operatorName in resolvedProfile.Operators)
         {
             if (onlySet is not null && !onlySet.Contains(operatorName)) continue;
             if (exceptSet is not null && exceptSet.Contains(operatorName)) continue;
@@ -231,8 +214,8 @@ internal static class PropertyMappingExtractor
         {
             diagnostics.Add(DiagnosticInfo.From(
                 DiagnosticDescriptors.ZeroOperatorsAllowed,
-                mapLocation,
-                propertyName!));
+                declaration.DeclarationLocation,
+                declaration.PropertyName));
         }
 
         // Drop metadata for operators excluded by Only/Except — the dispatcher will never invoke them.
@@ -243,25 +226,42 @@ internal static class PropertyMappingExtractor
 
         var hasTypedValueOperator = filteredCustomOperators.Exists(customOperator => customOperator.ValueClrType is not null);
 
-        var declarationLocation = LocationInfo.FromLocation(mapAttribute.ApplicationSyntaxReference?.GetSyntax().GetLocation());
-
         var model = new PropertyMappingModel(
-            PropertyName: propertyName!,
-            PropertyClrType: propertyClrType,
-            IsNullableValueType: propertySymbol.Type is INamedTypeSymbol { ConstructedFrom.SpecialType: SpecialType.System_Nullable_T },
+            PropertyName: declaration.PropertyName,
+            PropertyClrType: declaration.PropertyClrType,
+            IsNullableValueType: declaration.IsNullableValueType,
             ProfileFullName: resolvedProfile.ProfileFullName,
             AllowedOperators: new EquatableList<string>(allowedOperators),
             HasOperatorRestriction: onlySet is not null || exceptSet is not null,
-            Alias: alias,
-            Sortable: sortable,
-            DefaultSortDirection: defaultSortDirection,
-            DeclarationName: propertyName!,
+            Alias: declaration.Alias,
+            Sortable: declaration.Sortable,
+            DefaultSortDirection: declaration.DefaultSortDirection,
+            DeclarationName: declaration.PropertyName,
             CustomOperators: new EquatableList<CustomOperatorModel>(filteredCustomOperators),
             HasTypedValueOperator: hasTypedValueOperator,
-            ProfileBridges: new EquatableList<ProfileBridgeModel>(profileBridges),
-            DeclarationLocation: declarationLocation);
+            ProfileBridges: resolvedProfile.Bridges,
+            DeclarationLocation: declaration.DeclarationLocation);
 
         return new PropertyMappingExtractionResult(Model: model, Diagnostics: diagnostics);
+    }
+
+    private static void ReportUnknownOperators(
+        HashSet<string>? requestedOperators,
+        HashSet<string> profileOperatorSet,
+        PropertyDeclarationModel declaration,
+        ProfileDefinition resolvedProfile,
+        List<DiagnosticInfo> diagnostics)
+    {
+        if (requestedOperators is null) return;
+        foreach (var operatorName in requestedOperators)
+        {
+            if (profileOperatorSet.Contains(operatorName)) continue;
+            diagnostics.Add(DiagnosticInfo.From(
+                DiagnosticDescriptors.UnknownOperator,
+                declaration.DeclarationLocation,
+                operatorName,
+                resolvedProfile.ProfileFullName));
+        }
     }
 
     private static string? ReadConstructorString(AttributeData attributeData, int position)
@@ -270,15 +270,26 @@ internal static class PropertyMappingExtractor
         return attributeData.ConstructorArguments[position].Value as string;
     }
 
-    private static HashSet<string>? ToStringSet(ImmutableArray<TypedConstant> array)
+    private static EquatableList<string> ToStringList(ImmutableArray<TypedConstant> array)
     {
-        if (array.IsDefault) return null;
-        var result = new HashSet<string>();
+        var result = new List<string>();
+        if (array.IsDefault) return new EquatableList<string>(result);
         foreach (var typedConstant in array)
         {
             if (typedConstant.Value is string operatorName) result.Add(operatorName);
         }
-        return result;
+        return new EquatableList<string>(result);
+    }
+
+    private static ITypeSymbol UnwrapNullable(ITypeSymbol type)
+    {
+        if (type is INamedTypeSymbol namedType
+            && namedType.IsGenericType
+            && namedType.ConstructedFrom?.SpecialType == SpecialType.System_Nullable_T)
+        {
+            return namedType.TypeArguments[0];
+        }
+        return type;
     }
 
     private static string ResolveEnumName(TypedConstant typedConstant, string fallback)

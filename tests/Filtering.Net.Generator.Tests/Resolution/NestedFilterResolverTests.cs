@@ -29,7 +29,7 @@ public class NestedFilterResolverTests
     }
 
     [Fact]
-    public void AutoResolve_TwoCandidates_FiresFN0017()
+    public void AutoResolve_TwoCandidates_FiresFN0016()
     {
         // Arrange
         var source = """
@@ -50,11 +50,11 @@ public class NestedFilterResolverTests
         var resolved = ResolutionTestHelpers.Resolve(source, "UserFilter");
 
         // Assert
-        resolved.Diagnostics.Select(diagnostic => diagnostic.Id).Should().Contain("FN0017");
+        resolved.Diagnostics.Select(diagnostic => diagnostic.Id).Should().Contain("FN0016");
     }
 
     [Fact]
-    public void AutoResolve_NoCandidates_FiresFN0018()
+    public void AutoResolve_NoCandidates_FiresFN0017()
     {
         // Arrange
         var source = """
@@ -73,11 +73,11 @@ public class NestedFilterResolverTests
         var resolved = ResolutionTestHelpers.Resolve(source, "UserFilter");
 
         // Assert
-        resolved.Diagnostics.Select(diagnostic => diagnostic.Id).Should().Contain("FN0018");
+        resolved.Diagnostics.Select(diagnostic => diagnostic.Id).Should().Contain("FN0017");
     }
 
     [Fact]
-    public void NavigationDoesNotExist_FiresFN0019()
+    public void NavigationDoesNotExist_FiresFN0018()
     {
         // Arrange
         var source = """
@@ -97,11 +97,11 @@ public class NestedFilterResolverTests
         var resolved = ResolutionTestHelpers.Resolve(source, "UserFilter");
 
         // Assert
-        resolved.Diagnostics.Select(diagnostic => diagnostic.Id).Should().Contain("FN0019");
+        resolved.Diagnostics.Select(diagnostic => diagnostic.Id).Should().Contain("FN0018");
     }
 
     [Fact]
-    public void NavigationIsCollection_FiresFN0020()
+    public void NavigationIsCollection_FiresFN0019()
     {
         // Arrange
         var source = """
@@ -122,15 +122,15 @@ public class NestedFilterResolverTests
         var resolved = ResolutionTestHelpers.Resolve(source, "UserFilter");
 
         // Assert
-        resolved.Diagnostics.Select(diagnostic => diagnostic.Id).Should().Contain("FN0020");
+        resolved.Diagnostics.Select(diagnostic => diagnostic.Id).Should().Contain("FN0019");
     }
 
     [Fact]
-    public void Generic_NoMatchingFilterClass_FiresFN0016()
+    public void Generic_NoMatchingFilterClass_FiresFN0015()
     {
         // Arrange
         // FakeFilter has no [GenerateFilter<>], so it never appears as a host extraction result.
-        // The resolver's explicit-filter-class lookup misses and FN0016 fires.
+        // The resolver's explicit-filter-class lookup misses and FN0015 fires.
         var source = """
             using Filtering.Net;
             namespace TestNs;
@@ -148,7 +148,7 @@ public class NestedFilterResolverTests
         var resolved = ResolutionTestHelpers.Resolve(source, "UserFilter");
 
         // Assert
-        resolved.Diagnostics.Select(diagnostic => diagnostic.Id).Should().Contain("FN0016");
+        resolved.Diagnostics.Select(diagnostic => diagnostic.Id).Should().Contain("FN0015");
     }
 
     [Fact]

@@ -22,30 +22,14 @@ internal static class ProfileResolver
     private const string FilterOperatorAttributeFullName = "Filtering.Net.FilterOperatorAttribute";
     private const string FilterProfileAttributeFullName = "Filtering.Net.FilterProfileAttribute<T>";
 
-    private static readonly IReadOnlyList<CustomOperatorModel> EmptyCustomOperators = [];
-
     private const string AutoEmittedEnumProfileNamespace = "Filtering.Net.Generated";
-
-    public static ResolvedProfile? TryBuildVirtualEnumProfile(string profileFullName, ITypeSymbol propertyType)
-    {
-        if (!profileFullName.StartsWith(AutoEmittedEnumProfileNamespace + ".", StringComparison.Ordinal))
-        {
-            return null;
-        }
-        var unwrapped = UnwrapNullable(propertyType);
-        if (unwrapped.TypeKind != TypeKind.Enum)
-        {
-            return null;
-        }
-        return new ResolvedProfile(profileFullName, BuiltInEnumOperators, EmptyCustomOperators);
-    }
 
     public static bool IsAutoEmittedEnumProfile(string profileFullName) =>
         profileFullName.StartsWith(AutoEmittedEnumProfileNamespace + ".", StringComparison.Ordinal);
 
     // Walks the BasedOn chain so a derived profile inherits base operators; same-named derived
     // operators win. Cycle protection: short-circuits when a profile is seen a second time.
-    public static ResolvedProfile? ResolveExplicit(INamedTypeSymbol profileType)
+    public static ResolvedProfile ResolveExplicit(INamedTypeSymbol profileType)
     {
         var visited = new HashSet<string>(StringComparer.Ordinal);
         // Operator name -> declaring profile full name; derived-profile overwrites win.
@@ -100,6 +84,11 @@ internal static class ProfileResolver
                 if (attributeData.ConstructorArguments.Length == 0) continue;
                 if (attributeData.ConstructorArguments[0].Value is not string operatorName) continue;
 
+                // A member with no readable predicate shape reaches no FilterOperator entry in the
+                // emitted bridge, so it must not be advertised here either — that is FN0028.
+                var predicateSignature = OperatorPredicateSignature.TryRead(member);
+                if (predicateSignature is null) continue;
+
                 if (!operatorDeclarers.ContainsKey(operatorName))
                 {
                     operatorOrder.Add(operatorName);
@@ -113,15 +102,11 @@ internal static class ProfileResolver
                     continue;
                 }
 
-                var customMetadata = TryBuildCustomOperatorModel(member, operatorName, profileFullName);
-                if (customMetadata is not null)
-                {
-                    operatorMetadata[operatorName] = customMetadata;
-                }
-                else
-                {
-                    operatorMetadata.Remove(operatorName);
-                }
+                operatorMetadata[operatorName] = new CustomOperatorModel(
+                    OperatorName: operatorName,
+                    DeclaringProfileFullName: profileFullName,
+                    ValueClrType: predicateSignature.ValueType is null ? null : TypeNameFormatter.Format(predicateSignature.ValueType),
+                    Location: LocationInfo.FromLocation(member.Locations.FirstOrDefault()));
             }
         }
     }
@@ -130,42 +115,26 @@ internal static class ProfileResolver
         profileFullName.StartsWith("Filtering.Net.", StringComparison.Ordinal)
         && !profileFullName.StartsWith("Filtering.Net.Generated.", StringComparison.Ordinal);
 
-    // Returns null when the member is not an Expression<Func<...>> of a supported arity; the operator
-    // then has no runtime bridge entry and surfaces as a configuration error at startup.
-    private static CustomOperatorModel? TryBuildCustomOperatorModel(
-        ISymbol operatorMember,
-        string operatorName,
-        string declaringProfileFullName)
+    // clrTypeKey is the property's leaf CLR type with Nullable<T> already unwrapped, spelled the way
+    // ITypeSymbol.ToDisplayString() spells it ("string", "int", "System.Guid").
+    public static bool IsCompatible(string clrTypeKey, string profileFullName)
     {
-        var predicateSignature = OperatorPredicateSignature.TryRead(operatorMember);
-        if (predicateSignature is null) return null;
-
-        return new CustomOperatorModel(
-            OperatorName: operatorName,
-            DeclaringProfileFullName: declaringProfileFullName,
-            ValueClrType: predicateSignature.ValueType is null ? null : TypeNameFormatter.Format(predicateSignature.ValueType),
-            Location: LocationInfo.FromLocation(operatorMember.Locations.FirstOrDefault()));
-    }
-
-    public static bool IsCompatible(ITypeSymbol clrType, string profileFullName)
-    {
-        var unwrapped = UnwrapNullable(clrType);
         return profileFullName switch
         {
-            StringFilterFullName => unwrapped.SpecialType == SpecialType.System_String,
-            BoolFilterFullName => unwrapped.SpecialType == SpecialType.System_Boolean,
-            GuidFilterFullName => unwrapped.ToDisplayString() == "System.Guid",
-            Int32FilterFullName => unwrapped.SpecialType == SpecialType.System_Int32,
-            Int64FilterFullName => unwrapped.SpecialType == SpecialType.System_Int64,
-            Int16FilterFullName => unwrapped.SpecialType == SpecialType.System_Int16,
-            ByteFilterFullName => unwrapped.SpecialType == SpecialType.System_Byte,
-            DecimalFilterFullName => unwrapped.SpecialType == SpecialType.System_Decimal,
-            DoubleFilterFullName => unwrapped.SpecialType == SpecialType.System_Double,
-            SingleFilterFullName => unwrapped.SpecialType == SpecialType.System_Single,
-            DateTimeFilterFullName => unwrapped.ToDisplayString() == "System.DateTime",
-            DateTimeOffsetFilterFullName => unwrapped.ToDisplayString() == "System.DateTimeOffset",
-            DateOnlyFilterFullName => unwrapped.ToDisplayString() == "System.DateOnly",
-            TimeOnlyFilterFullName => unwrapped.ToDisplayString() == "System.TimeOnly",
+            StringFilterFullName => clrTypeKey == "string",
+            BoolFilterFullName => clrTypeKey == "bool",
+            GuidFilterFullName => clrTypeKey == "System.Guid",
+            Int32FilterFullName => clrTypeKey == "int",
+            Int64FilterFullName => clrTypeKey == "long",
+            Int16FilterFullName => clrTypeKey == "short",
+            ByteFilterFullName => clrTypeKey == "byte",
+            DecimalFilterFullName => clrTypeKey == "decimal",
+            DoubleFilterFullName => clrTypeKey == "double",
+            SingleFilterFullName => clrTypeKey == "float",
+            DateTimeFilterFullName => clrTypeKey == "System.DateTime",
+            DateTimeOffsetFilterFullName => clrTypeKey == "System.DateTimeOffset",
+            DateOnlyFilterFullName => clrTypeKey == "System.DateOnly",
+            TimeOnlyFilterFullName => clrTypeKey == "System.TimeOnly",
             _ => true,// Custom profiles: leave compatibility validation to the user.
         };
     }
@@ -180,9 +149,6 @@ internal static class ProfileResolver
         }
         return type;
     }
-
-    private static readonly string[] BuiltInEnumOperators =
-        ["eq", "ne", "in", "isNull"];
 
     public static ResolvedProfileCandidates ResolveCandidates(ITypeSymbol clrType, ProfileIndex index)
     {

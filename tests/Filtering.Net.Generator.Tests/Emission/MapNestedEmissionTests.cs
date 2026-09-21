@@ -222,8 +222,9 @@ public class MapNestedEmissionTests
     public Task NestedWithInterceptor_CallsThroughSourceWrapper()
     {
         // Arrange — interceptor on DepartmentFilter targets Email; we capture what the host UserFilter
-        // emits for the spliced Department.Email path. Interceptor splice-through is a vNext concern;
-        // this snapshot pins the current behaviour either way.
+        // emits for the spliced Department.Email path. The interceptor is carried by the lifted
+        // FilterProperty and runs for the host's department.email path — see
+        // MapNestedEndToEndRuntimeTests.Filter_SourceInterceptor_RunsThroughNestedLift.
         var consumerSource = """
             using Filtering.Net;
             namespace TestNs;
@@ -307,34 +308,4 @@ public class MapNestedEmissionTests
         return Verify(driver).UseDirectory("Snapshots");
     }
 
-    [Fact]
-    public Task NestedWithNullableNav_EmitsSplicedColumns()
-    {
-        // Arrange — Department is a nullable navigation; FN1006 today fires from
-        // PropertyMappingExtractor at extraction time, not for resolver-spliced paths, so this
-        // snapshot just pins the spliced columns. Extending FN1006 to spliced paths is a vNext
-        // concern.
-        var consumerSource = """
-            using Filtering.Net;
-            namespace TestNs;
-            public class Department { public string Name { get; set; } = ""; }
-            public class User { public Department? Department { get; set; } }
-            [Map(nameof(Department.Name))]
-            [GenerateFilter<Department>] public partial class DepartmentFilter
-            {
-            }
-            [GenerateFilter<User>]
-            [MapNested(nameof(User.Department))]
-            public partial class UserFilter
-            {
-            }
-            """;
-        var driver = GeneratorRunner.RunDriver(consumerSource, excludeDiAbstractions: false);
-
-        // Act
-        // (no separate act step — Verifier.Verify is the verification)
-
-        // Assert
-        return Verify(driver).UseDirectory("Snapshots");
-    }
 }

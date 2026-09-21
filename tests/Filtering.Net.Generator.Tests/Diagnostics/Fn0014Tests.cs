@@ -1,151 +1,177 @@
+using AwesomeAssertions;
+
+using Filtering.Net.Generator.Tests.Resolution;
+
 namespace Filtering.Net.Generator.Tests.Diagnostics;
 
 public class Fn0014Tests
 {
     [Fact]
-    public void DuplicateOperatorNameOnProfile_FiresFN0014()
+    public void DirectSelfReferenceViaNav_FiresFN0014()
     {
         // Arrange
         var source = """
-            using System;
-            using System.Linq.Expressions;
-            using System.Text.Json;
             using Filtering.Net;
             namespace TestNs;
-            [FilterProfile<string>]
-            public static class CustomProfile
+            public class User { public string Name { get; set; } = ""; public User Manager { get; set; } = new(); }
+            [GenerateFilter<User>]
+            [Map(nameof(User.Name))]
+            [MapNested(nameof(User.Manager))]
+            public partial class UserFilter
             {
-                [FilterOperator("eq")]
-                public static Expression<Func<string, string, bool>> Eq => (column, value) => column == value;
-
-                [FilterOperator("eq")]
-                public static Expression<Func<string, string, bool>> EqAlt => (column, value) => column == value;
-
-                public static bool TryGetValue(JsonElement element, out string value, out string error)
-                {
-                    value = ""; error = ""; return true;
-                }
             }
             """;
 
         // Act
+        var result = ResolutionTestHelpers.Resolve(source, "UserFilter");
+
         // Assert
-        DiagnosticTestHelpers.AssertDiagnostic(source, "FN0014");
+        result.Diagnostics.Select(diagnostic => diagnostic.Id).Should().Contain("FN0014");
     }
 
     [Fact]
-    public void UniqueOperatorNamesOnProfile_DoNotFireFN0014()
+    public void IndirectCycleAcrossTwoFilters_FiresFN0014()
     {
         // Arrange
         var source = """
-            using System;
-            using System.Linq.Expressions;
-            using System.Text.Json;
             using Filtering.Net;
             namespace TestNs;
-            [FilterProfile<string>]
-            public static class CustomProfile
+            public class Department { public string Name { get; set; } = ""; public User Head { get; set; } = new(); }
+            public class User { public string Name { get; set; } = ""; public Department Department { get; set; } = new(); }
+            [GenerateFilter<Department>]
+            [Map(nameof(Department.Name))]
+            [MapNested(nameof(Department.Head))]
+            public partial class DepartmentFilter
             {
-                [FilterOperator("eq")]
-                public static Expression<Func<string, string, bool>> Eq => (column, value) => column == value;
-
-                [FilterOperator("ne")]
-                public static Expression<Func<string, string, bool>> Ne => (column, value) => column != value;
-
-                public static bool TryGetValue(JsonElement element, out string value, out string error)
-                {
-                    value = ""; error = ""; return true;
-                }
+            }
+            [GenerateFilter<User>]
+            [Map(nameof(User.Name))]
+            [MapNested(nameof(User.Department))]
+            public partial class UserFilter
+            {
             }
             """;
 
         // Act
+        var result = ResolutionTestHelpers.Resolve(source, "UserFilter");
+
         // Assert
-        DiagnosticTestHelpers.AssertNoDiagnostic(source, "FN0014");
+        result.Diagnostics.Select(diagnostic => diagnostic.Id).Should().Contain("FN0014");
     }
 
     [Fact]
-    public void SameOperatorNameOnProfileAndBaseProfile_DoesNotFireFN0014()
-    {
-        // Arrange — per-profile check; an inheriting profile re-declaring an operator
-        // present on its BasedOn target is intentional override, not a duplicate.
-        var source = """
-            using System;
-            using System.Linq.Expressions;
-            using Filtering.Net;
-            namespace TestNs;
-            [FilterProfile<string>(BasedOn = typeof(StringFilter))]
-            public static class DerivedProfile
-            {
-                [FilterOperator("eq")]
-                public static Expression<Func<string, string, bool>> EqOverride => (column, value) => column == value;
-            }
-            """;
-
-        // Act
-        // Assert
-        DiagnosticTestHelpers.AssertNoDiagnostic(source, "FN0014");
-    }
-
-    [Fact]
-    public void DuplicateAcrossPropertyAndMethod_FiresFN0014()
-    {
-        // Arrange — [FilterOperator] is allowed on both Property and Method targets;
-        // duplicate detection must work across both forms.
-        var source = """
-            using System;
-            using System.Linq.Expressions;
-            using System.Text.Json;
-            using Filtering.Net;
-            namespace TestNs;
-            [FilterProfile<string>]
-            public static class CustomProfile
-            {
-                [FilterOperator("eq")]
-                public static Expression<Func<string, string, bool>> Eq => (column, value) => column == value;
-
-                [FilterOperator("eq")]
-                public static Expression<Func<string, string, bool>> EqMethod() => (column, value) => column == value;
-
-                public static bool TryGetValue(JsonElement element, out string value, out string error)
-                {
-                    value = ""; error = ""; return true;
-                }
-            }
-            """;
-
-        // Act
-        // Assert
-        DiagnosticTestHelpers.AssertDiagnostic(source, "FN0014");
-    }
-
-    [Fact]
-    public void DuplicateOperator_ReportsFirstOperatorAsAdditionalLocation()
+    public void SelfReferenceWithMaxDepth_DoesNotFireFN0014()
     {
         // Arrange
         var source = """
-            using System;
-            using System.Linq.Expressions;
-            using System.Text.Json;
             using Filtering.Net;
             namespace TestNs;
-            [FilterProfile<string>]
-            public static class CustomProfile
+            public class Employee { public string Name { get; set; } = ""; public Employee? Manager { get; set; } }
+            [GenerateFilter<Employee>]
+            [Map(nameof(Employee.Name))]
+            [MapNested(nameof(Employee.Manager), MaxDepth = 2)]
+            public partial class EmployeeFilter
             {
-                [FilterOperator("eq")]
-                public static Expression<Func<string, string, bool>> EqFirst => (column, value) => column == value;
-
-                [FilterOperator("eq")]
-                public static Expression<Func<string, string, bool>> EqSecond => (column, value) => column == value;
-
-                public static bool TryGetValue(JsonElement element, out string value, out string error)
-                {
-                    value = ""; error = ""; return true;
-                }
             }
             """;
 
         // Act
+        var result = ResolutionTestHelpers.Resolve(source, "EmployeeFilter");
+
+        // Assert
+        result.Diagnostics.Select(diagnostic => diagnostic.Id).Should().NotContain("FN0014");
+        result.Model.Properties.Select(property => property.PropertyName)
+            .Should().Equal("Name", "Manager.Name", "Manager.Manager.Name");
+    }
+
+    [Fact]
+    public void IndirectCycleBoundedOnOneNesting_DoesNotFireFN0014()
+    {
+        // Arrange
+        var source = """
+            using Filtering.Net;
+            namespace TestNs;
+            public class Department { public string Name { get; set; } = ""; public User Head { get; set; } = new(); }
+            public class User { public string Name { get; set; } = ""; public Department Department { get; set; } = new(); }
+            [GenerateFilter<Department>]
+            [Map(nameof(Department.Name))]
+            [MapNested(nameof(Department.Head), MaxDepth = 1)]
+            public partial class DepartmentFilter
+            {
+            }
+            [GenerateFilter<User>]
+            [Map(nameof(User.Name))]
+            [MapNested(nameof(User.Department))]
+            public partial class UserFilter
+            {
+            }
+            """;
+
+        // Act
+        var result = ResolutionTestHelpers.Resolve(source, "UserFilter");
+
+        // Assert
+        result.Diagnostics.Select(diagnostic => diagnostic.Id).Should().NotContain("FN0014");
+        result.Model.Properties.Select(property => property.PropertyName).Should().Equal(
+            "Name", "Department.Name", "Department.Head.Name", "Department.Head.Department.Name");
+    }
+
+    [Fact]
+    public void NoCycle_DoesNotFireFN0014()
+    {
+        // Arrange
+        var source = """
+            using Filtering.Net;
+            namespace TestNs;
+            public class Department { public string Name { get; set; } = ""; }
+            public class User { public Department Department { get; set; } = new(); }
+            [GenerateFilter<Department>]
+            [Map(nameof(Department.Name))]
+            public partial class DepartmentFilter
+            {
+            }
+            [GenerateFilter<User>]
+            [MapNested(nameof(User.Department))]
+            public partial class UserFilter
+            {
+            }
+            """;
+
+        // Act
+        var result = ResolutionTestHelpers.Resolve(source, "UserFilter");
+
+        // Assert
+        result.Diagnostics.Select(diagnostic => diagnostic.Id).Should().NotContain("FN0014");
+    }
+
+    [Fact]
+    public void NestedCycle_ReportsOuterMapNestedSiteAsAdditionalLocation()
+    {
+        // Arrange — A→B→A 2-class cycle: outer User.Department [MapNested] is pushed to the
+        // DFS stack before Department.Head re-visits UserFilter, so the cycle diagnostic
+        // surfaces the outer site as the lone additional location.
+        var source = """
+            using Filtering.Net;
+            namespace TestNs;
+            public class Department { public string Name { get; set; } = ""; public User Head { get; set; } = new(); }
+            public class User { public string Name { get; set; } = ""; public Department Department { get; set; } = new(); }
+            [GenerateFilter<Department>]
+            [Map(nameof(Department.Name))]
+            [MapNested(nameof(Department.Head))]
+            public partial class DepartmentFilter
+            {
+            }
+            [GenerateFilter<User>]
+            [Map(nameof(User.Name))]
+            [MapNested(nameof(User.Department))]
+            public partial class UserFilter
+            {
+            }
+            """;
+
+        // Act
+        // (no separate act step — AssertDiagnosticHasAdditionalLocations is the verification)
+
         // Assert
         DiagnosticTestHelpers.AssertDiagnosticHasAdditionalLocations(source, "FN0014", expectedAdditionalCount: 1);
     }

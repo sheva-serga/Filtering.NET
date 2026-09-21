@@ -14,31 +14,40 @@ public sealed class FilterGenerator : IIncrementalGenerator
 
     public void Initialize(IncrementalGeneratorInitializationContext context)
     {
+        // -------- Compilation-wide index --------
+        // Profiles, enum profiles and [assembly: FilterDefaults] are read once here instead of once
+        // per filter class, and every consumer of them is combined with this node, so a change in
+        // one file cannot leave another file's cached model behind.
+        var generatorIndex = context.CompilationProvider
+            .Select(static (compilation, cancellationToken) => GeneratorIndexBuilder.Build(compilation, cancellationToken))
+            .WithTrackingName(TrackingNames.GeneratorIndex);
+
         // -------- Pipeline branch 1: [GenerateFilter<TEntity>] partial classes --------
-        var filterClasses = context.SyntaxProvider.ForAttributeWithMetadataName(
+        var filterClassDeclarations = context.SyntaxProvider.ForAttributeWithMetadataName(
             GenerateFilterAttributeFullName,
             predicate: static (syntaxNode, _) =>
                 syntaxNode is ClassDeclarationSyntax classDeclaration
                 && classDeclaration.Modifiers.Any(SyntaxKind.PartialKeyword),
             transform: static (generatorContext, cancellationToken) =>
-                ExtractFilterClassModel(generatorContext, cancellationToken))
+                FilterClassExtractor.Extract(generatorContext, cancellationToken))
+            .WithTrackingName(TrackingNames.FilterClassDeclarations);
+
+        var filterClasses = filterClassDeclarations
+            .Combine(generatorIndex)
+            .Select(static (input, cancellationToken) =>
+                FilterClassResolver.Resolve(input.Left, input.Right, cancellationToken))
             .WithTrackingName(TrackingNames.FilterClassModels);
 
         // Always report the per-class diagnostics (regardless of whether a model came back).
         context.RegisterSourceOutput(filterClasses, ReportFilterClassDiagnostics);
 
-        // [MapNested] splice runs after extraction; needs every host's model plus the compilation symbol table.
+        // [MapNested] splice runs after extraction; it needs every host's model and nothing else,
+        // because each navigation was already classified against its entity during extraction.
         var allHostsCollected = filterClasses.Collect();
         var resolvedHosts = filterClasses
             .Combine(allHostsCollected)
-            .Combine(context.CompilationProvider)
             .Select(static (input, cancellationToken) =>
-            {
-                var perHost = input.Left.Left;
-                var allHosts = input.Left.Right;
-                var compilation = input.Right;
-                return NestedFilterResolver.Resolve(perHost, allHosts, compilation, cancellationToken);
-            })
+                NestedFilterResolver.Resolve(input.Left, input.Right, cancellationToken))
             .WithTrackingName(TrackingNames.ResolvedFilterClassModels);
 
         context.RegisterSourceOutput(resolvedHosts, ReportResolvedDiagnostics);
@@ -52,13 +61,12 @@ public sealed class FilterGenerator : IIncrementalGenerator
         // Microsoft.Extensions.DependencyInjection.Abstractions; otherwise the emitted call
         // to IServiceCollection wouldn't compile.
         var modelsCollected = modelsForEmission.Collect();
-        var compilationProvider = context.CompilationProvider;
-        var diBundle = modelsCollected.Combine(compilationProvider);
+        var diBundle = modelsCollected.Combine(generatorIndex);
         context.RegisterSourceOutput(diBundle, GenerateAssemblyDiExtension!);
 
         context.RegisterSourceOutput(modelsCollected, GenerateProfileBridges);
 
-        var enumEmissionBundle = modelsCollected.Combine(compilationProvider);
+        var enumEmissionBundle = modelsCollected.Combine(generatorIndex);
         context.RegisterSourceOutput(enumEmissionBundle, GenerateEnumProfiles!);
 
         // -------- Pipeline branch 2: [FilterProfile] classes --------
@@ -77,15 +85,10 @@ public sealed class FilterGenerator : IIncrementalGenerator
         context.RegisterSourceOutput(combinedForCrossDiagnostics, ReportCrossPipelineDiagnostics);
 
         // -------- FN1008: FilterValueTypeUnregistered (opt-in via [assembly: FilterValueDiagnostics(WarnUnregistered = true)]) --------
-        var allModelsAndCompilation = modelsCollected.Combine(context.CompilationProvider);
-        context.RegisterSourceOutput(allModelsAndCompilation, EmitFn1008IfOptedIn!);
-    }
-
-    private static FilterClassModelWithDiagnostics ExtractFilterClassModel(
-        GeneratorAttributeSyntaxContext context,
-        CancellationToken cancellationToken)
-    {
-        return FilterClassExtractor.Extract(context, cancellationToken);
+        // The opt-in flag and the registered type names ride on the index, so this node re-runs only
+        // when one of them actually changed rather than on every Compilation instance.
+        var fn1008Bundle = modelsCollected.Combine(generatorIndex);
+        context.RegisterSourceOutput(fn1008Bundle, EmitFn1008IfOptedIn!);
     }
 
     private static void ReportFilterClassDiagnostics(SourceProductionContext sourceProductionContext, FilterClassModelWithDiagnostics extractionResult)
@@ -119,7 +122,6 @@ public sealed class FilterGenerator : IIncrementalGenerator
         var (filterClassResults, profileResults) = bundle;
 
         var profilesReferenced = new HashSet<string>(StringComparer.Ordinal);
-        var profilesWithImplicitFullUsage = new HashSet<string>(StringComparer.Ordinal);
         var explicitlyReferencedOperators = new HashSet<string>(StringComparer.Ordinal);
 
         foreach (var filterResult in filterClassResults)
@@ -127,10 +129,21 @@ public sealed class FilterGenerator : IIncrementalGenerator
             if (filterResult.Model is null) continue;
             foreach (var mapping in filterResult.Model.Properties)
             {
+                // The whole BasedOn chain counts as referenced: every bridge in it is emitted and
+                // its operators are inherited by the leaf profile the [Map] actually names.
                 profilesReferenced.Add(mapping.ProfileFullName);
+                foreach (var bridge in mapping.ProfileBridges)
+                {
+                    profilesReferenced.Add(bridge.ProfileFullName);
+                }
+
                 foreach (var operatorName in mapping.AllowedOperators)
                 {
                     explicitlyReferencedOperators.Add($"{mapping.ProfileFullName}|{operatorName}");
+                    foreach (var bridge in mapping.ProfileBridges)
+                    {
+                        explicitlyReferencedOperators.Add($"{bridge.ProfileFullName}|{operatorName}");
+                    }
                 }
             }
         }
@@ -185,48 +198,33 @@ public sealed class FilterGenerator : IIncrementalGenerator
 
     private static void GenerateAssemblyDiExtension(
         SourceProductionContext sourceProductionContext,
-        (ImmutableArray<FilterClassModel> Models, Compilation Compilation) bundle)
+        (ImmutableArray<FilterClassModel> Models, GeneratorIndex Index) bundle)
     {
-        var (models, compilation) = bundle;
+        var (models, index) = bundle;
         if (models.IsDefaultOrEmpty) return;
-        if (!DiExtensionEmitter.IsDiAbstractionsReferenced(compilation)) return;
+        if (!index.IsDependencyInjectionReferenced) return;
 
-        var emittedSource = DiExtensionEmitter.Emit(models, compilation.AssemblyName ?? "GeneratedAssembly");
+        var emittedSource = DiExtensionEmitter.Emit(models);
         sourceProductionContext.AddSource("FilteringServiceCollectionExtensions.g.cs", emittedSource);
     }
 
-    private const string FilterValueDiagnosticsAttributeFullName = "Filtering.Net.FilterValueDiagnosticsAttribute";
-
     private static void EmitFn1008IfOptedIn(
         SourceProductionContext sourceProductionContext,
-        (ImmutableArray<FilterClassModel> Models, Compilation Compilation) bundle)
+        (ImmutableArray<FilterClassModel> Models, GeneratorIndex Index) bundle)
     {
-        var (models, compilation) = bundle;
+        var (models, index) = bundle;
 
-        if (!IsWarnUnregisteredOptIn(compilation)) return;
+        if (!index.IsFilterValueDiagnosticsOptIn) return;
 
-        var registeredTypes = JsonSerializableTypeCollector.CollectRegisteredTypes(compilation);
-        var registeredFullNames = new HashSet<string>(
-            registeredTypes.Select(symbol => symbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)),
-            StringComparer.Ordinal);
+        // The index stores every registration with and without the global:: prefix, so the stored
+        // ValueClrType matches whichever spelling it happens to carry.
+        var registeredFullNames = new HashSet<string>(index.RegisteredJsonTypeNames, StringComparer.Ordinal);
 
         foreach (var model in models)
         {
             foreach (var typedValueReference in TypedValueTypeCollector.Collect(model))
             {
-                // The stored CLR type string may or may not carry the global:: prefix.
-                var clrTypeWithGlobal = typedValueReference.ValueClrType.StartsWith("global::")
-                    ? typedValueReference.ValueClrType
-                    : "global::" + typedValueReference.ValueClrType;
-                var clrTypeWithoutGlobal = typedValueReference.ValueClrType.StartsWith("global::")
-                    ? typedValueReference.ValueClrType.Substring("global::".Length)
-                    : typedValueReference.ValueClrType;
-
-                if (registeredFullNames.Contains(clrTypeWithGlobal) ||
-                    registeredFullNames.Contains(clrTypeWithoutGlobal))
-                {
-                    continue;
-                }
+                if (registeredFullNames.Contains(typedValueReference.ValueClrType)) continue;
 
                 var location = typedValueReference.Location?.ToLocation() ?? Location.None;
                 sourceProductionContext.ReportDiagnostic(Diagnostic.Create(
@@ -238,38 +236,16 @@ public sealed class FilterGenerator : IIncrementalGenerator
         }
     }
 
-    private static bool IsWarnUnregisteredOptIn(Compilation compilation)
-    {
-        var attributeSymbol = compilation.GetTypeByMetadataName(FilterValueDiagnosticsAttributeFullName);
-        if (attributeSymbol is null) return false;
-
-        foreach (var attribute in compilation.Assembly.GetAttributes())
-        {
-            if (!SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, attributeSymbol)) continue;
-
-            foreach (var namedArgument in attribute.NamedArguments)
-            {
-                if (namedArgument.Key == "WarnUnregistered" &&
-                    namedArgument.Value.Value is bool warnUnregistered)
-                {
-                    return warnUnregistered;
-                }
-            }
-        }
-        return false;
-    }
-
     private static void GenerateEnumProfiles(
         SourceProductionContext sourceProductionContext,
-        (ImmutableArray<FilterClassModel> Models, Compilation Compilation) bundle)
+        (ImmutableArray<FilterClassModel> Models, GeneratorIndex Index) bundle)
     {
-        var (models, compilation) = bundle;
+        var (models, index) = bundle;
         if (models.IsDefaultOrEmpty) return;
-        var enumTypes = EnumTypeCollector.Collect(compilation);
-        foreach (var enumSymbol in enumTypes)
+        foreach (var enumProfile in index.EnumProfiles)
         {
-            var emittedSource = EnumProfileEmitter.Emit(enumSymbol);
-            var hintName = $"{EnumProfileEmitter.GeneratedNamespace}.{enumSymbol.Name}Filter.g.cs";
+            var emittedSource = EnumProfileEmitter.Emit(enumProfile);
+            var hintName = $"{EnumProfileEmitter.GeneratedNamespace}.{enumProfile.ClassName}.g.cs";
             sourceProductionContext.AddSource(hintName, emittedSource);
         }
     }

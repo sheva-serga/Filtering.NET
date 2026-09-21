@@ -250,7 +250,6 @@ public class ExtractionTaxonomyTests
     // No-extraction arm: column-only predicate applied directly
     // -------------------------------------------------------------------------
 
-    // TryFindLambdaSyntax only recognises parenthesized lambdas — use (string column) form.
     private const string Row7Source = """
         using System;
         using System.Linq.Expressions;
@@ -260,7 +259,7 @@ public class ExtractionTaxonomyTests
         public static class CustomStringProfile
         {
             [FilterOperator("isEmpty")]
-            public static Expression<Func<string, bool>> IsEmpty => (string column) => column.Length == 0;
+            public static Expression<Func<string, bool>> IsEmpty => column => column.Length == 0;
         }
         public sealed class User { public string Name { get; set; } = ""; }
         [GenerateFilter<User>]

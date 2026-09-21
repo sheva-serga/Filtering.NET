@@ -1,13 +1,14 @@
 ﻿{
   Diagnostics: [
     {
-      Location: : (7,50)-(7,66),
+      Location: : (4,1)-(4,27),
       Message: Property 'Id' has CLR type 'int' but is not marked Sortable=true. Did you forget to make it sortable?,
       Severity: Warning,
       WarningLevel: 1,
       Descriptor: {
         Id: FN1002,
         Title: Property likely should be sortable,
+        HelpLink: https://sheva-serga.github.io/Filtering.NET/diagnostics/,
         MessageFormat: Property '{0}' has CLR type '{1}' but is not marked Sortable=true. Did you forget to make it sortable?,
         Category: Filtering.Net,
         DefaultSeverity: Warning,

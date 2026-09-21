@@ -6,7 +6,7 @@ namespace {{ generated_namespace }}
 {{- for bridge in bridges }}
 {{- if !for.first }}
 {{ end }}
-    /// <summary>Runtime form of the <c>{{ bridge.profile_full_name }}</c> profile.</summary>
+    /// <summary>Runtime form of the <c>{{ bridge.profile_display_name_xml }}</c> profile.</summary>
     internal static class {{ bridge.bridge_class_name }}
     {
         public static readonly global::Filtering.Net.FilterProfile<{{ bridge.column_type_fqn }}> Instance =

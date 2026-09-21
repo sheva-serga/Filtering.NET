@@ -8,7 +8,7 @@ namespace Filtering.Net.Generated
     internal static class Sample_FuzzyStringFilterProfile
     {
         public static readonly global::Filtering.Net.FilterProfile<string> Instance =
-            global::Filtering.Net.StringFilter.Profile.Extend("FuzzyStringFilter",
+            global::Filtering.Net.StringFilter.Profile.ExtendWithOverrides("FuzzyStringFilter",
                 global::Filtering.Net.FilterOperator.Value<string, string>("fuzzy", global::Sample.FuzzyStringFilter.Fuzzy));
     }
 }

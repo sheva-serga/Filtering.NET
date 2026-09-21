@@ -199,6 +199,151 @@ public class Fn0001Tests
     }
 
     [Fact]
+    public void TwoPropertyMapsForSameProperty_FiresFN0001()
+    {
+        // Arrange — both rules would reach FilterSchema, which rejects the wire key at construction.
+        var source = """
+            using Filtering.Net;
+            namespace TestNs;
+            public class User { public string Email { get; set; } = ""; public string Login { get; set; } = ""; }
+            [GenerateFilter<User>]
+            public partial class UserFilter
+            {
+                [PropertyMap("Email")]
+                private static FilterRule<User, string> RuleA(FilterRuleBuilder<User, string> builder) =>
+                    builder.For(user => user.Email).Operator<string>("eq", (string column, string value) => column == value);
+
+                [PropertyMap("Email")]
+                private static FilterRule<User, string> RuleB(FilterRuleBuilder<User, string> builder) =>
+                    builder.For(user => user.Login).Operator<string>("eq", (string column, string value) => column == value);
+            }
+            """;
+
+        // Act
+        var diagnostics = DiagnosticTestHelpers.GetDiagnostics(source);
+
+        // Assert
+        diagnostics.Select(diagnostic => diagnostic.Id).Should().Contain("FN0001");
+    }
+
+    [Fact]
+    public void PropertyMapCollidingWithNestedPath_FiresFN0001()
+    {
+        // Arrange — the rule and the lifted nested property both claim "Department.Name".
+        var source = """
+            using Filtering.Net;
+            namespace TestNs;
+            public class Department { public string Name { get; set; } = ""; }
+            public class User { public Department Department { get; set; } = new(); public string Alias { get; set; } = ""; }
+            [GenerateFilter<Department>]
+            [Map(nameof(Department.Name))]
+            public partial class DepartmentFilter
+            {
+            }
+            [GenerateFilter<User>]
+            [MapNested(nameof(User.Department))]
+            public partial class UserFilter
+            {
+                [PropertyMap("Department.Name")]
+                private static FilterRule<User, string> MapDepartmentName(FilterRuleBuilder<User, string> builder) =>
+                    builder.For(user => user.Alias).Operator<string>("eq", (string column, string value) => column == value);
+            }
+            """;
+
+        // Act
+        // (no separate act step — AssertDiagnostic is the verification)
+
+        // Assert
+        DiagnosticTestHelpers.AssertDiagnostic(source, "FN0001");
+    }
+
+    [Fact]
+    public void NestedFilterRuleCollidingWithHostMap_FiresFN0001()
+    {
+        // Arrange — DepartmentFilter's rule is lifted to "Department.Domain", which the host also maps.
+        var source = """
+            using Filtering.Net;
+            namespace TestNs;
+            public class Department { public string Name { get; set; } = ""; public string Domain { get; set; } = ""; }
+            public class User { public Department Department { get; set; } = new(); }
+            [GenerateFilter<Department>]
+            [Map(nameof(Department.Name))]
+            public partial class DepartmentFilter
+            {
+                [PropertyMap("Domain")]
+                private static FilterRule<Department, string> MapDomain(FilterRuleBuilder<Department, string> builder) =>
+                    builder.For(department => department.Domain).Operator<string>("eq", (string column, string value) => column == value);
+            }
+            [GenerateFilter<User>]
+            [Map("Department.Domain")]
+            [MapNested(nameof(User.Department))]
+            public partial class UserFilter
+            {
+            }
+            """;
+
+        // Act
+        // (no separate act step — AssertDiagnostic is the verification)
+
+        // Assert
+        DiagnosticTestHelpers.AssertDiagnostic(source, "FN0001");
+    }
+
+    [Fact]
+    public void AliasCollidingWithNestedPath_FiresFN0001()
+    {
+        // Arrange — FilterSchema registers both a property's own path and its alias as wire keys,
+        // so an alias may collide with a spliced property's path even when no path is repeated.
+        var source = """
+            using Filtering.Net;
+            namespace TestNs;
+            public class Department { public string Name { get; set; } = ""; }
+            public class User { public Department Department { get; set; } = new(); public string Nickname { get; set; } = ""; }
+            [GenerateFilter<Department>]
+            [Map(nameof(Department.Name))]
+            public partial class DepartmentFilter
+            {
+            }
+            [GenerateFilter<User>]
+            [Map(nameof(User.Nickname), Alias = "Department.Name")]
+            [MapNested(nameof(User.Department), Prefix = "Dept")]
+            public partial class UserFilter
+            {
+            }
+            """;
+
+        // Act
+        // (no separate act step — AssertDiagnostic is the verification)
+
+        // Assert
+        DiagnosticTestHelpers.AssertDiagnostic(source, "FN0001");
+    }
+
+    [Fact]
+    public void AliasCollisionBetweenTwoMaps_FiresOnlyFN0009()
+    {
+        // Arrange — one mistake should not produce two error ids; FN0009 names the offending alias.
+        var source = """
+            using Filtering.Net;
+            namespace TestNs;
+            public class User { public string Name { get; set; } = ""; public string Nickname { get; set; } = ""; }
+            [GenerateFilter<User>]
+            [Map(nameof(User.Name))]
+            [Map(nameof(User.Nickname), Alias = "name")]
+            public partial class UserFilter
+            {
+            }
+            """;
+
+        // Act
+        var observedIds = DiagnosticTestHelpers.GetDiagnostics(source).Select(diagnostic => diagnostic.Id).ToList();
+
+        // Assert
+        observedIds.Should().Contain("FN0009");
+        observedIds.Should().NotContain("FN0001");
+    }
+
+    [Fact]
     public void DuplicateMap_ReportsPriorMapAsAdditionalLocation()
     {
         // Arrange

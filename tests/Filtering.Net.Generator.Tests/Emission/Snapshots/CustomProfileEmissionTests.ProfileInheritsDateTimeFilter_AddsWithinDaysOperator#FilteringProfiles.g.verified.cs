@@ -8,7 +8,7 @@ namespace Filtering.Net.Generated
     internal static class Sample_RecencyFilterProfile
     {
         public static readonly global::Filtering.Net.FilterProfile<global::System.DateTime> Instance =
-            global::Filtering.Net.DateTimeFilter.Profile.Extend("RecencyFilter",
+            global::Filtering.Net.DateTimeFilter.Profile.ExtendWithOverrides("RecencyFilter",
                 global::Filtering.Net.FilterOperator.Value<global::System.DateTime, int>("withinDays", global::Sample.RecencyFilter.WithinDays));
     }
 }

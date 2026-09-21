@@ -50,6 +50,64 @@ public class Fn1006Tests
     }
 
     [Fact]
+    public void NullableNavigationInMapNested_DoesNotFireFN1006()
+    {
+        // Arrange — an optional reference navigation is the normal EF shape and [MapNested] offers no
+        // place to put a null guard (the lifted properties belong to the nested filter class), so the
+        // rule stays scoped to dotted [Map] paths, which can be rewritten as a [PropertyMap] rule.
+        var source = """
+            using Filtering.Net;
+            namespace TestNs;
+            public class Department { public string Name { get; set; } = ""; }
+            public class User { public Department? Department { get; set; } }
+            [GenerateFilter<Department>]
+            [Map(nameof(Department.Name))]
+            public partial class DepartmentFilter
+            {
+            }
+            [GenerateFilter<User>]
+            [MapNested(nameof(User.Department))]
+            public partial class UserFilter
+            {
+            }
+            """;
+
+        // Act
+        // (no separate act step — AssertNoDiagnostic is the verification)
+
+        // Assert
+        DiagnosticTestHelpers.AssertNoDiagnostic(source, "FN1006");
+    }
+
+    [Fact]
+    public void NonNullableNavigationInMapNested_DoesNotFireFN1006()
+    {
+        // Arrange
+        var source = """
+            using Filtering.Net;
+            namespace TestNs;
+            public class Department { public string Name { get; set; } = ""; }
+            public class User { public Department Department { get; set; } = new(); }
+            [GenerateFilter<Department>]
+            [Map(nameof(Department.Name))]
+            public partial class DepartmentFilter
+            {
+            }
+            [GenerateFilter<User>]
+            [MapNested(nameof(User.Department))]
+            public partial class UserFilter
+            {
+            }
+            """;
+
+        // Act
+        // (no separate act step — AssertNoDiagnostic is the verification)
+
+        // Assert
+        DiagnosticTestHelpers.AssertNoDiagnostic(source, "FN1006");
+    }
+
+    [Fact]
     public void DirectPropertyNoNavigation_DoesNotFireFN1006()
     {
         // Arrange

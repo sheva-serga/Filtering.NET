@@ -8,6 +8,7 @@
       Descriptor: {
         Id: FN1001,
         Title: DateTime.UtcNow/Now used directly inside [FilterOperator] lambda,
+        HelpLink: https://sheva-serga.github.io/Filtering.NET/diagnostics/,
         MessageFormat: [FilterOperator] body references DateTime.UtcNow/Now directly inside the lambda. Consider using the method-shape override that pre-computes the cutoff for app-clock semantics.,
         Category: Filtering.Net,
         DefaultSeverity: Warning,
@@ -22,6 +23,7 @@
       Descriptor: {
         Id: FN1007,
         Title: Operator body uses untranslatable method,
+        HelpLink: https://sheva-serga.github.io/Filtering.NET/diagnostics/,
         MessageFormat: Method '{0}' in operator body is not in the EF Core translatable allow-list. May produce client-side evaluation or runtime errors.,
         Category: Filtering.Net,
         DefaultSeverity: Warning,

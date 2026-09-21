@@ -6,9 +6,10 @@ using AwesomeAssertions;
 
 namespace Filtering.Net.Generator.Tests.Emission;
 
-/// <summary>Snapshot tests for custom profile inheritance and custom
-/// operator lambda inlining. Verifies the generator merges <c>BasedOn</c> chains and
-/// emits user-declared <c>[FilterOperator]</c> bodies inline.</summary>
+/// <summary>Snapshot + runtime tests for custom profile inheritance. The generator never copies a
+/// user-declared <c>[FilterOperator]</c> body: it emits a bridge in <c>FilteringProfiles.g.cs</c>
+/// that references the consumer's member and extends the <c>BasedOn</c> profile, and the schema
+/// entry points at that bridge.</summary>
 public class CustomProfileEmissionTests
 {
     [Fact]

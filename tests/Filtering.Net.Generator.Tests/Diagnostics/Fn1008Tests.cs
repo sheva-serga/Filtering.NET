@@ -172,7 +172,7 @@ public class Fn1008Tests
         var fn1008Diagnostics = diagnostics.Where(d => d.Id == "FN1008").ToList();
         fn1008Diagnostics.Should().NotBeEmpty(
             because: "FullNameSearch is an unregistered Path B value type used in a [PropertyMap] override operator");
-        var mentionsFullNameSearch = fn1008Diagnostics.Any(d => d.GetMessage().IndexOf("FullNameSearch", StringComparison.Ordinal) >= 0);
+        var mentionsFullNameSearch = fn1008Diagnostics.Any(d => d.GetMessage().Contains("FullNameSearch"));
         mentionsFullNameSearch.Should().BeTrue(
             because: "the FN1008 diagnostic message should identify FullNameSearch as the unregistered type");
     }
@@ -213,6 +213,165 @@ public class Fn1008Tests
             because: "FN1008 should point at the [FilterOperator] declaration site, not Location.None");
         fn1008Diagnostic.Location.GetLineSpan().IsValid.Should().BeTrue(
             because: "the diagnostic location should carry a valid line span from the declaration site");
+    }
+
+    [Fact]
+    public void GetDiagnostics_WithOptIn_AndArrayValueTypeRegistered_DoesNotFireFN1008()
+    {
+        // Arrange — typeof(T[]) binds to an array symbol, which a named-type-only collector drops,
+        // leaving the warning impossible to silence by any registration.
+        var source = """
+            using System;
+            using System.Linq;
+            using System.Linq.Expressions;
+            using System.Text.Json.Serialization;
+            using Filtering.Net;
+            [assembly: FilterValueDiagnostics(WarnUnregistered = true)]
+            namespace TestNs;
+            public sealed record RegexFilterValue(string Pattern);
+            [JsonSerializable(typeof(RegexFilterValue[]))]
+            internal partial class AppJsonContext : JsonSerializerContext;
+            [FilterProfile<string>(BasedOn = typeof(StringFilter))]
+            public static class StringWithRegexProfile
+            {
+                [FilterOperator("anyOf")]
+                public static Expression<Func<string, RegexFilterValue[], bool>> AnyOf =>
+                    (column, values) => values.Any(value => column == value.Pattern);
+            }
+            public sealed class User { public string Email { get; set; } = string.Empty; }
+            [GenerateFilter<User>]
+            [Map(nameof(User.Email), Profile = typeof(StringWithRegexProfile))]
+            public partial class UserFilter
+            {
+            }
+            """;
+
+        // Act
+        var diagnostics = DiagnosticTestHelpers.GetDiagnostics(source);
+
+        // Assert
+        diagnostics.Should().NotContain(d => d.Id == "FN1008",
+            because: "RegexFilterValue[] is registered in AppJsonContext so FN1008 should not fire");
+    }
+
+    [Fact]
+    public void GetDiagnostics_WithOptIn_AndContextNestedTwoLevelsDeep_DoesNotFireFN1008()
+    {
+        // Arrange
+        var source = """
+            using System;
+            using System.Linq.Expressions;
+            using System.Text.Json.Serialization;
+            using Filtering.Net;
+            [assembly: FilterValueDiagnostics(WarnUnregistered = true)]
+            namespace TestNs;
+            public sealed record RegexFilterValue(string Pattern);
+            public static partial class Serialization
+            {
+                public static partial class Json
+                {
+                    [JsonSerializable(typeof(RegexFilterValue))]
+                    internal partial class AppJsonContext : JsonSerializerContext;
+                }
+            }
+            [FilterProfile<string>(BasedOn = typeof(StringFilter))]
+            public static class StringWithRegexProfile
+            {
+                [FilterOperator("regex")]
+                public static Expression<Func<string, RegexFilterValue, bool>> Regex =>
+                    (column, value) => System.Text.RegularExpressions.Regex.IsMatch(column, value.Pattern);
+            }
+            public sealed class User { public string Email { get; set; } = string.Empty; }
+            [GenerateFilter<User>]
+            [Map(nameof(User.Email), Profile = typeof(StringWithRegexProfile))]
+            public partial class UserFilter
+            {
+            }
+            """;
+
+        // Act
+        var diagnostics = DiagnosticTestHelpers.GetDiagnostics(source);
+
+        // Assert
+        diagnostics.Should().NotContain(d => d.Id == "FN1008",
+            because: "a JsonSerializerContext nested two types deep is still visible in this compilation");
+    }
+
+    [Fact]
+    public void GetDiagnostics_WithOptIn_AndOneProfileSharedByTwoMaps_FiresFN1008Once()
+    {
+        // Arrange — the operator's declaration site is the same line for both properties, so one
+        // reference per property would stack identical warnings on it.
+        var source = """
+            using System;
+            using System.Linq.Expressions;
+            using Filtering.Net;
+            [assembly: FilterValueDiagnostics(WarnUnregistered = true)]
+            namespace TestNs;
+            public sealed record RegexFilterValue(string Pattern);
+            [FilterProfile<string>(BasedOn = typeof(StringFilter))]
+            public static class StringWithRegexProfile
+            {
+                [FilterOperator("regex")]
+                public static Expression<Func<string, RegexFilterValue, bool>> Regex =>
+                    (column, value) => System.Text.RegularExpressions.Regex.IsMatch(column, value.Pattern);
+            }
+            public sealed class User
+            {
+                public string Email { get; set; } = string.Empty;
+                public string Name { get; set; } = string.Empty;
+            }
+            [GenerateFilter<User>]
+            [Map(nameof(User.Email), Profile = typeof(StringWithRegexProfile))]
+            [Map(nameof(User.Name), Profile = typeof(StringWithRegexProfile))]
+            public partial class UserFilter
+            {
+            }
+            """;
+
+        // Act
+        var diagnostics = DiagnosticTestHelpers.GetDiagnostics(source);
+
+        // Assert
+        diagnostics.Where(d => d.Id == "FN1008").Should().ContainSingle(
+            because: "FN1008 is reported once per distinct (value type, declaration site)");
+    }
+
+    [Fact]
+    public void GetDiagnostics_WithOptIn_AndTypedValueSplicedThroughMapNested_FiresFN1008Once()
+    {
+        // Arrange — the nested filter class reports its own typed values; every host that splices
+        // it would otherwise report them again on the same line.
+        var source = """
+            using System;
+            using System.Linq.Expressions;
+            using Filtering.Net;
+            [assembly: FilterValueDiagnostics(WarnUnregistered = true)]
+            namespace TestNs;
+            public sealed record RegexFilterValue(string Pattern);
+            [FilterProfile<string>(BasedOn = typeof(StringFilter))]
+            public static class StringWithRegexProfile
+            {
+                [FilterOperator("regex")]
+                public static Expression<Func<string, RegexFilterValue, bool>> Regex =>
+                    (column, value) => System.Text.RegularExpressions.Regex.IsMatch(column, value.Pattern);
+            }
+            public sealed class Department { public string Name { get; set; } = string.Empty; }
+            public sealed class User { public Department Department { get; set; } = new(); }
+            [GenerateFilter<Department>]
+            [Map(nameof(Department.Name), Profile = typeof(StringWithRegexProfile))]
+            public partial class DepartmentFilter { }
+            [GenerateFilter<User>]
+            [MapNested(nameof(User.Department))]
+            public partial class UserFilter { }
+            """;
+
+        // Act
+        var diagnostics = DiagnosticTestHelpers.GetDiagnostics(source);
+
+        // Assert
+        diagnostics.Where(d => d.Id == "FN1008").Should().ContainSingle(
+            because: "the spliced mapping belongs to DepartmentFilter's own model");
     }
 
     [Fact]

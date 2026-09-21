@@ -49,6 +49,29 @@ public class Fn1002Tests
     }
 
     [Fact]
+    public void NotSortableLikelyOmission_ReportsAtTheMapAttribute()
+    {
+        // Arrange — anchored at the [Map] so the warning is navigable and #pragma-suppressible
+        // per property instead of piling every warning onto the class-name token.
+        var source = """
+            using Filtering.Net;
+            namespace TestNs;
+            public class User { public int Age { get; set; } }
+            [GenerateFilter<User>]
+            [Map(nameof(User.Age))]
+            public partial class UserFilter
+            {
+            }
+            """;
+
+        // Act
+        // (no separate act step — AssertDiagnosticWithLocations is the verification)
+
+        // Assert
+        DiagnosticTestHelpers.AssertDiagnosticWithLocations(source, "FN1002", primaryLine: 5, primaryColumn: 2);
+    }
+
+    [Fact]
     public void StringPropertyNotSortable_DoesNotFireFN1002()
     {
         // Arrange

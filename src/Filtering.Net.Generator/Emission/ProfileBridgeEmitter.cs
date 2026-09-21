@@ -38,6 +38,7 @@ internal static class ProfileBridgeEmitter
         {
             bridgeViews.Add(new ProfileBridgeView(
                 ProfileFullName: bridge.ProfileFullName,
+                ProfileDisplayNameXml: EmissionNames.EscapeXmlText(bridge.ProfileFullName),
                 BridgeClassName: bridge.BridgeClassName,
                 ColumnTypeFqn: bridge.ColumnTypeFqn,
                 Initializer: BuildInitializer(bridge)));
@@ -45,12 +46,15 @@ internal static class ProfileBridgeEmitter
         return new ProfileBridgeFileView(ProfileBridgeBuilder.GeneratedNamespace, bridgeViews);
     }
 
+    // BasedOn profiles use ExtendWithOverrides: re-declaring an inherited operator is a legal
+    // override (the derived one wins), which is what ProfileResolver already models. Extend would
+    // throw FilterConfigurationException inside the static initialiser for exactly that source.
     private static string BuildInitializer(ProfileBridgeModel bridge)
     {
         var profileNameLiteral = "\"" + EmissionNames.EscapeStringLiteral(bridge.ProfileName) + "\"";
         var initializer = new StringBuilder(bridge.BaseProfileReference is null
             ? $"global::Filtering.Net.FilterProfile<{bridge.ColumnTypeFqn}>.Create({profileNameLiteral}"
-            : $"{bridge.BaseProfileReference}.Extend({profileNameLiteral}");
+            : $"{bridge.BaseProfileReference}.ExtendWithOverrides({profileNameLiteral}");
         foreach (var bridgeOperator in bridge.Operators)
         {
             initializer.Append(",\n").Append(InitializerIndent).Append(bridgeOperator.OperatorFactoryCall);

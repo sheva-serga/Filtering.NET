@@ -67,6 +67,77 @@ public class Fn0012Tests
     }
 
     [Fact]
+    public void SingleBuiltInProfileForIntType_DoesNotFireFN0012()
+    {
+        // Arrange — only Int32Filter matches int, so resolution must settle on it silently. A
+        // double-registration in the profile index would make every plain [Map] on an int an error.
+        var source = """
+            using Filtering.Net;
+            namespace TestNs;
+            public class User { public int Id { get; set; } }
+            [GenerateFilter<User>]
+            [Map(nameof(User.Id), Sortable = true)]
+            public partial class UserFilter
+            {
+            }
+            """;
+
+        // Act
+        // Assert
+        DiagnosticTestHelpers.AssertNoDiagnostic(source, "FN0012");
+    }
+
+    [Fact]
+    public void OnlyTheAutoEmittedEnumProfileForEnumType_DoesNotFireFN0012()
+    {
+        // Arrange — the generator emits one profile per enum; if that emitted profile were also
+        // registered as a source declaration, every enum [Map] would report an ambiguity.
+        var source = """
+            using Filtering.Net;
+            namespace TestNs;
+            public enum UserStatus { Active, Closed }
+            public class User { public UserStatus Status { get; set; } }
+            [GenerateFilter<User>]
+            [Map(nameof(User.Status))]
+            public partial class UserFilter
+            {
+            }
+            """;
+
+        // Act
+        // Assert
+        DiagnosticTestHelpers.AssertNoDiagnostic(source, "FN0012");
+    }
+
+    [Fact]
+    public void AmbiguityResolvedByExplicitProfile_DoesNotFireFN0012()
+    {
+        // Arrange — same two-candidate shape as the first test, with Profile = typeof(...) naming one.
+        var source = """
+            using System;
+            using System.Linq.Expressions;
+            using Filtering.Net;
+            namespace TestNs;
+            [FilterProfile<int>]
+            public static class MyIntFilter
+            {
+                [FilterOperator("eq")]
+                public static Expression<Func<int, int, bool>> Eq => (column, value) => column == value;
+            }
+            public class User { public int Id { get; set; } }
+            [GenerateFilter<User>]
+            [Map(nameof(User.Id), Profile = typeof(MyIntFilter), Sortable = true)]
+            public partial class UserFilter
+            {
+            }
+            """;
+
+        // Act
+        // Assert
+        DiagnosticTestHelpers.AssertNoDiagnostic(source, "FN0012");
+    }
+
+    [Fact]
     public void AmbiguousProfile_ReportsAllCandidateProfilesAsAdditionalLocations()
     {
         // Arrange — two hand-written profiles for the same enum so both candidate locations
@@ -74,7 +145,6 @@ public class Fn0012Tests
         var source = """
             using System;
             using System.Linq.Expressions;
-            using System.Text.Json;
             using Filtering.Net;
             namespace TestNs;
             public enum Priority { Low, High }
@@ -83,16 +153,12 @@ public class Fn0012Tests
             {
                 [FilterOperator("eq")]
                 public static Expression<Func<Priority, Priority, bool>> Eq => (column, value) => column == value;
-                public static bool TryGetValue(JsonElement element, out Priority value, out string error)
-                { value = Priority.Low; error = ""; return true; }
             }
             [FilterProfile<Priority>]
             public static class PriorityFilterB
             {
                 [FilterOperator("eq")]
                 public static Expression<Func<Priority, Priority, bool>> Eq => (column, value) => column == value;
-                public static bool TryGetValue(JsonElement element, out Priority value, out string error)
-                { value = Priority.Low; error = ""; return true; }
             }
             public class Ticket { public Priority Priority { get; set; } }
             [GenerateFilter<Ticket>]

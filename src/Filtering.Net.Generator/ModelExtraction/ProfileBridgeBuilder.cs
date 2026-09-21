@@ -1,5 +1,3 @@
-using System.Text;
-
 using Microsoft.CodeAnalysis;
 
 namespace Filtering.Net.Generator;
@@ -106,13 +104,6 @@ internal static class ProfileBridgeBuilder
         return null;
     }
 
-    private static string BridgeClassName(string profileFullName)
-    {
-        var identifier = new StringBuilder(profileFullName.Length + 7);
-        foreach (var character in profileFullName)
-        {
-            identifier.Append(char.IsLetterOrDigit(character) ? character : '_');
-        }
-        return identifier.Append("Profile").ToString();
-    }
+    private static string BridgeClassName(string profileFullName) =>
+        EmissionNames.ToIdentifier(profileFullName) + "Profile";
 }

@@ -6,24 +6,22 @@ internal static class JsonSerializableTypeCollector
 {
     private const string JsonSerializableAttributeFullName = "System.Text.Json.Serialization.JsonSerializableAttribute";
     private const string JsonSerializerContextFullName = "System.Text.Json.Serialization.JsonSerializerContext";
+    private const string SystemTextJsonAssemblyName = "System.Text.Json";
 
-    public static HashSet<INamedTypeSymbol> CollectRegisteredTypes(Compilation compilation)
+    // Each registration is recorded both with and without the global:: prefix so the comparison
+    // against a stored ValueClrType needs no string surgery at the call site.
+    public static List<string> CollectRegisteredTypeNames(Compilation compilation)
     {
-        var registeredTypes = new HashSet<INamedTypeSymbol>(SymbolEqualityComparer.Default);
+        var registeredTypeNames = new List<string>();
 
         var jsonSerializerContextSymbol = compilation.GetTypeByMetadataName(JsonSerializerContextFullName);
-        if (jsonSerializerContextSymbol is null)
-        {
-            return registeredTypes; // System.Text.Json not referenced — nothing to register.
-        }
-
         var jsonSerializableAttributeSymbol = compilation.GetTypeByMetadataName(JsonSerializableAttributeFullName);
-        if (jsonSerializableAttributeSymbol is null)
+        if (jsonSerializerContextSymbol is null || jsonSerializableAttributeSymbol is null)
         {
-            return registeredTypes;
+            return registeredTypeNames; // System.Text.Json not referenced — nothing to register.
         }
 
-        foreach (var namedType in EnumerateAllNamedTypes(compilation.GlobalNamespace))
+        foreach (var namedType in EnumerateCandidateTypes(compilation))
         {
             if (!IsSubclassOf(namedType, jsonSerializerContextSymbol)) continue;
 
@@ -33,14 +31,55 @@ internal static class JsonSerializableTypeCollector
                     continue;
                 if (attribute.ConstructorArguments.Length == 0)
                     continue;
-                if (attribute.ConstructorArguments[0].Value is INamedTypeSymbol registeredType)
-                {
-                    registeredTypes.Add(registeredType);
-                }
+                // typeof(T[]) binds to an IArrayTypeSymbol, so anything narrower than ITypeSymbol
+                // would drop array registrations and make FN1008 unsilenceable for them.
+                if (attribute.ConstructorArguments[0].Value is not ITypeSymbol registeredType)
+                    continue;
+
+                var qualifiedName = registeredType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+                registeredTypeNames.Add(qualifiedName);
+                registeredTypeNames.Add(qualifiedName.StartsWith("global::", StringComparison.Ordinal)
+                    ? qualifiedName.Substring("global::".Length)
+                    : "global::" + qualifiedName);
             }
         }
 
-        return registeredTypes;
+        registeredTypeNames.Sort(StringComparer.Ordinal);
+        return registeredTypeNames;
+    }
+
+    // The source assembly plus only those references that use System.Text.Json at all: walking the
+    // merged global namespace would realize every type in the whole reference closure.
+    private static IEnumerable<INamedTypeSymbol> EnumerateCandidateTypes(Compilation compilation)
+    {
+        foreach (var namedType in EnumerateAllNamedTypes(compilation.Assembly.GlobalNamespace))
+        {
+            yield return namedType;
+        }
+
+        foreach (var referencedAssembly in compilation.SourceModule.ReferencedAssemblySymbols)
+        {
+            if (!ReferencesSystemTextJson(referencedAssembly)) continue;
+            foreach (var namedType in EnumerateAllNamedTypes(referencedAssembly.GlobalNamespace))
+            {
+                yield return namedType;
+            }
+        }
+    }
+
+    private static bool ReferencesSystemTextJson(IAssemblySymbol assemblySymbol)
+    {
+        foreach (var module in assemblySymbol.Modules)
+        {
+            foreach (var referencedAssemblyName in module.ReferencedAssemblies)
+            {
+                if (string.Equals(referencedAssemblyName.Name, SystemTextJsonAssemblyName, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     private static IEnumerable<INamedTypeSymbol> EnumerateAllNamedTypes(INamespaceSymbol namespaceSymbol)
@@ -56,11 +95,24 @@ internal static class JsonSerializableTypeCollector
             }
             else if (member is INamedTypeSymbol namedType)
             {
-                yield return namedType;
-                foreach (var nestedType in namedType.GetTypeMembers())
+                foreach (var typeOrNested in EnumerateWithNestedTypes(namedType))
                 {
-                    yield return nestedType;
+                    yield return typeOrNested;
                 }
+            }
+        }
+    }
+
+    // Recursive rather than one level deep: a JsonSerializerContext nested two or more types down
+    // would otherwise be invisible and produce a false-positive FN1008.
+    private static IEnumerable<INamedTypeSymbol> EnumerateWithNestedTypes(INamedTypeSymbol namedType)
+    {
+        yield return namedType;
+        foreach (var nestedType in namedType.GetTypeMembers())
+        {
+            foreach (var typeOrNested in EnumerateWithNestedTypes(nestedType))
+            {
+                yield return typeOrNested;
             }
         }
     }

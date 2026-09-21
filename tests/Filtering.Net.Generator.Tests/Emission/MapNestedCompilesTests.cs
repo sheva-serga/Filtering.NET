@@ -1,6 +1,6 @@
 namespace Filtering.Net.Generator.Tests.Emission;
 
-/// <summary>Asserts each <see cref="MapNestedEmissionTests"/> scenario's emitted output compiles cleanly. Catches regressions where the snapshot matches but the C# is malformed (duplicate switch cases, broken lambdas).</summary>
+/// <summary>Asserts every <see cref="MapNestedEmissionTests"/> scenario's emitted output compiles cleanly, plus the nullable-navigation shape whose snapshot was dropped because it could not be distinguished. Catches regressions where the snapshot matches but the emitted C# is malformed.</summary>
 public class MapNestedCompilesTests
 {
     [Fact]
@@ -227,6 +227,61 @@ public class MapNestedCompilesTests
             [GenerateFilter<User>]
             [MapNested(nameof(User.Department))]
             public partial class UserFilter
+            {
+            }
+            """;
+
+        // Act
+        // (no separate act step — CompileVerifier.AssertCompilesCleanly is the verification)
+
+        // Assert
+        CompileVerifier.AssertCompilesCleanly(consumerSource);
+    }
+
+    [Fact]
+    public void NestedWithPropertyMap_Compiles()
+    {
+        // Arrange
+        var consumerSource = """
+            using Filtering.Net;
+            using System.Collections.Generic;
+            using System.Linq;
+            namespace TestNs;
+            public class Department { public List<string> Tags { get; set; } = new(); }
+            public class User { public Department Department { get; set; } = new(); }
+            [GenerateFilter<Department>] public partial class DepartmentFilter
+            {
+                [PropertyMap(nameof(Department.Tags))]
+                private static FilterRule<Department, string> MapTags(FilterRuleBuilder<Department, string> builder) =>
+                    builder.For(d => d.Tags.FirstOrDefault() ?? "")
+                        .Operator("anyEq", (string tags, string v) => tags == v);
+            }
+            [GenerateFilter<User>]
+            [MapNested(nameof(User.Department))]
+            public partial class UserFilter
+            {
+            }
+            """;
+
+        // Act
+        // (no separate act step — CompileVerifier.AssertCompilesCleanly is the verification)
+
+        // Assert
+        CompileVerifier.AssertCompilesCleanly(consumerSource);
+    }
+
+    [Fact]
+    public void NestedSelfReferenceWithMaxDepth_Compiles()
+    {
+        // Arrange
+        var consumerSource = """
+            using Filtering.Net;
+            namespace TestNs;
+            public class Employee { public string Name { get; set; } = ""; public Employee? Manager { get; set; } }
+            [GenerateFilter<Employee>]
+            [Map(nameof(Employee.Name))]
+            [MapNested(nameof(Employee.Manager), MaxDepth = 2)]
+            public partial class EmployeeFilter
             {
             }
             """;

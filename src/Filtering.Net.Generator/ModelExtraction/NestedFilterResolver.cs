@@ -1,12 +1,17 @@
 using System.Collections.Immutable;
 using System.Globalization;
 
-using Microsoft.CodeAnalysis;
-
 namespace Filtering.Net.Generator;
 
+// Splices every [MapNested] target's mappings into the host so duplicates and cycles can be found at
+// build time. Works on models only: the navigation was already classified against the entity symbol
+// during extraction, so this node needs no Compilation and re-runs only when a model actually changes.
 internal static class NestedFilterResolver
 {
+    // MaxDepth expands one nesting that many times along a single path, and the DFS below recurses
+    // once per level. Anything past this is an authoring mistake, not a filter graph.
+    public const int MaxSupportedNestingDepth = 64;
+
     public sealed record ResolvedHost(
         FilterClassModel Model,
         EquatableList<DiagnosticInfo> Diagnostics);
@@ -14,7 +19,6 @@ internal static class NestedFilterResolver
     public static ResolvedHost Resolve(
         FilterClassModelWithDiagnostics hostExtractionResult,
         ImmutableArray<FilterClassModelWithDiagnostics> allHostExtractionResults,
-        Compilation compilation,
         CancellationToken cancellationToken)
     {
         if (hostExtractionResult.Model is null)
@@ -24,19 +28,20 @@ internal static class NestedFilterResolver
 
         var hostModel = hostExtractionResult.Model;
         var newDiagnostics = new List<DiagnosticInfo>();
-        var hostEntitySymbol = compilation.GetTypeByMetadataName(hostModel.FullEntityTypeName);
 
         var mergedProperties = new List<PropertyMappingModel>(hostModel.Properties);
         var resolvedNestedMappings = new List<NestedMappingModel>(hostModel.NestedMappings.Count);
         var typedValueTracker = new TypedValueTracker();
+
+        var hostFqn = ClassFqnOf(hostModel);
+        var mappingSources = SeedHostMappingSources(hostModel);
 
         // Seeded with the host so a [MapNested] whose target is the host itself trips the cycle
         // check on the first recursive entry rather than infinite-looping. The parallel location
         // stack mirrors the visited-set so cycle diagnostics can report every [MapNested] site
         // along the path as additionalLocations.
         var nestingPath = new List<NestingPathStep>();
-        var nestedSiteStack = new Stack<Location?>();
-        var hostFqn = ClassFqnOf(hostModel);
+        var nestedSiteStack = new Stack<LocationInfo?>();
         nestingPath.Add(new NestingPathStep(hostFqn, EnteredThroughNestingKey: null, EnteredThroughBoundedNesting: false));
         nestedSiteStack.Push(null);
 
@@ -44,17 +49,23 @@ internal static class NestedFilterResolver
         {
             cancellationToken.ThrowIfCancellationRequested();
 
-            if (nested.MaxDepth < 0)
+            var keyedNested = nested with { NestingKey = NestingKeyOf(hostFqn, nested) };
+
+            // FN0021: an out-of-range MaxDepth is rejected before the DFS runs, because a huge bound
+            // on a self-referencing navigation would recurse until the analyzer process dies.
+            if (nested.MaxDepth < 0 || nested.MaxDepth > MaxSupportedNestingDepth)
             {
                 newDiagnostics.Add(DiagnosticInfo.From(
                     DiagnosticDescriptors.NestedMaxDepthInvalid,
-                    nested.AttributeLocation?.ToLocation() ?? Location.None,
+                    nested.AttributeLocation,
                     nested.NavigationPropertyName,
-                    nested.MaxDepth.ToString(CultureInfo.InvariantCulture)));
+                    nested.MaxDepth.ToString(CultureInfo.InvariantCulture),
+                    MaxSupportedNestingDepth.ToString(CultureInfo.InvariantCulture)));
+                resolvedNestedMappings.Add(keyedNested);
+                continue;
             }
-            var keyedNested = nested with { NestingKey = NestingKeyOf(hostFqn, nested) };
 
-            var targetModel = ResolveTargetForNested(nested, hostEntitySymbol, compilation, allHostExtractionResults, newDiagnostics);
+            var targetModel = ResolveTargetForNested(nested, hostModel.FullEntityTypeName, allHostExtractionResults, newDiagnostics);
             if (targetModel is null)
             {
                 resolvedNestedMappings.Add(keyedNested);
@@ -62,68 +73,24 @@ internal static class NestedFilterResolver
             }
             resolvedNestedMappings.Add(keyedNested with { ResolvedTargetClassFqn = ClassFqnOf(targetModel) });
 
+            ReportUnknownPathFilters(nested, targetModel, newDiagnostics);
+
             var spliced = SpliceMappings(
                 targetModel,
                 keyedNested,
                 accumulatedClrPath: nested.NavigationPropertyName,
                 accumulatedAliasPath: nested.Prefix,
                 allHostExtractionResults,
-                compilation,
                 newDiagnostics,
                 nestingPath,
                 nestedSiteStack,
                 typedValueTracker,
+                mappingSources,
                 cancellationToken);
             mergedProperties.AddRange(spliced);
         }
 
-        // FN0001 fires on either axis: same CLR accessor (would emit two predicates against the same
-        // entity member) or same wire dispatch key (would shadow each other at apply time).
-        var reportedGroupKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-        var clrPathGroups = mergedProperties
-            .GroupBy(mapping => mapping.PropertyName, StringComparer.OrdinalIgnoreCase)
-            .Where(group => group.Count() > 1);
-        foreach (var duplicateGroup in clrPathGroups)
-        {
-            ReportDuplicate(duplicateGroup.Key, duplicateGroup.ToList());
-        }
-        var wireKeyGroups = mergedProperties
-            .GroupBy(WireKeyOf, StringComparer.OrdinalIgnoreCase)
-            .Where(group => group.Count() > 1);
-        foreach (var duplicateGroup in wireKeyGroups)
-        {
-            ReportDuplicate(duplicateGroup.Key, duplicateGroup.ToList());
-        }
-
-        void ReportDuplicate(string groupKey, List<PropertyMappingModel> conflicts)
-        {
-            // A pair colliding on both CLR and wire axes would otherwise fire FN0001 twice.
-            if (!reportedGroupKeys.Add(groupKey)) return;
-            var sourcesFormatted = string.Join(", ", conflicts.Select(FormatSource));
-            var locationsForReporting = new List<Location>();
-            foreach (var mapping in conflicts)
-            {
-                var location = mapping.InliningSiteLocation?.ToLocation()
-                    ?? mapping.DeclarationLocation?.ToLocation();
-                if (location is not null)
-                {
-                    locationsForReporting.Add(location);
-                }
-            }
-
-            var primaryLocation = locationsForReporting.Count > 0 ? locationsForReporting[0] : Location.None;
-            var additionalLocations = locationsForReporting.Count > 1
-                ? locationsForReporting.Skip(1).ToArray()
-                : Array.Empty<Location>();
-
-            newDiagnostics.Add(DiagnosticInfo.From(
-                DiagnosticDescriptors.DuplicateMapping,
-                primaryLocation,
-                additionalLocations,
-                groupKey,
-                hostFqn,
-                sourcesFormatted));
-        }
+        ReportDuplicateMappings(mappingSources, hostFqn, newDiagnostics);
 
         // A spliced typed-value operator forces JsonSerializerOptions threading even when the host's
         // own extraction said no — the host extractor ran before splice and couldn't see it.
@@ -139,6 +106,160 @@ internal static class NestedFilterResolver
                 HasAnyTypedValueProperty = mergedHasAnyTypedValueProperty,
             },
             new EquatableList<DiagnosticInfo>(newDiagnostics));
+    }
+
+    // What claimed a filter path on this host. [PropertyMap] rules take part because FilterSchema
+    // registers them exactly like a [Map], even though they never enter the merged property list.
+    private enum MappingSourceKind
+    {
+        HostMap,
+        HostRule,
+        Spliced,
+    }
+
+    private sealed record MappingSource(
+        MappingSourceKind Kind,
+        string ClrPath,
+        string? Alias,
+        string Label,
+        LocationInfo? Location);
+
+    private static List<MappingSource> SeedHostMappingSources(FilterClassModel hostModel)
+    {
+        var mappingSources = new List<MappingSource>(hostModel.Properties.Count + hostModel.Overrides.Count);
+        var mappedPropertyNames = new HashSet<string>(StringComparer.Ordinal);
+
+        foreach (var mapping in hostModel.Properties)
+        {
+            mappedPropertyNames.Add(mapping.PropertyName);
+            mappingSources.Add(new MappingSource(
+                MappingSourceKind.HostMap,
+                mapping.PropertyName,
+                mapping.Alias,
+                $"[Map] {mapping.DeclarationName}",
+                mapping.DeclarationLocation));
+        }
+
+        foreach (var propertyOverride in hostModel.Overrides)
+        {
+            // Mirrors emission: an override with an unusable signature (FN0023) or one shadowed by a
+            // [Map] (FN0002) never reaches the schema, so it cannot collide with anything.
+            if (propertyOverride.BuilderTypeFqn is null) continue;
+            if (mappedPropertyNames.Contains(propertyOverride.PropertyName)) continue;
+            mappingSources.Add(new MappingSource(
+                MappingSourceKind.HostRule,
+                propertyOverride.PropertyName,
+                Alias: null,
+                $"[PropertyMap] {propertyOverride.PropertyName}",
+                propertyOverride.DeclarationLocation));
+        }
+
+        return mappingSources;
+    }
+
+    // FN0001 fires on either axis: same CLR accessor (would emit two predicates against the same
+    // entity member) or same wire dispatch key (would shadow each other at apply time). The wire axis
+    // is the exact set FilterSchema registers — a property's own path and its alias, both.
+    private static void ReportDuplicateMappings(
+        List<MappingSource> mappingSources,
+        string hostFqn,
+        List<DiagnosticInfo> diagnostics)
+    {
+        var reportedGroupKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var duplicateGroup in mappingSources
+            .GroupBy(source => source.ClrPath, StringComparer.OrdinalIgnoreCase)
+            .Where(group => group.Count() > 1))
+        {
+            ReportDuplicate(duplicateGroup.Key, duplicateGroup.ToList());
+        }
+
+        var wireKeyClaimants = new Dictionary<string, List<MappingSource>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var source in mappingSources)
+        {
+            ClaimWireKey(source.ClrPath, source);
+            if (!string.IsNullOrEmpty(source.Alias)) ClaimWireKey(source.Alias!, source);
+        }
+        foreach (var claim in wireKeyClaimants)
+        {
+            if (claim.Value.Count <= 1) continue;
+            // A collision purely between two [Map]s on this class is FN0009's alias rule, which names
+            // the offending alias; reporting FN0001 as well would be two ids for one mistake.
+            if (claim.Value.TrueForAll(source => source.Kind == MappingSourceKind.HostMap)) continue;
+            ReportDuplicate(claim.Key, claim.Value);
+        }
+
+        void ClaimWireKey(string wireKey, MappingSource source)
+        {
+            if (!wireKeyClaimants.TryGetValue(wireKey, out var claimants))
+            {
+                claimants = [];
+                wireKeyClaimants[wireKey] = claimants;
+            }
+            if (!claimants.Contains(source)) claimants.Add(source);
+        }
+
+        void ReportDuplicate(string groupKey, List<MappingSource> conflicts)
+        {
+            // A pair colliding on both CLR and wire axes would otherwise fire FN0001 twice.
+            if (!reportedGroupKeys.Add(groupKey)) return;
+            var sourcesFormatted = string.Join(", ", conflicts.Select(source => source.Label));
+            var locationsForReporting = new List<LocationInfo>();
+            foreach (var source in conflicts)
+            {
+                if (source.Location is not null) locationsForReporting.Add(source.Location);
+            }
+
+            var primaryLocation = locationsForReporting.Count > 0 ? locationsForReporting[0] : null;
+            var additionalLocations = locationsForReporting.Count > 1
+                ? locationsForReporting.Skip(1).ToArray()
+                : Array.Empty<LocationInfo>();
+
+            diagnostics.Add(DiagnosticInfo.From(
+                DiagnosticDescriptors.DuplicateMapping,
+                primaryLocation,
+                additionalLocations,
+                groupKey,
+                hostFqn,
+                sourcesFormatted));
+        }
+    }
+
+    // FN0026: mirrors FilterSchema.LiftInto, which throws for a dotless Only/Except entry the nested
+    // filter does not expose. A dotted entry names a path a further [MapNested] contributes, and a
+    // bounded nesting legitimately drops those, so only dotless entries can be checked.
+    private static void ReportUnknownPathFilters(
+        NestedMappingModel nested,
+        FilterClassModel target,
+        List<DiagnosticInfo> diagnostics)
+    {
+        var mappedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var mapping in target.Properties)
+        {
+            if (mapping.SourceFilterClassFqn is null) mappedPaths.Add(mapping.PropertyName);
+        }
+        foreach (var propertyOverride in target.Overrides)
+        {
+            if (propertyOverride.BuilderTypeFqn is not null) mappedPaths.Add(propertyOverride.PropertyName);
+        }
+
+        ReportUnknownEntries(nested.Only, "Only");
+        ReportUnknownEntries(nested.Except, "Except");
+
+        void ReportUnknownEntries(EquatableList<string> entries, string optionName)
+        {
+            foreach (var entry in entries)
+            {
+                if (entry.IndexOf('.') >= 0 || mappedPaths.Contains(entry)) continue;
+                diagnostics.Add(DiagnosticInfo.From(
+                    DiagnosticDescriptors.NestedPathFilterUnknown,
+                    nested.AttributeLocation,
+                    nested.NavigationPropertyName,
+                    optionName,
+                    entry,
+                    ClassFqnOf(target)));
+            }
+        }
     }
 
     // A nested filter's [PropertyMap] rules are lifted at runtime but never spliced into the merged
@@ -160,62 +281,36 @@ internal static class NestedFilterResolver
     private static string ClassFqnOf(FilterClassModel model) =>
         string.IsNullOrEmpty(model.Namespace) ? model.ClassName : model.Namespace + "." + model.ClassName;
 
-    private static string WireKeyOf(PropertyMappingModel mapping)
-        => string.IsNullOrEmpty(mapping.Alias) ? mapping.PropertyName : mapping.Alias!;
-
-    private static string FormatSource(PropertyMappingModel mapping)
-    {
-        if (mapping.SourceFilterClassFqn is null)
-        {
-            return $"[Map] {mapping.DeclarationName}";
-        }
-        var sourceShortName = mapping.SourceFilterClassFqn.Substring(
-            mapping.SourceFilterClassFqn.LastIndexOf('.') + 1);
-        return $"[MapNested] {mapping.DeclarationName} (from {sourceShortName})";
-    }
-
     private static FilterClassModel? ResolveTargetForNested(
         NestedMappingModel nested,
-        INamedTypeSymbol? hostEntitySymbol,
-        Compilation compilation,
+        string declaringEntityFullName,
         ImmutableArray<FilterClassModelWithDiagnostics> allHostExtractionResults,
         List<DiagnosticInfo> diagnosticsSink)
     {
-        var navProperty = hostEntitySymbol?
-            .GetMembers(nested.NavigationPropertyName)
-            .OfType<IPropertySymbol>()
-            .FirstOrDefault();
-
-        if (navProperty is null || IsPrimitiveOrValueType(navProperty.Type))
+        if (nested.NavigationKind is NestedNavigationKind.Missing or NestedNavigationKind.PrimitiveOrValue)
         {
-            // navProperty may be null entirely (name typo) — primary site is the only location;
-            // when the property is found-but-primitive we surface its declaration as additional.
-            var navAdditionalLocations = navProperty is not null
-                ? CollectSymbolLocations(navProperty)
-                : Array.Empty<Location>();
+            // A missing navigation has no declaration to point at; a found-but-primitive one does.
             diagnosticsSink.Add(DiagnosticInfo.From(
                 DiagnosticDescriptors.NestedNavigationInvalid,
-                nested.AttributeLocation?.ToLocation() ?? Location.None,
-                navAdditionalLocations,
+                nested.AttributeLocation,
+                new[] { nested.NavigationLocation },
                 nested.NavigationPropertyName,
-                hostEntitySymbol?.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat).Replace("global::", string.Empty) ?? string.Empty));
+                declaringEntityFullName));
             return null;
         }
 
         // Collection navigations would need Any/All quantifier semantics — out of scope for v1.
-        if (IsCollectionType(navProperty.Type))
+        if (nested.NavigationKind == NestedNavigationKind.Collection)
         {
             diagnosticsSink.Add(DiagnosticInfo.From(
                 DiagnosticDescriptors.NestedCollectionUnsupported,
-                nested.AttributeLocation?.ToLocation() ?? Location.None,
-                CollectSymbolLocations(navProperty),
+                nested.AttributeLocation,
+                new[] { nested.NavigationLocation },
                 nested.NavigationPropertyName));
             return null;
         }
 
-        var navTypeFqn = navProperty.Type
-            .ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)
-            .Replace("global::", string.Empty);
+        var navTypeFqn = nested.NavigationTypeFullName ?? string.Empty;
         var candidates = new List<FilterClassModel>();
         foreach (var candidateExtractionResult in allHostExtractionResults)
         {
@@ -228,25 +323,20 @@ internal static class NestedFilterResolver
         {
             foreach (var candidate in candidates)
             {
-                var candidateFqn = string.IsNullOrEmpty(candidate.Namespace)
-                    ? candidate.ClassName
-                    : candidate.Namespace + "." + candidate.ClassName;
-                if (string.Equals(candidateFqn, nested.ExplicitFilterClassFqn, StringComparison.Ordinal))
+                if (string.Equals(ClassFqnOf(candidate), nested.ExplicitFilterClassFqn, StringComparison.Ordinal))
                 {
                     return candidate;
                 }
             }
-            // Surface the explicit T type's declaration when it lives in this compilation; cross-
-            // assembly references typically have no syntax-tree location and contribute nothing.
-            var explicitSymbol = compilation.GetTypeByMetadataName(nested.ExplicitFilterClassFqn);
-            var explicitAdditionalLocations = explicitSymbol is not null
-                ? CollectSymbolLocations(explicitSymbol)
-                : Array.Empty<Location>();
+            // Surface the explicit T type's declaration when it lives in this compilation; a type
+            // from a referenced assembly has no syntax-tree location and contributes nothing.
             diagnosticsSink.Add(DiagnosticInfo.From(
-                DiagnosticDescriptors.NestedCrossAssembly,
-                nested.AttributeLocation?.ToLocation() ?? Location.None,
-                explicitAdditionalLocations,
-                nested.ExplicitFilterClassFqn));
+                DiagnosticDescriptors.NestedFilterClassUnusable,
+                nested.AttributeLocation,
+                new[] { nested.ExplicitFilterClassLocation },
+                nested.ExplicitFilterClassFqn,
+                nested.NavigationPropertyName,
+                navTypeFqn));
             return null;
         }
 
@@ -254,44 +344,29 @@ internal static class NestedFilterResolver
         {
             diagnosticsSink.Add(DiagnosticInfo.From(
                 DiagnosticDescriptors.NestedTargetNotFound,
-                nested.AttributeLocation?.ToLocation() ?? Location.None,
-                CollectSymbolLocations(navProperty),
+                nested.AttributeLocation,
+                new[] { nested.NavigationLocation },
                 nested.NavigationPropertyName,
                 navTypeFqn));
             return null;
         }
         if (candidates.Count > 1)
         {
-            var candidateLocations = new List<Location>(candidates.Count);
+            var candidateLocations = new List<LocationInfo?>(candidates.Count);
             foreach (var candidate in candidates)
             {
-                var candidateLocation = candidate.Location?.ToLocation();
-                if (candidateLocation is not null)
-                {
-                    candidateLocations.Add(candidateLocation);
-                }
+                candidateLocations.Add(candidate.Location);
             }
             diagnosticsSink.Add(DiagnosticInfo.From(
                 DiagnosticDescriptors.NestedAmbiguous,
-                nested.AttributeLocation?.ToLocation() ?? Location.None,
-                candidateLocations.ToArray(),
+                nested.AttributeLocation,
+                candidateLocations,
                 nested.NavigationPropertyName,
                 candidates.Count.ToString(CultureInfo.InvariantCulture),
                 navTypeFqn));
             return null;
         }
         return candidates[0];
-    }
-
-    private static Location[] CollectSymbolLocations(ISymbol symbol)
-    {
-        var collected = new List<Location>(symbol.Locations.Length);
-        foreach (var symbolLocation in symbol.Locations)
-        {
-            if (symbolLocation is null || symbolLocation == Location.None) continue;
-            collected.Add(symbolLocation);
-        }
-        return collected.ToArray();
     }
 
     // accumulatedClrPath threads verbatim navigation names so emitted lambdas hit real entity members;
@@ -304,11 +379,11 @@ internal static class NestedFilterResolver
         string accumulatedClrPath,
         string accumulatedAliasPath,
         ImmutableArray<FilterClassModelWithDiagnostics> allHostExtractionResults,
-        Compilation compilation,
         List<DiagnosticInfo> diagnosticsSink,
         List<NestingPathStep> nestingPath,
-        Stack<Location?> nestedSiteStack,
+        Stack<LocationInfo?> nestedSiteStack,
         TypedValueTracker typedValueTracker,
+        List<MappingSource> mappingSources,
         CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
@@ -337,20 +412,20 @@ internal static class NestedFilterResolver
             var cyclePath = string.Join(" -> ", nestingPath.Select(step => step.ClassFqn).Append(targetClassFqn));
             // The currently-being-visited [MapNested] is the primary squiggle; every previously-
             // pushed site on the DFS path becomes additional, in declaration order.
-            var pathLocations = new List<Location>();
+            var pathLocations = new List<LocationInfo?>();
             foreach (var stackedLocation in nestedSiteStack.Reverse())
             {
                 if (stackedLocation is not null) pathLocations.Add(stackedLocation);
             }
             diagnosticsSink.Add(DiagnosticInfo.From(
                 DiagnosticDescriptors.NestedCycle,
-                originalNested.AttributeLocation?.ToLocation() ?? Location.None,
-                pathLocations.ToArray(),
+                originalNested.AttributeLocation,
+                pathLocations,
                 cyclePath));
             return output;
         }
         nestingPath.Add(new NestingPathStep(targetClassFqn, nestingKey, isBoundedNesting));
-        nestedSiteStack.Push(originalNested.AttributeLocation?.ToLocation());
+        nestedSiteStack.Push(originalNested.AttributeLocation);
 
         try
         {
@@ -371,13 +446,41 @@ internal static class NestedFilterResolver
                     SourceFilterClassFqn = targetClassFqn,
                     DeclarationName = originalNested.NavigationPropertyName,
                 });
+                mappingSources.Add(new MappingSource(
+                    MappingSourceKind.Spliced,
+                    splicedPropertyName,
+                    splicedAlias,
+                    $"[MapNested] {originalNested.NavigationPropertyName} (from {ShortNameOf(targetClassFqn)})",
+                    originalNested.AttributeLocation));
             }
 
-            var targetEntitySymbol = compilation.GetTypeByMetadataName(target.FullEntityTypeName);
+            // The target's [PropertyMap] rules are lifted at runtime under the same prefix, so they
+            // claim filter paths on the host even though they never join the merged property list.
+            foreach (var propertyOverride in target.Overrides)
+            {
+                if (propertyOverride.BuilderTypeFqn is null) continue;
+                if (!IsPathAllowed(propertyOverride.PropertyName, originalNested.Only, originalNested.Except)) continue;
+                mappingSources.Add(new MappingSource(
+                    MappingSourceKind.Spliced,
+                    accumulatedClrPath + "." + propertyOverride.PropertyName,
+                    accumulatedAliasPath + "." + propertyOverride.PropertyName,
+                    $"[PropertyMap] {propertyOverride.PropertyName} (from {ShortNameOf(targetClassFqn)})",
+                    originalNested.AttributeLocation));
+            }
+
             foreach (var transitive in target.NestedMappings)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                var transitiveTarget = ResolveTargetForNested(transitive, targetEntitySymbol, compilation, allHostExtractionResults, diagnosticsSink);
+                if (transitive.MaxDepth < 0 || transitive.MaxDepth > MaxSupportedNestingDepth) continue;
+
+                // A broken [MapNested] on the target is reported by the target's own resolution pass;
+                // re-reporting it here would repeat it once per host that reaches this class.
+                var transitiveDiagnostics = new List<DiagnosticInfo>();
+                var transitiveTarget = ResolveTargetForNested(
+                    transitive,
+                    target.FullEntityTypeName,
+                    allHostExtractionResults,
+                    transitiveDiagnostics);
                 if (transitiveTarget is null) continue;
 
                 output.AddRange(SpliceMappings(
@@ -386,11 +489,11 @@ internal static class NestedFilterResolver
                     accumulatedClrPath: accumulatedClrPath + "." + transitive.NavigationPropertyName,
                     accumulatedAliasPath: accumulatedAliasPath + "." + transitive.Prefix,
                     allHostExtractionResults,
-                    compilation,
                     diagnosticsSink,
                     nestingPath,
                     nestedSiteStack,
                     typedValueTracker,
+                    mappingSources,
                     cancellationToken));
             }
         }
@@ -403,6 +506,9 @@ internal static class NestedFilterResolver
 
         return output;
     }
+
+    private static string ShortNameOf(string classFqn) =>
+        classFqn.Substring(classFqn.LastIndexOf('.') + 1);
 
     private static bool IsPathAllowed(string relativePath, EquatableList<string> only, EquatableList<string> except)
     {
@@ -424,32 +530,5 @@ internal static class NestedFilterResolver
             if (string.Equals(blocked, relativePath, StringComparison.OrdinalIgnoreCase)) return false;
         }
         return true;
-    }
-
-    // Leaf types (string, primitives, structs like DateTime/Guid) belong to [Map]/[PropertyMap], not [MapNested].
-    private static bool IsPrimitiveOrValueType(ITypeSymbol type)
-    {
-        if (type.SpecialType != SpecialType.None) return true;
-        if (type.IsValueType) return true;
-        if (type.ContainingNamespace?.ToDisplayString() == "System") return true;
-        return false;
-    }
-
-    // System.String implements IEnumerable<char> but is a leaf, not a collection nav.
-    private static bool IsCollectionType(ITypeSymbol type)
-    {
-        if (type is IArrayTypeSymbol) return true;
-        if (type is INamedTypeSymbol named)
-        {
-            if (named.SpecialType == SpecialType.System_String) return false;
-            foreach (var implementedInterface in named.AllInterfaces)
-            {
-                if (implementedInterface.OriginalDefinition.SpecialType == SpecialType.System_Collections_Generic_IEnumerable_T)
-                {
-                    return true;
-                }
-            }
-        }
-        return false;
     }
 }

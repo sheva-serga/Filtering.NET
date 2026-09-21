@@ -1,17 +1,15 @@
-using Microsoft.CodeAnalysis;
-
 namespace Filtering.Net.Generator;
 
 internal static class EnumProfileEmitter
 {
     public const string GeneratedNamespace = "Filtering.Net.Generated";
 
-    public static string Emit(INamedTypeSymbol enumSymbol) =>
-        ScribanRuntime.Render("EnumProfile", BuildView(enumSymbol));
+    public static string Emit(EnumProfileDescriptor descriptor) =>
+        ScribanRuntime.Render("EnumProfile", BuildView(descriptor));
 
-    internal static EnumProfileView BuildView(INamedTypeSymbol enumSymbol) =>
+    internal static EnumProfileView BuildView(EnumProfileDescriptor descriptor) =>
         new(
             GeneratedNamespace: GeneratedNamespace,
-            EnumFullName: "global::" + enumSymbol.ToDisplayString(),
-            ClassName: enumSymbol.Name + "Filter");
+            EnumFullName: "global::" + descriptor.EnumFullName,
+            ClassName: descriptor.ClassName);
 }

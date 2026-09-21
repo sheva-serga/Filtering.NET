@@ -40,21 +40,6 @@ internal static class DiagnosticTestHelpers
         observedIds.Should().NotContain(diagnosticId, because: $"clean source should not produce diagnostic {diagnosticId}");
     }
 
-    public static void AssertNoDiagnostics(string sourceCode, bool excludeEntityFrameworkCore = false)
-    {
-        // Arrange
-        var runResult = GeneratorRunner.RunDriver(
-            sourceCode,
-            excludeDiAbstractions: false,
-            excludeEntityFrameworkCore: excludeEntityFrameworkCore).GetRunResult();
-
-        // Act
-        var observed = runResult.Diagnostics;
-
-        // Assert
-        observed.Should().BeEmpty();
-    }
-
     /// <summary>
     /// Returns the full set of diagnostics produced by running the generator against
     /// <paramref name="sourceCode"/>. Prefer <see cref="AssertDiagnostic"/> /

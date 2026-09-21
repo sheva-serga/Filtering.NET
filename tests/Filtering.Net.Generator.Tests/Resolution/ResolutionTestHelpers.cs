@@ -6,7 +6,6 @@ internal static class ResolutionTestHelpers
 {
     public static NestedFilterResolver.ResolvedHost Resolve(string sourceCode, string hostFilterClassName)
     {
-        var compilation = GeneratorRunner.BuildCompilation(sourceCode);
         var allExtractionResults = GeneratorRunner.ExtractFilterClassResults(sourceCode).ToImmutableArray();
         var hostExtractionResult = allExtractionResults
             .First(extractionResult =>
@@ -15,7 +14,6 @@ internal static class ResolutionTestHelpers
         return NestedFilterResolver.Resolve(
             hostExtractionResult,
             allExtractionResults,
-            compilation,
             CancellationToken.None);
     }
 }

@@ -30,13 +30,16 @@ public class AotCleanCompileTests
         var outputLines = new System.Collections.Concurrent.ConcurrentQueue<string>();
         var errorLines = new System.Collections.Concurrent.ConcurrentQueue<string>();
 
-        var startInfo = new ProcessStartInfo("dotnet", "build -c Release --nologo")
+        // Reusable MSBuild nodes and build servers outlive the build while holding the redirected
+        // pipes open, which would block the drain-after-exit WaitForExit below forever.
+        var startInfo = new ProcessStartInfo("dotnet", "build -c Release --nologo --disable-build-servers -nodeReuse:false")
         {
             WorkingDirectory = fixtureDirectory,
             RedirectStandardOutput = true,
             RedirectStandardError = true,
             UseShellExecute = false,
         };
+        startInfo.Environment["MSBUILDDISABLENODEREUSE"] = "1";
 
         using var buildProcess = Process.Start(startInfo)!;
         buildProcess.OutputDataReceived += (_, eventArgs) =>

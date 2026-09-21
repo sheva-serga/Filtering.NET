@@ -4,11 +4,8 @@ internal static class DiExtensionEmitter
 {
     public const string DiAbstractionsAssemblyName = "Microsoft.Extensions.DependencyInjection.Abstractions";
 
-    public static string Emit(IReadOnlyList<FilterClassModel> models, string consumerAssemblyName)
-    {
-        _ = consumerAssemblyName;
-        return ScribanRuntime.Render("DiExtension", BuildView(models));
-    }
+    public static string Emit(IReadOnlyList<FilterClassModel> models) =>
+        ScribanRuntime.Render("DiExtension", BuildView(models));
 
     internal static DiExtensionView BuildView(IReadOnlyList<FilterClassModel> models)
     {

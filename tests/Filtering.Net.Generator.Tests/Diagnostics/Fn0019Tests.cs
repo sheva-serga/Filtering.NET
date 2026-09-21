@@ -7,17 +7,18 @@ namespace Filtering.Net.Generator.Tests.Diagnostics;
 public class Fn0019Tests
 {
     [Fact]
-    public void NavigationDoesNotExistOnHostEntity_FiresFN0019()
+    public void NavigationIsCollection_FiresFN0019()
     {
         // Arrange
         var source = """
+            using System.Collections.Generic;
             using Filtering.Net;
             namespace TestNs;
-            public class Department { public string Name { get; set; } = ""; }
-            public class User { public string Email { get; set; } = ""; }
-            [GenerateFilter<Department>] public partial class DepartmentFilter { }
+            public class Post { public string Title { get; set; } = ""; }
+            public class User { public List<Post> Posts { get; set; } = new(); }
+            [GenerateFilter<Post>] public partial class PostFilter { }
             [GenerateFilter<User>]
-            [MapNested("Department")]
+            [MapNested(nameof(User.Posts))]
             public partial class UserFilter
             {
             }
@@ -31,7 +32,35 @@ public class Fn0019Tests
     }
 
     [Fact]
-    public void ValidReferenceNavigation_DoesNotFireFN0019()
+    public void NavigationDeclaredAsIEnumerable_FiresFN0019()
+    {
+        // Arrange — IEnumerable<T>'s own AllInterfaces only carries the non-generic IEnumerable,
+        // so the interface walk alone would classify this as an unresolvable reference navigation.
+        var source = """
+            using System.Collections.Generic;
+            using Filtering.Net;
+            namespace TestNs;
+            public class Post { public string Title { get; set; } = ""; }
+            public class User { public IEnumerable<Post> Posts { get; set; } = new List<Post>(); }
+            [GenerateFilter<Post>] public partial class PostFilter { }
+            [GenerateFilter<User>]
+            [MapNested(nameof(User.Posts))]
+            public partial class UserFilter
+            {
+            }
+            """;
+
+        // Act
+        var result = ResolutionTestHelpers.Resolve(source, "UserFilter");
+
+        // Assert
+        var observedIds = result.Diagnostics.Select(diagnostic => diagnostic.Id).ToList();
+        observedIds.Should().Contain("FN0019");
+        observedIds.Should().NotContain("FN0017");
+    }
+
+    [Fact]
+    public void SingleReferenceNavigation_DoesNotFireFN0019()
     {
         // Arrange
         var source = """
@@ -55,16 +84,18 @@ public class Fn0019Tests
     }
 
     [Fact]
-    public void NestedNavigationInvalid_PrimitiveNav_ReportsNavigationPropertyAsAdditionalLocation()
+    public void NestedCollectionUnsupported_ReportsCollectionNavigationAsAdditionalLocation()
     {
-        // Arrange — Email is a primitive (string) so the navigation exists but isn't a reference type;
-        // the property declaration is the lone additional location.
+        // Arrange
         var source = """
+            using System.Collections.Generic;
             using Filtering.Net;
             namespace TestNs;
-            public class User { public string Email { get; set; } = ""; }
+            public class Post { public string Title { get; set; } = ""; }
+            public class User { public List<Post> Posts { get; set; } = new(); }
+            [GenerateFilter<Post>] public partial class PostFilter { }
             [GenerateFilter<User>]
-            [MapNested(nameof(User.Email))]
+            [MapNested(nameof(User.Posts))]
             public partial class UserFilter
             {
             }

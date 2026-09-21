@@ -135,6 +135,72 @@ public class EndToEndRuntimeTests
     }
 
     [Fact]
+    public void ApplySorting_TwoSortItems_OrdersByTheFirstKeyThenTheSecond()
+    {
+        // Arrange — two users share a name, so the second sort key is the only thing that can order
+        // them, and the two directions disagree so a single OrderBy cannot produce this sequence.
+        var assembly = RuntimeLoader.LoadGeneratedAssembly(ConsumerSource);
+        var userFilterType = assembly.GetType("Sample.UserFilter")!;
+        var userType = assembly.GetType("Sample.User")!;
+        var instance = Activator.CreateInstance(userFilterType)!;
+        var query = BuildQueryable(userType,
+        [
+            CreateUser(userType, "Bea", 30),
+            CreateUser(userType, "Ada", 25),
+            CreateUser(userType, "Ada", 40),
+        ]);
+        var sortItems = new List<SortItem> { new("Name", SortDir.Asc), new("Age", SortDir.Desc) };
+        var applySortingMethod = userFilterType.GetMethods().First(m => m.Name == "ApplySorting" && m.GetParameters().Length == 4);
+        var ageProperty = userType.GetProperty("Age")!;
+
+        // Act
+        var sortedQuery = applySortingMethod.Invoke(instance, [query, sortItems, (int?)null, (int?)null])!;
+        var orderedAges = ((System.Collections.IEnumerable)sortedQuery).Cast<object>()
+            .Select(user => (int)ageProperty.GetValue(user)!).ToList();
+
+        // Assert
+        orderedAges.Should().Equal(40, 25, 30);
+    }
+
+    [Fact]
+    public void ApplySorting_PageWithoutPageSize_TakesTheDefaultPageSize()
+    {
+        // Arrange
+        var assembly = RuntimeLoader.LoadGeneratedAssembly(PageSettingsSource);
+        var userFilterType = assembly.GetType("Sample.UserFilter")!;
+        var userType = assembly.GetType("Sample.User")!;
+        var instance = Activator.CreateInstance(userFilterType)!;
+        var query = BuildQueryable(userType, [.. Enumerable.Range(1, 30).Select(age => CreateUser(userType, $"User{age:00}", age))]);
+        var sortItems = new List<SortItem> { new("Name", SortDir.Asc) };
+        var applySortingMethod = userFilterType.GetMethods().First(m => m.Name == "ApplySorting" && m.GetParameters().Length == 4);
+
+        // Act
+        var pagedQuery = applySortingMethod.Invoke(instance, [query, sortItems, (int?)1, (int?)null])!;
+        var pageRowCount = ((System.Collections.IEnumerable)pagedQuery).Cast<object>().Count();
+
+        // Assert — [PageSettings(DefaultPageSize = 25)], not the built-in fallback of 50.
+        pageRowCount.Should().Be(25);
+    }
+
+    [Fact]
+    public void ValidatePage_SizeAboveTheDeclaredMaximum_ReportsPageSizeTooLarge()
+    {
+        // Arrange
+        var assembly = RuntimeLoader.LoadGeneratedAssembly(PageSettingsSource);
+        var userFilterType = assembly.GetType("Sample.UserFilter")!;
+        var instance = Activator.CreateInstance(userFilterType)!;
+        var validateMethod = userFilterType.GetMethods().First(m => m.Name == "Validate" && m.GetParameters().Length == 2);
+
+        // Act
+        var withinDeclaredMaximum = (FilterValidationResult)validateMethod.Invoke(instance, [1, 100])!;
+        var aboveDeclaredMaximum = (FilterValidationResult)validateMethod.Invoke(instance, [1, 150])!;
+
+        // Assert — [PageSettings(MaxPageSize = 100)]; the built-in fallback of 200 would accept 150.
+        withinDeclaredMaximum.IsValid.Should().BeTrue();
+        aboveDeclaredMaximum.Errors.Should().ContainSingle(error => error.Code == FilterValidationCode.PageSizeTooLarge);
+    }
+
+    [Fact]
     public void ApplyFilter_ProducesExpectedResults()
     {
         // Arrange
@@ -177,6 +243,21 @@ public class EndToEndRuntimeTests
         var resultNames = materialisedResults.Select(u => (string)nameProperty.GetValue(u)!).ToList();
         resultNames.Should().BeEquivalentTo(["Alice", "Charlie"]);
     }
+
+    // [PageSettings] values that differ from the generator's fallbacks (50 / 200), so a dropped
+    // attribute shows up as behaviour rather than only as a snapshot diff.
+    private const string PageSettingsSource = """
+        using Filtering.Net;
+        namespace Sample;
+        public class User { public string Name { get; set; } = ""; public int Age { get; set; } }
+        [GenerateFilter<User>]
+        [PageSettings(MaxPageSize = 100, DefaultPageSize = 25)]
+        [Map(nameof(User.Name), Sortable = true)]
+        [Map(nameof(User.Age), Sortable = true)]
+        public partial class UserFilter
+        {
+        }
+        """;
 
     private const string InterceptorShapesSource = """
         using System.Linq;
@@ -306,6 +387,204 @@ public class EndToEndRuntimeTests
         // Assert
         resolverCtor.Should().NotBeNull("the IJsonTypeInfoResolver-accepting constructor must be emitted");
         actualOptions.TypeInfoResolver.Should().BeSameAs(suppliedResolver);
+    }
+
+    // A BasedOn profile that re-declares an inherited operator: the derived one wins, which the
+    // generated bridge expresses with FilterProfile<T>.ExtendWithOverrides.
+    private const string ShadowingProfileSource = """
+        using System;
+        using System.Linq.Expressions;
+        using Filtering.Net;
+        namespace Sample;
+        [FilterProfile<string>(BasedOn = typeof(StringFilter))]
+        public static class CaseInsensitiveStringFilter
+        {
+            [FilterOperator("contains")]
+            public static Expression<Func<string, string, bool>> Contains =>
+                (column, value) => column.ToLower().Contains(value.ToLower());
+        }
+        public class User { public string Name { get; set; } = ""; }
+        [GenerateFilter<User>]
+        [Map(nameof(User.Name), Profile = typeof(CaseInsensitiveStringFilter))]
+        public partial class UserFilter
+        {
+        }
+        """;
+
+    [Fact]
+    public void ApplyFilter_BasedOnProfileShadowingBaseOperator_UsesTheDerivedOperator()
+    {
+        // Arrange
+        var assembly = RuntimeLoader.LoadGeneratedAssembly(ShadowingProfileSource);
+        var userFilterType = assembly.GetType("Sample.UserFilter")!;
+        var userType = assembly.GetType("Sample.User")!;
+        var instance = Activator.CreateInstance(userFilterType)!;
+        var query = BuildQueryable(userType, [CreateNamedUser(userType, "Alice"), CreateNamedUser(userType, "Bob")]);
+        // The base StringFilter "contains" is case-sensitive, so a match on "ALIC" proves the
+        // derived operator replaced it rather than being rejected or ignored.
+        var leaf = new FilterLeaf("Name", "contains", JsonDocument.Parse("\"ALIC\"").RootElement);
+
+        // Act
+        var validationResult = (FilterValidationResult)userFilterType.GetMethods()
+            .First(m => m.Name == "Validate" && m.GetParameters().Length == 1
+                        && m.GetParameters()[0].ParameterType == typeof(FilterNode))
+            .Invoke(instance, [leaf])!;
+        var filteredQuery = userFilterType.GetMethod("ApplyFilter")!.Invoke(instance, [query, (object?)leaf])!;
+        var nameProperty = userType.GetProperty("Name")!;
+        var matchedNames = ((System.Collections.IEnumerable)filteredQuery).Cast<object>()
+            .Select(user => (string)nameProperty.GetValue(user)!).ToList();
+
+        // Assert
+        validationResult.IsValid.Should().BeTrue();
+        matchedNames.Should().Equal("Alice");
+    }
+
+    [Fact]
+    public void Schema_BasedOnProfileShadowingBaseOperator_ExposesEveryInheritedOperatorExactlyOnce()
+    {
+        // Arrange — the resolver advertises the merged operator set in AllowedOperators; the runtime
+        // profile must carry exactly the same names, each one only once.
+        var assembly = RuntimeLoader.LoadGeneratedAssembly(ShadowingProfileSource);
+        var userFilterType = assembly.GetType("Sample.UserFilter")!;
+        var instance = Activator.CreateInstance(userFilterType)!;
+        var resolvedModel = GeneratorRunner.ExtractFilterClassModels(ShadowingProfileSource).Single();
+
+        // Act
+        var schema = userFilterType.GetProperty("Schema")!.GetValue(instance)!;
+        var nameProperty = ((System.Collections.IEnumerable)schema.GetType().GetProperty("Properties")!.GetValue(schema)!)
+            .Cast<object>().Single();
+        var runtimeOperatorNames = ((System.Collections.IEnumerable)nameProperty.GetType()
+            .GetProperty("Operators")!.GetValue(nameProperty)!).Cast<string>().ToList();
+
+        // Assert
+        runtimeOperatorNames.Should().BeEquivalentTo(resolvedModel.Properties.Single().AllowedOperators);
+        runtimeOperatorNames.Should().OnlyHaveUniqueItems();
+    }
+
+    // Two enums that share a simple name across namespaces: the generated profile class name, the
+    // profile full name and the AddSource hint name all have to stay distinct.
+    private const string CollidingEnumNamesSource = """
+        using Filtering.Net;
+        namespace Sample.Billing
+        {
+            public enum Status { Draft, Paid }
+            public class Invoice { public Status Status { get; set; } }
+            [GenerateFilter<Invoice>]
+            [Map(nameof(Invoice.Status))]
+            public partial class InvoiceFilter { }
+        }
+        namespace Sample.Shipping
+        {
+            public enum Status { Packed, Sent }
+            public class Parcel { public Status Status { get; set; } }
+            [GenerateFilter<Parcel>]
+            [Map(nameof(Parcel.Status))]
+            public partial class ParcelFilter { }
+        }
+        """;
+
+    [Fact]
+    public void ApplyFilter_TwoSameNamedEnumsInDifferentNamespaces_FilterOnTheirOwnProfiles()
+    {
+        // Arrange
+        var assembly = RuntimeLoader.LoadGeneratedAssembly(CollidingEnumNamesSource);
+        var invoiceFilterType = assembly.GetType("Sample.Billing.InvoiceFilter")!;
+        var invoiceType = assembly.GetType("Sample.Billing.Invoice")!;
+        var invoiceStatusType = assembly.GetType("Sample.Billing.Status")!;
+        var paidInvoice = Activator.CreateInstance(invoiceType)!;
+        invoiceType.GetProperty("Status")!.SetValue(paidInvoice, Enum.Parse(invoiceStatusType, "Paid"));
+        var draftInvoice = Activator.CreateInstance(invoiceType)!;
+        invoiceType.GetProperty("Status")!.SetValue(draftInvoice, Enum.Parse(invoiceStatusType, "Draft"));
+        var query = BuildQueryable(invoiceType, [paidInvoice, draftInvoice]);
+        var leaf = new FilterLeaf("Status", "eq", JsonDocument.Parse("\"Paid\"").RootElement);
+        var instance = Activator.CreateInstance(invoiceFilterType)!;
+
+        // Act
+        var validationResult = (FilterValidationResult)invoiceFilterType.GetMethods()
+            .First(m => m.Name == "Validate" && m.GetParameters().Length == 1
+                        && m.GetParameters()[0].ParameterType == typeof(FilterNode))
+            .Invoke(instance, [leaf])!;
+        var filteredQuery = invoiceFilterType.GetMethod("ApplyFilter")!.Invoke(instance, [query, (object?)leaf])!;
+        var matched = ((System.Collections.IEnumerable)filteredQuery).Cast<object>().ToList();
+
+        // Assert
+        assembly.GetType("Sample.Shipping.ParcelFilter").Should().NotBeNull(
+            because: "a hint-name collision between the two enum profiles would have failed the whole generator run");
+        validationResult.IsValid.Should().BeTrue();
+        matched.Should().ContainSingle().Which.Should().BeSameAs(paidInvoice);
+    }
+
+    // A typed-value operator whose value type is a record: malformed JSON for it must accumulate as
+    // a validation error, never throw out of Validate.
+    private const string RegexOperatorSource = """
+        using System;
+        using System.Linq.Expressions;
+        using Filtering.Net;
+
+        namespace Sample;
+
+        public sealed record RegexFilterValue(string Pattern);
+
+        [FilterProfile<string>(BasedOn = typeof(StringFilter))]
+        public static class StringWithRegexProfile
+        {
+            [FilterOperator("regex")]
+            public static Expression<Func<string, RegexFilterValue, bool>> Regex =>
+                (column, value) => System.Text.RegularExpressions.Regex.IsMatch(column, value.Pattern);
+        }
+
+        public sealed class User { public string Email { get; set; } = string.Empty; }
+
+        [GenerateFilter<User>]
+        [Map(nameof(User.Email), Profile = typeof(StringWithRegexProfile), Only = new[] { "regex" })]
+        public partial class UserFilter
+        {
+        }
+        """;
+
+    [Fact]
+    public void ValidateRequest_TypedValuePropertyWithMalformedValue_ReportsTypeErrorWithoutThrowing()
+    {
+        // Arrange
+        var assembly = RuntimeLoader.LoadGeneratedAssembly(RegexOperatorSource);
+        var filterType = assembly.GetType("Sample.UserFilter")!;
+        var resolverCtor = filterType.GetConstructor([typeof(System.Text.Json.Serialization.Metadata.IJsonTypeInfoResolver)])!;
+        var filterInstance = resolverCtor.Invoke([new System.Text.Json.Serialization.Metadata.DefaultJsonTypeInfoResolver()]);
+        // A JSON number where a RegexFilterValue object is expected — malformed for the custom type.
+        var request = new FilterRequest
+        {
+            Where = new FilterLeaf("Email", "regex", JsonDocument.Parse("42").RootElement),
+        };
+        var validateMethod = filterType.GetMethods()
+            .First(m => m.Name == "Validate"
+                        && m.GetParameters().Length == 1
+                        && m.GetParameters()[0].ParameterType == typeof(FilterRequest));
+
+        // Act
+        var validationResult = (FilterValidationResult)validateMethod.Invoke(filterInstance, [request])!;
+
+        // Assert
+        validationResult.IsValid.Should().BeFalse();
+        validationResult.Errors.Should().Contain(e => e.Code == FilterValidationCode.InvalidValueType);
+    }
+
+    private static object BuildQueryable(Type elementType, IReadOnlyList<object> elements)
+    {
+        var listType = typeof(List<>).MakeGenericType(elementType);
+        var typedList = Activator.CreateInstance(listType)!;
+        var addMethod = listType.GetMethod("Add")!;
+        foreach (var element in elements) addMethod.Invoke(typedList, [element]);
+        return typeof(Queryable).GetMethods()
+            .First(m => m.Name == "AsQueryable" && m.IsGenericMethod)
+            .MakeGenericMethod(elementType)
+            .Invoke(null, [typedList])!;
+    }
+
+    private static object CreateNamedUser(Type userType, string name)
+    {
+        var user = Activator.CreateInstance(userType)!;
+        userType.GetProperty("Name")!.SetValue(user, name);
+        return user;
     }
 
     private static object CreateUser(Type userType, string name, int age)

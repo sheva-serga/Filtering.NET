@@ -1,3 +1,5 @@
+using System.Collections.Immutable;
+
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 
@@ -85,27 +87,58 @@ internal static class GeneratorRunner
     internal static CSharpCompilation BuildCompilation(
         string sourceCode,
         bool excludeDiAbstractions = true,
+        bool excludeEntityFrameworkCore = false) =>
+        BuildCompilation([sourceCode], excludeDiAbstractions, excludeEntityFrameworkCore);
+
+    internal static CSharpCompilation BuildCompilation(
+        IReadOnlyList<string> sourceFiles,
+        bool excludeDiAbstractions = true,
         bool excludeEntityFrameworkCore = false)
     {
-        var syntaxTree = CSharpSyntaxTree.ParseText(sourceCode);
-        var references = ResolveReferences(excludeDiAbstractions, excludeEntityFrameworkCore);
-        references.Add(MetadataReference.CreateFromFile(typeof(GenerateFilterAttribute<>).Assembly.Location));
+        var syntaxTrees = sourceFiles.Select(sourceFile => CSharpSyntaxTree.ParseText(sourceFile)).ToArray();
 
         return CSharpCompilation.Create(
             assemblyName: "TestAssembly",
-            syntaxTrees: [syntaxTree],
-            references: references,
+            syntaxTrees: syntaxTrees,
+            references: ResolveReferences(excludeDiAbstractions, excludeEntityFrameworkCore),
             options: new CSharpCompilationOptions(
                 OutputKind.DynamicallyLinkedLibrary,
                 nullableContextOptions: NullableContextOptions.Enable));
     }
 
-    private static List<MetadataReference> ResolveReferences(
+    // Every test method builds at least one compilation, and re-reading the whole trusted-platform
+    // list from disk each time also denies Roslyn any metadata reuse across them, because each
+    // PortableExecutableReference carries its own AssemblyMetadata. Three flag combinations are used,
+    // so one cached array per combination covers the suite.
+    private static readonly Lazy<ImmutableArray<MetadataReference>> AllReferences =
+        new(() => BuildReferenceSet(excludeDiAbstractions: false, excludeEntityFrameworkCore: false));
+
+    private static readonly Lazy<ImmutableArray<MetadataReference>> ReferencesWithoutDiAbstractions =
+        new(() => BuildReferenceSet(excludeDiAbstractions: true, excludeEntityFrameworkCore: false));
+
+    private static readonly Lazy<ImmutableArray<MetadataReference>> ReferencesWithoutDiAbstractionsAndEntityFrameworkCore =
+        new(() => BuildReferenceSet(excludeDiAbstractions: true, excludeEntityFrameworkCore: true));
+
+    private static readonly Lazy<ImmutableArray<MetadataReference>> ReferencesWithoutEntityFrameworkCore =
+        new(() => BuildReferenceSet(excludeDiAbstractions: false, excludeEntityFrameworkCore: true));
+
+    private static ImmutableArray<MetadataReference> ResolveReferences(
+        bool excludeDiAbstractions,
+        bool excludeEntityFrameworkCore) =>
+        (excludeDiAbstractions, excludeEntityFrameworkCore) switch
+        {
+            (false, false) => AllReferences.Value,
+            (true, false) => ReferencesWithoutDiAbstractions.Value,
+            (true, true) => ReferencesWithoutDiAbstractionsAndEntityFrameworkCore.Value,
+            (false, true) => ReferencesWithoutEntityFrameworkCore.Value,
+        };
+
+    private static ImmutableArray<MetadataReference> BuildReferenceSet(
         bool excludeDiAbstractions,
         bool excludeEntityFrameworkCore)
     {
         var trustedAssembliesString = AppContext.GetData("TRUSTED_PLATFORM_ASSEMBLIES") as string ?? string.Empty;
-        var references = new List<MetadataReference>();
+        var references = ImmutableArray.CreateBuilder<MetadataReference>();
         foreach (var assemblyPath in trustedAssembliesString.Split(Path.PathSeparator))
         {
             if (string.IsNullOrWhiteSpace(assemblyPath)) continue;
@@ -113,7 +146,8 @@ internal static class GeneratorRunner
             if (excludeEntityFrameworkCore && IsEntityFrameworkCoreAssembly(assemblyPath)) continue;
             references.Add(MetadataReference.CreateFromFile(assemblyPath));
         }
-        return references;
+        references.Add(MetadataReference.CreateFromFile(typeof(GenerateFilterAttribute<>).Assembly.Location));
+        return references.ToImmutable();
     }
 
     private static bool IsDiAbstractionsAssembly(string assemblyPath) =>

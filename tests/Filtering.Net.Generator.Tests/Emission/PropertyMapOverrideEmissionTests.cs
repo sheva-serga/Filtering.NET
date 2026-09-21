@@ -6,9 +6,11 @@ using AwesomeAssertions;
 
 namespace Filtering.Net.Generator.Tests.Emission;
 
-/// <summary>Snapshot + compile tests for [PropertyMap] override emission. Verifies
-/// the generator parses the user's <c>builder.For(...).Operator(...).Operator(...)</c> chain
-/// and inlines each predicate into typed leaf methods.</summary>
+/// <summary>Snapshot + compile tests for <c>[PropertyMap]</c> override emission. The generator does
+/// not parse the consumer's <c>builder.For(...).Operator(...)</c> chain: it emits one
+/// <c>FilterProperty.MapRule</c> schema entry that calls the consumer's builder method once at
+/// construction, and the rule's predicates run as written. The <c>.Operator(...)</c> calls are read
+/// only to learn operator names and value types (typed-value detection and FN1008).</summary>
 public class PropertyMapOverrideEmissionTests
 {
     private const string TagsConsumerSource = """
@@ -34,7 +36,7 @@ public class PropertyMapOverrideEmissionTests
         """;
 
     [Fact]
-    public async Task TagsCollection_EmitsTypedLeavesForEachOperator()
+    public async Task TagsCollection_EmitsMapRuleSchemaEntry()
     {
         // Arrange
         var driver = GeneratorRunner.RunDriver(TagsConsumerSource);
@@ -93,6 +95,106 @@ public class PropertyMapOverrideEmissionTests
         // Assert
         results.Should().HaveCount(1);
         trackingResolver.RequestedTypes.Should().Contain(requestedType => requestedType == typeof(string));
+    }
+
+    private const string StatementBodiedOverrideSource = """
+        using Filtering.Net;
+        namespace Sample;
+
+        public sealed class NameQuery { public string Term { get; set; } = ""; }
+
+        public sealed class User { public string FirstName { get; set; } = ""; public string LastName { get; set; } = ""; }
+
+        [GenerateFilter<User>]
+        public partial class UserFilter
+        {
+            [PropertyMap("FullName")]
+            public static FilterRule<User, string> MapFullName(FilterRuleBuilder<User, string> builder)
+            {
+                var rule = builder.For(user => user.FirstName + " " + user.LastName);
+                rule.Operator<NameQuery>("matches", (string column, NameQuery value) => column.Contains(value.Term));
+                return rule;
+            }
+        }
+        """;
+
+    [Fact]
+    public void StatementBodiedRule_Compiles()
+    {
+        // Act
+        // (no separate act step — CompileVerifier.AssertCompilesCleanly is the verification)
+
+        // Assert
+        CompileVerifier.AssertCompilesCleanly(StatementBodiedOverrideSource);
+    }
+
+    [Fact]
+    public void StatementBodiedRule_ThreadsTheSerializerOptionsThrough()
+    {
+        // Arrange — the typed-value operator lives outside the returned expression's chain, so a
+        // purely syntactic scan of the return statement would miss it and emit a filter class that
+        // throws FilterConfigurationException on construction with no way to supply a resolver.
+        var assembly = RuntimeLoader.LoadGeneratedAssembly(StatementBodiedOverrideSource);
+        var trackingResolver = new TrackingResolver(new DefaultJsonTypeInfoResolver());
+        var filterInstance = ActivateFilterWithResolver(assembly, "Sample.UserFilter", trackingResolver);
+
+        var leafJson = JsonDocument.Parse("""{"Term":"Alice"}""").RootElement;
+        var whereNode = new FilterLeaf("FullName", "matches", leafJson);
+        var queryable = BuildUserQueryable(assembly, [("Alice", "Smith"), ("Bob", "Jones")]);
+
+        // Act
+        var results = InvokeApplyFilter(assembly, "Sample.UserFilter", filterInstance, queryable, whereNode);
+
+        // Assert
+        results.Should().HaveCount(1);
+        trackingResolver.RequestedTypes.Should().Contain(requestedType => requestedType.Name == "NameQuery");
+    }
+
+    private const string NullableValueOverrideSource = """
+        using Filtering.Net;
+        namespace Sample;
+
+        public sealed class User { public string? MiddleName { get; set; } }
+
+        [GenerateFilter<User>]
+        public partial class UserFilter
+        {
+            [PropertyMap(nameof(User.MiddleName))]
+            public static FilterRule<User, string?> MapMiddleName(FilterRuleBuilder<User, string?> builder) =>
+                builder.For(user => user.MiddleName)
+                       .Operator("isEmpty", (string? column) => column == null);
+        }
+        """;
+
+    [Fact]
+    public void NullableValueRule_Compiles()
+    {
+        // Act
+        // (no separate act step — CompileVerifier.AssertCompilesCleanly is the verification)
+
+        // Assert
+        CompileVerifier.AssertCompilesCleanly(NullableValueOverrideSource);
+    }
+
+    [Fact]
+    public void NullableValueRule_EmitsNullabilityWarningFreeCode()
+    {
+        // Arrange — FilterRuleBuilder<,> is invariant in TValue, so dropping the '?' from the emitted
+        // construction is CS8620 in a file the consumer cannot edit.
+        var (_, updatedCompilation) = GeneratorRunner.RunAndUpdate(NullableValueOverrideSource, excludeDiAbstractions: false);
+
+        // Act
+        var generatedFilePaths = updatedCompilation.SyntaxTrees
+            .Select(tree => tree.FilePath)
+            .Where(filePath => filePath.EndsWith("Sample.UserFilter.g.cs", StringComparison.Ordinal))
+            .ToList();
+        var generatedFileDiagnostics = updatedCompilation
+            .GetDiagnostics(TestContext.Current.CancellationToken)
+            .Where(diagnostic => generatedFilePaths.Contains(diagnostic.Location.SourceTree?.FilePath ?? string.Empty))
+            .ToList();
+
+        // Assert
+        generatedFileDiagnostics.Should().BeEmpty();
     }
 
     private static object ActivateFilterWithResolver(Assembly assembly, string filterTypeName, IJsonTypeInfoResolver resolver)
