@@ -44,6 +44,12 @@ jobs:
       - run: npm run build
 
       - name: Publish to npmjs.org
-        run: npm publish --provenance --access public
+        run: |
+          case "${{ steps.ver.outputs.version }}" in
+            *-*) DIST_TAG=next ;;
+            *)   DIST_TAG=latest ;;
+          esac
+          echo "Publishing with dist-tag: $DIST_TAG"
+          npm publish --provenance --access public --tag "$DIST_TAG"
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
