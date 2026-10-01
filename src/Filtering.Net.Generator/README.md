@@ -79,7 +79,7 @@ Then `[Map(nameof(User.Name), Profile = typeof(StringFilterPlus))]` and the new 
 | FN0006 | Error | Property's CLR type has no built-in primitive profile; specify `Profile = typeof(...)` explicitly. |
 | FN0007 | Error | Property has multiple `[InterceptValue]` declarations. |
 | FN0008 | Error | `[FilterOperator]` member is not `public static`. |
-| FN0009 | Error | Alias collides with another property or alias on the entity (case-insensitive). |
+| FN0009 | Error | Alias collides with another property name or alias ([Map] or [PropertyMap]) on the filter (case-insensitive). |
 | FN0010 | Error | `[FilterProfile(BasedOn = typeof(...))]` references a type that is not marked with `[FilterProfile]`. |
 | FN0011 | Error | Property has `[InterceptValue]` but no matching `[Map]` declaration. |
 | FN0012 | Error | Property's CLR type is matched by multiple profiles — use `Profile = typeof(...)` on the `[Map]` to pick one. |

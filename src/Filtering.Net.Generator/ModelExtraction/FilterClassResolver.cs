@@ -68,37 +68,43 @@ internal static class FilterClassResolver
         FilterClassDeclaration declaration,
         List<DiagnosticInfo> diagnostics)
     {
+        // [Map] properties and [PropertyMap] rules share one wire-key space at runtime, so they are scanned together.
+        var wireKeyClaims = properties
+            .Select(mapping => (Name: mapping.PropertyName, mapping.Alias, Location: mapping.DeclarationLocation))
+            .Concat(declaration.Overrides.Select(propertyOverride =>
+                (Name: propertyOverride.PropertyName, propertyOverride.Alias, Location: propertyOverride.DeclarationLocation)))
+            .ToList();
+
         // Tracks every site that has claimed a given case-folded name (property name or alias);
         // a fresh collision reports every prior claimant as an additional location.
         var nameToSites = new Dictionary<string, List<LocationInfo>>(StringComparer.OrdinalIgnoreCase);
-        foreach (var mapping in properties)
+        foreach (var claim in wireKeyClaims)
         {
-            if (!nameToSites.TryGetValue(mapping.PropertyName, out var bucket))
+            if (!nameToSites.TryGetValue(claim.Name, out var bucket))
             {
                 bucket = [];
-                nameToSites[mapping.PropertyName] = bucket;
+                nameToSites[claim.Name] = bucket;
             }
-            if (mapping.DeclarationLocation is not null) bucket.Add(mapping.DeclarationLocation);
+            if (claim.Location is not null) bucket.Add(claim.Location);
         }
-        foreach (var mapping in properties)
+        foreach (var claim in wireKeyClaims)
         {
-            if (string.IsNullOrEmpty(mapping.Alias)) continue;
-            var aliasLocation = mapping.DeclarationLocation;
-            if (nameToSites.TryGetValue(mapping.Alias!, out var existingSites))
+            if (string.IsNullOrEmpty(claim.Alias)) continue;
+            if (nameToSites.TryGetValue(claim.Alias!, out var existingSites))
             {
                 diagnostics.Add(DiagnosticInfo.From(
                     DiagnosticDescriptors.AliasCollision,
-                    aliasLocation ?? declaration.Location,
+                    claim.Location ?? declaration.Location,
                     existingSites.ToArray(),
-                    mapping.Alias!,
+                    claim.Alias!,
                     declaration.FullEntityTypeName));
-                if (aliasLocation is not null) existingSites.Add(aliasLocation);
+                if (claim.Location is not null) existingSites.Add(claim.Location);
             }
             else
             {
                 var bucket = new List<LocationInfo>();
-                if (aliasLocation is not null) bucket.Add(aliasLocation);
-                nameToSites[mapping.Alias!] = bucket;
+                if (claim.Location is not null) bucket.Add(claim.Location);
+                nameToSites[claim.Alias!] = bucket;
             }
         }
     }
