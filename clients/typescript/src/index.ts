@@ -13,3 +13,4 @@ export { field, type FieldRef } from './leaf.js';
 export { and, not, or } from './group.js';
 export { asc, desc, sortBy, withTiebreakers } from './sort.js';
 export { request, type RequestParts } from './request.js';
+export { FilterQueryStringError, fromQueryString, toQueryString } from './query-string.js';
