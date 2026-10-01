@@ -14,6 +14,8 @@ Filter / sort / page library for `IQueryable<T>` and EF Core. Consumers declare 
 | `tests/Filtering.Net.Generator.Tests/` | Generator extraction + emission + analyzer tests. Mix of compile-and-run, snapshot (`Verify.Xunit`), and runtime end-to-end. |
 | `tests/Filtering.Net.EntityFrameworkCore.Tests/` | EF integration tests against SQLite + Testcontainers Postgres / SQL Server. |
 | `docs/github/docs/diagnostics/index.md` | Single mkdocs catalogue page listing every `FN0xxx` / `FN1xxx` rule. New diagnostics add a row here. |
+| `clients/typescript/` | `filtering-net` npm package: TypeScript combinators and query-string helpers. `npm test` / `npm run typecheck` / `npm run build`. Released in lockstep with the NuGet packages by `.github/workflows/npm.yml`. |
+| `tests/wire-fixtures/` | Shared JSON fixtures (`name`, `request`, `queryString`) read by both the Vitest suite and `tests/Filtering.Net.Tests/WireFixtures`. Change the format here first. |
 
 ## Build / test commands
 

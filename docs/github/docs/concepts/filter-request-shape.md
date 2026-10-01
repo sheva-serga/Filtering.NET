@@ -98,3 +98,5 @@ The converter itself reads a leaf's `value` as a raw `JsonElement` and uses no r
 
 - [Validation philosophy](validation-philosophy.md)
 - [Profiles and operators](profiles-and-operators.md)
+- [Query-string binding](../guides/query-string-binding.md): the same request in a URL.
+- [TypeScript client](../guides/typescript-client.md): compose it from TypeScript.

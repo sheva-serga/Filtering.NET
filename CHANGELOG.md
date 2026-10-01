@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - Unreleased
+
+### Added
+- `[PropertyMap]` takes `Alias`, `Sortable`, and `DefaultSortDirection`, with the same meaning as on `[Map]`. A computed accessor such as `x => x.Price ?? 0m` can now be sorted and exposed under a different wire key, including when lifted through `[MapNested]`. `FN0009` checks `[PropertyMap]` names and aliases together with `[Map]` ones.
+- Query-string binding: `FilterNode.TryParse` (JSON tree), `SortItem.TryParse` (`field`, `field:asc`, `field:desc`), and the `FilterQuery` record (`Where`, `Sort`, `Page`, `PageSize`, `ToRequest()`). ASP.NET Core minimal APIs (`[AsParameters]`) and MVC (`[FromQuery]`) bind them from `?where=…&sort=…&page=…&pageSize=…`.
+- `filtering-net` on npm: dependency-free TypeScript combinators (`field`, `and`/`or`/`not`, `asc`/`desc`/`sortBy`, `withTiebreakers`, `request`) and `toQueryString` / `fromQueryString`, versioned in lockstep with the NuGet packages.
+- Shared wire fixtures under `tests/wire-fixtures` keep the .NET and TypeScript sides byte-compatible, including real ASP.NET query binding.
+- CI runs the .NET and TypeScript test suites on every push and pull request.
+
 ## [0.2.1] - 2026-09-21
 
 ### Added

@@ -87,6 +87,8 @@ nav:
       - Trim / AOT-clean setup: guides/aot-clean-setup.md
       - Testing filter classes: guides/testing-filter-classes.md
       - Building a definition by hand: guides/hand-built-definitions.md
+      - Query-string binding: guides/query-string-binding.md
+      - TypeScript client: guides/typescript-client.md
   - Diagnostics catalogue: diagnostics/index.md
   - Sample app: sample-app.md
   - FAQ: faq.md
