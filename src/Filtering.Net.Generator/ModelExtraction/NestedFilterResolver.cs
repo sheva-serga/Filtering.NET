@@ -460,10 +460,11 @@ internal static class NestedFilterResolver
             {
                 if (propertyOverride.BuilderTypeFqn is null) continue;
                 if (!IsPathAllowed(propertyOverride.PropertyName, originalNested.HasOnly, originalNested.Only, originalNested.Except)) continue;
+                var overrideWireKey = string.IsNullOrEmpty(propertyOverride.Alias) ? propertyOverride.PropertyName : propertyOverride.Alias!;
                 mappingSources.Add(new MappingSource(
                     MappingSourceKind.Spliced,
                     accumulatedClrPath + "." + propertyOverride.PropertyName,
-                    accumulatedAliasPath + "." + propertyOverride.PropertyName,
+                    accumulatedAliasPath + "." + overrideWireKey,
                     $"[PropertyMap] {propertyOverride.PropertyName} (from {ShortNameOf(targetClassFqn)})",
                     originalNested.AttributeLocation));
             }

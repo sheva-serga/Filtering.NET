@@ -290,6 +290,40 @@ public class Fn0001Tests
     }
 
     [Fact]
+    public void NestedFilterRuleAliasCollidingWithHostMap_FiresFN0001()
+    {
+        // Arrange — DepartmentFilter's rule is lifted under its alias as "Department.name", the wire key
+        // the host's [Map("Department.Name")] also registers; FilterSchema compares them case-insensitively.
+        var source = """
+            using Filtering.Net;
+            namespace TestNs;
+            public class Department { public string Name { get; set; } = ""; public string Code { get; set; } = ""; }
+            public class User { public Department Department { get; set; } = new(); }
+            [GenerateFilter<Department>]
+            [Map(nameof(Department.Code))]
+            public partial class DepartmentFilter
+            {
+                [PropertyMap("FullName", Alias = "name")]
+                private static FilterRule<Department, string> MapFullName(FilterRuleBuilder<Department, string> builder) =>
+                    builder.For(department => department.Name + " (" + department.Code + ")")
+                           .Operator<string>("eq", (string column, string value) => column == value);
+            }
+            [GenerateFilter<User>]
+            [Map("Department.Name")]
+            [MapNested(nameof(User.Department))]
+            public partial class UserFilter
+            {
+            }
+            """;
+
+        // Act
+        // (no separate act step — AssertDiagnostic is the verification)
+
+        // Assert
+        DiagnosticTestHelpers.AssertDiagnostic(source, "FN0001");
+    }
+
+    [Fact]
     public void AliasCollidingWithNestedPath_FiresFN0001()
     {
         // Arrange — FilterSchema registers both a property's own path and its alias as wire keys,
