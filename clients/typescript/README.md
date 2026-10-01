@@ -36,10 +36,10 @@ const query = toQueryString(body);            // where=<JSON>&sort=createDate:de
 const restored = fromQueryString(location.search);
 ```
 
-`fromQueryString` ignores parameters it does not own. It throws `FilterQueryStringError` (with `.parameter`) on malformed JSON, a sort item not ending in `:asc`/`:desc`, a non-integer page, or a repeated scalar parameter. On the server, bind with `[AsParameters] FilterQuery` (minimal APIs) or `[FromQuery] FilterQuery` (MVC) and call `ToRequest()`.
+`fromQueryString` ignores parameters it does not own. It throws `FilterQueryStringError` (with `.parameter`) on malformed JSON, a sort item whose `:` suffix is not `asc`/`desc`, a non-integer page, or a repeated scalar parameter. On the server, bind with `[AsParameters] FilterQuery` (minimal APIs) or `[FromQuery] FilterQuery` (MVC) and call `ToRequest()`. Minimal APIs and `[ApiController]` controllers reject a parameter that fails to parse with a 400; other MVC controllers must check `ModelState.IsValid`.
 
 A sort field that itself contains `:` cannot travel through the query string.
 
 ## Versioning
 
-Released in lockstep with the Filtering.Net NuGet packages: `filtering-net@0.3.0` matches `Filtering.Net 0.3.0`.
+Released in lockstep with the Filtering.Net NuGet packages. The npm version always equals the NuGet version: `filtering-net@X.Y.Z` matches `Filtering.Net X.Y.Z`.

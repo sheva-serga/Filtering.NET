@@ -35,13 +35,13 @@ app.MapGet("/api/users", async ([AsParameters] FilterQuery query, AppDbContext d
 });
 ```
 
-MVC: `public IActionResult Get([FromQuery] FilterQuery query) => ...query.ToRequest()...`.
+MVC, on an `[ApiController]`: `public IActionResult Get([FromQuery] FilterQuery query) => ...query.ToRequest()...`. On a controller without `[ApiController]`, check `ModelState.IsValid` first: a parameter that fails `TryParse` only adds a model-state error there, and the action would run with `query.Where == null` and return the unfiltered set.
 
 From TypeScript, `toQueryString(request)` writes exactly this format and `fromQueryString(location.search)` reads it back (see [TypeScript client](typescript-client.md)).
 
 ## Pitfalls
 
-- A parameter that does not parse (`where=5`, `sort=name:up`, `page=abc`) is the framework's binding 400. Validation codes still come only from `Validate`, the same as for a body.
+- A parameter that does not parse (`where=5`, `sort=name:up`, `page=abc`) is a binding failure. Minimal APIs and `[ApiController]` controllers turn it into a 400 on their own; other MVC controllers must check `ModelState.IsValid`. Validation codes still come only from `Validate`, the same as for a body.
 - A field name that itself contains `:` cannot be sorted through the query string.
 - URLs have length limits (proxies commonly cap them around 8 KB). Large trees belong in a `POST` body.
 - `FilterQuery` exists because `FilterRequest.Sort` is an `IReadOnlyList<SortItem>`, which query binding cannot fill. Use `ToRequest()` rather than binding `FilterRequest` directly.

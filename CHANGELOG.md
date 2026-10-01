@@ -14,6 +14,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Shared wire fixtures under `tests/wire-fixtures` keep the .NET and TypeScript sides byte-compatible, including real ASP.NET query binding.
 - CI runs the .NET and TypeScript test suites on every push and pull request.
 
+### Changed
+- `FilterNode` and `SortItem` expose `TryParse(string?, IFormatProvider?, out T)`, so ASP.NET Core now treats them as simple (parseable) types. An endpoint parameter that is a bare `FilterNode` or `SortItem` is inferred from the query string instead of the JSON body; add `[FromBody]` to keep binding it from the body. `FilterRequest` is unaffected.
+
 ## [0.2.1] - 2026-09-21
 
 ### Added
