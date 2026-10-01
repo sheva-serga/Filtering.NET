@@ -73,7 +73,7 @@ Then `[Map(nameof(User.Name), Profile = typeof(StringFilterPlus))]` and the new 
 |----|----------|---------|
 | FN0001 | Error | Filter path is mapped by multiple sources (`[Map]`, `[PropertyMap]`, or `[MapNested]`) on the same filter class. |
 | FN0002 | Error | Property has both a `[Map]` and a `[PropertyMap]` — use one or the other. |
-| FN0003 | Error | Property referenced by `[Map]` or `[PropertyMap]` does not exist on the entity type. |
+| FN0003 | Error | Property referenced by `[Map]` does not exist on the entity type. |
 | FN0004 | Error | Profile cannot be applied to the property — the profile's column type is incompatible with the property's CLR type. |
 | FN0005 | Error | Operator named in `[Map(Only = ...)]` / `[Map(Except = ...)]` is not declared by the resolved profile. |
 | FN0006 | Error | Property's CLR type has no built-in primitive profile; specify `Profile = typeof(...)` explicitly. |

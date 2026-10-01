@@ -370,11 +370,35 @@ internal static class FilterClassExtractor
 
         propertyMapFirstLocation[propertyName!] = attributeLocation;
 
+        string? alias = null;
+        var sortable = false;
+        var defaultSortDirection = "Asc";
+        foreach (var namedArgument in propertyMapAttribute.NamedArguments)
+        {
+            switch (namedArgument.Key)
+            {
+                case "Alias":
+                    alias = namedArgument.Value.Value as string;
+                    break;
+                case "Sortable":
+                    sortable = namedArgument.Value.Value is bool sortableValue && sortableValue;
+                    break;
+                case "DefaultSortDirection":
+                    defaultSortDirection = PropertyMappingExtractor.ResolveEnumName(namedArgument.Value, defaultSortDirection);
+                    break;
+            }
+        }
+
         overrides.Add(PropertyMapOverrideExtractor.Extract(
             methodSymbol,
             propertyName!,
             LocationInfo.FromLocation(attributeLocation),
-            semanticModel));
+            semanticModel) with
+        {
+            Alias = alias,
+            Sortable = sortable,
+            DefaultSortDirection = defaultSortDirection,
+        });
     }
 
     private static (int? DefaultPageSize, int? MaxPageSize) ReadClassPageSettings(INamedTypeSymbol classSymbol)

@@ -48,8 +48,7 @@ internal static class SourceEmitter
         {
             // A property carried by both [Map] and [PropertyMap] is already an FN0002 error.
             if (overrideModel.BuilderTypeFqn is null || mappedPropertyNames.Contains(overrideModel.PropertyName)) continue;
-            schemaEntries.Add(
-                $".Add({PropertyFactoryType}.MapRule({Literal(overrideModel.PropertyName)}, {overrideModel.MethodName}(new {overrideModel.BuilderTypeFqn}())).Build())");
+            schemaEntries.Add(BuildRuleEntry(overrideModel));
         }
 
         foreach (var nestedMapping in model.NestedMappings)
@@ -84,6 +83,33 @@ internal static class SourceEmitter
             AppendOption(entry, property.DefaultSortDirection == "Desc" ? ".Sortable(global::Filtering.Net.SortDir.Desc)" : ".Sortable()");
         }
         AppendOption(entry, ".Build())");
+        return entry.ToString();
+    }
+
+    // Rules without options keep the single-line entry, so existing [PropertyMap] snapshots do not move.
+    private static string BuildRuleEntry(PropertyOverrideModel overrideModel)
+    {
+        var entry = new StringBuilder()
+            .Append($".Add({PropertyFactoryType}.MapRule({Literal(overrideModel.PropertyName)}, {overrideModel.MethodName}(new {overrideModel.BuilderTypeFqn}()))");
+        var hasOptions = false;
+        if (!string.IsNullOrEmpty(overrideModel.Alias))
+        {
+            AppendOption(entry, $".Alias({Literal(overrideModel.Alias!)})");
+            hasOptions = true;
+        }
+        if (overrideModel.Sortable)
+        {
+            AppendOption(entry, overrideModel.DefaultSortDirection == "Desc" ? ".Sortable(global::Filtering.Net.SortDir.Desc)" : ".Sortable()");
+            hasOptions = true;
+        }
+        if (hasOptions)
+        {
+            AppendOption(entry, ".Build())");
+        }
+        else
+        {
+            entry.Append(".Build())");
+        }
         return entry.ToString();
     }
 

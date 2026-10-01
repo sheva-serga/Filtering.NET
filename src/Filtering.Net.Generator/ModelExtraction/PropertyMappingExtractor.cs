@@ -293,7 +293,7 @@ internal static class PropertyMappingExtractor
         return type;
     }
 
-    private static string ResolveEnumName(TypedConstant typedConstant, string fallback)
+    internal static string ResolveEnumName(TypedConstant typedConstant, string fallback)
     {
         if (typedConstant.Type is INamedTypeSymbol enumType
             && enumType.ToDisplayString() == SortDirEnumFullName

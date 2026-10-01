@@ -45,6 +45,9 @@ public partial class ArticleFilter
 - **Operators without a value.** `.Operator("isEmpty", tags => tags.Count == 0)`.
 - **Mixed argument types.** Chain `.Operator<string>(...)` and `.Operator<string[]>(...)` on the same builder.
 - **Statement bodies.** The method does not have to be one fluent `return` chain. Building the rule across several statements — a local for the builder, conditional `.Operator(...)` calls, then `return builder;` — works, and the analyzer reads operators from the whole body.
+- **Sorting and aliases.** `[PropertyMap("FullName", Alias = "name", Sortable = true, DefaultSortDirection = SortDir.Desc)]` makes the rule's accessor sortable and accepts `name` as well as `FullName` in requests. The three options mean exactly what they mean on `[Map]`, and a rule lifted through `[MapNested]` keeps them (`Leader.name`).
+- **Computed sort keys.** `For(order => order.Discount ?? 0m)` with `Sortable = true` sorts by the computed value. EF Core translates the expression into `ORDER BY`.
+- **The field key.** `PropertyName` is the rule's wire key. It does not have to name a member of the entity, because the accessor comes from `For(...)`.
 
 ## Typed values and the JSON resolver
 

@@ -10,4 +10,7 @@ internal sealed record PropertyOverrideModel(
     EquatableList<OverrideOperatorModel> Operators,
     bool HasTypedValueOperator,
     string? SignatureProblem = null,
-    LocationInfo? DeclarationLocation = null);
+    LocationInfo? DeclarationLocation = null,
+    string? Alias = null,
+    bool Sortable = false,
+    string DefaultSortDirection = "Asc");

@@ -221,6 +221,65 @@ public class PropertyMapOverrideEmissionTests
         CompileVerifier.AssertCompilesCleanly(NullableBuilderParameterSource);
     }
 
+    private const string AliasedSortableRuleSource = """
+        using Filtering.Net;
+        namespace Sample;
+
+        public sealed class Person { public string FirstName { get; set; } = ""; public string LastName { get; set; } = ""; }
+
+        [GenerateFilter<Person>]
+        public partial class PersonFilter
+        {
+            [PropertyMap("FullName", Alias = "name", Sortable = true, DefaultSortDirection = SortDir.Desc)]
+            private static FilterRule<Person, string> MapFullName(FilterRuleBuilder<Person, string> builder) =>
+                builder.For(person => person.FirstName + " " + person.LastName);
+        }
+        """;
+
+    [Fact]
+    public void AliasedSortableRule_EmitsAliasAndSortableBeforeBuild()
+    {
+        // Arrange
+        var driver = GeneratorRunner.RunDriver(AliasedSortableRuleSource);
+
+        // Act
+        var generatedFilterSource = driver.GetRunResult().GeneratedTrees
+            .Select(tree => tree.ToString())
+            .Single(text => text.Contains("partial class PersonFilter", StringComparison.Ordinal));
+
+        // Assert
+        generatedFilterSource.Should().Contain(".Alias(\"name\")");
+        generatedFilterSource.Should().Contain(".Sortable(global::Filtering.Net.SortDir.Desc)");
+        generatedFilterSource.IndexOf(".Sortable(", StringComparison.Ordinal)
+            .Should().BeLessThan(generatedFilterSource.IndexOf(".Build())", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task AliasedSortableRule_EmitsMapRuleWithOptions()
+    {
+        // Arrange
+        var driver = GeneratorRunner.RunDriver(AliasedSortableRuleSource);
+
+        // Act
+        // (no separate act step — Verifier.Verify is the verification)
+
+        // Assert
+        await Verify(driver).UseDirectory("Snapshots");
+    }
+
+    [Fact]
+    public void AliasedSortableRule_Compiles()
+    {
+        // Arrange
+        // (source is declared as AliasedSortableRuleSource above)
+
+        // Act
+        // (no separate act step — CompileVerifier.AssertCompilesCleanly is the verification)
+
+        // Assert
+        CompileVerifier.AssertCompilesCleanly(AliasedSortableRuleSource);
+    }
+
     private static object ActivateFilterWithResolver(Assembly assembly, string filterTypeName, IJsonTypeInfoResolver resolver)
     {
         var filterType = assembly.GetType(filterTypeName)!;
