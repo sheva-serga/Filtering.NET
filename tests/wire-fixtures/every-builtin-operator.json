@@ -1,0 +1,19 @@
+{
+  "name": "every-builtin-operator",
+  "request": {
+    "where": { "and": [
+      { "field": "name", "op": "eq", "value": "Ann" },
+      { "field": "name", "op": "ne", "value": "Bob" },
+      { "field": "age", "op": "gt", "value": 18 },
+      { "field": "age", "op": "gte", "value": 21 },
+      { "field": "age", "op": "lt", "value": 65 },
+      { "field": "age", "op": "lte", "value": 60 },
+      { "field": "name", "op": "contains", "value": "an" },
+      { "field": "name", "op": "startsWith", "value": "A" },
+      { "field": "name", "op": "endsWith", "value": "n" },
+      { "field": "age", "op": "in", "value": [30, 40] },
+      { "field": "nickname", "op": "isNull" }
+    ] }
+  },
+  "queryString": "where=%7B%22and%22%3A%5B%7B%22field%22%3A%22name%22%2C%22op%22%3A%22eq%22%2C%22value%22%3A%22Ann%22%7D%2C%7B%22field%22%3A%22name%22%2C%22op%22%3A%22ne%22%2C%22value%22%3A%22Bob%22%7D%2C%7B%22field%22%3A%22age%22%2C%22op%22%3A%22gt%22%2C%22value%22%3A18%7D%2C%7B%22field%22%3A%22age%22%2C%22op%22%3A%22gte%22%2C%22value%22%3A21%7D%2C%7B%22field%22%3A%22age%22%2C%22op%22%3A%22lt%22%2C%22value%22%3A65%7D%2C%7B%22field%22%3A%22age%22%2C%22op%22%3A%22lte%22%2C%22value%22%3A60%7D%2C%7B%22field%22%3A%22name%22%2C%22op%22%3A%22contains%22%2C%22value%22%3A%22an%22%7D%2C%7B%22field%22%3A%22name%22%2C%22op%22%3A%22startsWith%22%2C%22value%22%3A%22A%22%7D%2C%7B%22field%22%3A%22name%22%2C%22op%22%3A%22endsWith%22%2C%22value%22%3A%22n%22%7D%2C%7B%22field%22%3A%22age%22%2C%22op%22%3A%22in%22%2C%22value%22%3A%5B30%2C40%5D%7D%2C%7B%22field%22%3A%22nickname%22%2C%22op%22%3A%22isNull%22%7D%5D%7D"
+}

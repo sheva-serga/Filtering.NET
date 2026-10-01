@@ -1,0 +1,10 @@
+{
+  "name": "custom-operators",
+  "request": {
+    "where": { "and": [
+      { "field": "name", "op": "ilike", "value": "an%" },
+      { "field": "tags", "op": "isEmpty" }
+    ] }
+  },
+  "queryString": "where=%7B%22and%22%3A%5B%7B%22field%22%3A%22name%22%2C%22op%22%3A%22ilike%22%2C%22value%22%3A%22an%25%22%7D%2C%7B%22field%22%3A%22tags%22%2C%22op%22%3A%22isEmpty%22%7D%5D%7D"
+}

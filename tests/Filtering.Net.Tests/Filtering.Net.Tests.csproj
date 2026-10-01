@@ -10,4 +10,11 @@
     <PackageReference Include="xunit.runner.visualstudio" Version="3.0.0" />
     <PackageReference Include="AwesomeAssertions" Version="9.2.1" />
   </ItemGroup>
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+    <PackageReference Include="Microsoft.AspNetCore.TestHost" Version="9.0.0" />
+  </ItemGroup>
+  <ItemGroup>
+    <None Include="..\wire-fixtures\*.json" LinkBase="wire-fixtures" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
 </Project>

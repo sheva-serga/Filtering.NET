@@ -1,0 +1,14 @@
+{
+  "name": "sort-and-paging",
+  "request": {
+    "where": { "field": "isActive", "op": "eq", "value": true },
+    "sort": [
+      { "field": "createdAt", "dir": "desc" },
+      { "field": "name", "dir": "asc" },
+      { "field": "age" }
+    ],
+    "page": 2,
+    "pageSize": 25
+  },
+  "queryString": "where=%7B%22field%22%3A%22isActive%22%2C%22op%22%3A%22eq%22%2C%22value%22%3Atrue%7D&sort=createdAt%3Adesc&sort=name%3Aasc&sort=age&page=2&pageSize=25"
+}

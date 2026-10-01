@@ -1,0 +1,10 @@
+{
+  "name": "special-characters",
+  "request": {
+    "where": { "and": [
+      { "field": "name", "op": "eq", "value": "a b&c=d+e%f\"g" },
+      { "field": "name", "op": "contains", "value": "Київ" }
+    ] }
+  },
+  "queryString": "where=%7B%22and%22%3A%5B%7B%22field%22%3A%22name%22%2C%22op%22%3A%22eq%22%2C%22value%22%3A%22a+b%26c%3Dd%2Be%25f%5C%22g%22%7D%2C%7B%22field%22%3A%22name%22%2C%22op%22%3A%22contains%22%2C%22value%22%3A%22%D0%9A%D0%B8%D1%97%D0%B2%22%7D%5D%7D"
+}

@@ -1,0 +1,13 @@
+{
+  "name": "nested-groups-and-not",
+  "request": {
+    "where": { "or": [
+      { "and": [
+        { "field": "isActive", "op": "eq", "value": true },
+        { "field": "age", "op": "gte", "value": 18 }
+      ] },
+      { "not": [ { "field": "department.name", "op": "isNull" } ] }
+    ] }
+  },
+  "queryString": "where=%7B%22or%22%3A%5B%7B%22and%22%3A%5B%7B%22field%22%3A%22isActive%22%2C%22op%22%3A%22eq%22%2C%22value%22%3Atrue%7D%2C%7B%22field%22%3A%22age%22%2C%22op%22%3A%22gte%22%2C%22value%22%3A18%7D%5D%7D%2C%7B%22not%22%3A%5B%7B%22field%22%3A%22department.name%22%2C%22op%22%3A%22isNull%22%7D%5D%7D%5D%7D"
+}
