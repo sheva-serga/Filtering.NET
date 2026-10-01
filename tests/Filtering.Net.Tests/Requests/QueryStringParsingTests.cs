@@ -140,4 +140,14 @@ public class QueryStringParsingTests
         // Assert
         filterRequest.Should().Be(new FilterRequest());
     }
+
+    [Fact]
+    public void FilterQueryToRequest_EmptySort_ReturnsNullSort()
+    {
+        // Act
+        var filterRequest = new FilterQuery(null, [], null, null).ToRequest();
+
+        // Assert
+        filterRequest.Sort.Should().BeNull();
+    }
 }

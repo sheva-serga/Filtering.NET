@@ -8,5 +8,7 @@ namespace Filtering.Net;
 public sealed record FilterQuery(FilterNode? Where, SortItem[]? Sort, int? Page, int? PageSize)
 {
     /// <summary>Converts the bound parameters into the request the filter engine consumes.</summary>
-    public FilterRequest ToRequest() => new() { Where = Where, Sort = Sort, Page = Page, PageSize = PageSize };
+    public FilterRequest ToRequest() =>
+        // Minimal APIs bind an absent repeated parameter as an empty array; MVC binds null. Both mean "no sort".
+        new() { Where = Where, Sort = Sort is { Length: > 0 } ? Sort : null, Page = Page, PageSize = PageSize };
 }
