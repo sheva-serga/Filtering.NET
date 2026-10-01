@@ -122,6 +122,23 @@ public sealed class WireFixtureTests : IAsyncLifetime
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
     }
 
+    [Theory]
+    [InlineData("where=5")]
+    [InlineData("where=%7B%22field%22%3A%22a%22%7D")]
+    [InlineData("sort=name%3Aup")]
+    [InlineData("page=abc")]
+    public async Task MvcBinding_MalformedParameter_ReturnsBadRequest(string queryString)
+    {
+        // Arrange
+        var client = _echoServer!.GetTestClient();
+
+        // Act
+        var response = await client.GetAsync("/mvc?" + queryString, TestContext.Current.CancellationToken);
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
     private static string Canonical(FilterRequest filterRequest) => JsonSerializer.Serialize(filterRequest, WebOptions);
 
     private static async Task<FilterRequest> ReadRequestAsync(HttpResponseMessage response) =>

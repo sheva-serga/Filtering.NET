@@ -100,6 +100,40 @@ public class PropertyMapSortingRuntimeTests
         validationResult.IsValid.Should().BeTrue();
     }
 
+    [Fact]
+    public void ApplySorting_LiftedAliasWithoutDirection_SortsByComputedValueDescending()
+    {
+        // Arrange
+        var assembly = RuntimeLoader.LoadGeneratedAssembly(ConsumerSource);
+        var personType = assembly.GetType("Sample.Person")!;
+        var teamType = assembly.GetType("Sample.Team")!;
+        var filterType = assembly.GetType("Sample.TeamFilter")!;
+        var filter = Activator.CreateInstance(filterType)!;
+        var teams = (IList)Activator.CreateInstance(typeof(List<>).MakeGenericType(teamType))!;
+        teams.Add(CreateTeam(teamType, 1, CreatePerson(personType, 1, "Ann", "Adams")));
+        teams.Add(CreateTeam(teamType, 2, CreatePerson(personType, 2, "Cid", "Clark")));
+        teams.Add(CreateTeam(teamType, 3, CreatePerson(personType, 3, "Bea", "Brown")));
+        var applySorting = filterType.GetMethod(
+            "ApplySorting",
+            [typeof(IQueryable<>).MakeGenericType(teamType), typeof(IReadOnlyList<SortItem>), typeof(int?), typeof(int?)])!;
+        IReadOnlyList<SortItem> sortItems = [new SortItem("Leader.name")];
+
+        // Act
+        var sortedTeams = (IEnumerable)applySorting.Invoke(filter, [Queryable.AsQueryable(teams), sortItems, null, null])!;
+
+        // Assert
+        sortedTeams.Cast<object>().Select(team => (int)ReadMember(team, "Id"))
+            .Should().Equal(2, 3, 1);
+    }
+
+    private static object CreateTeam(Type teamType, int id, object leader)
+    {
+        var team = Activator.CreateInstance(teamType)!;
+        teamType.GetProperty("Id")!.SetValue(team, id);
+        teamType.GetProperty("Leader")!.SetValue(team, leader);
+        return team;
+    }
+
     private static object CreatePerson(Type personType, int id, string firstName, string lastName)
     {
         var person = Activator.CreateInstance(personType)!;
