@@ -38,7 +38,7 @@ app.MapGet("/api/users", async ([AsParameters] FilterQuery query, AppDbContext d
 });
 ```
 
-`[AsParameters] FilterQuery` reads `sort` from the query only on `GET` and `DELETE` routes. On `POST`, `PUT`, `PATCH` or `app.Map`, minimal APIs infer the `SortItem[]` from the JSON body, so `?sort=` is silently ignored while `where`, `page` and `pageSize` still bind from the query. Use MVC `[FromQuery] FilterQuery` there, or bind `[FromQuery] SortItem[]? sort` as its own parameter.
+`[AsParameters] FilterQuery` reads `sort` from the query only on `GET`, `HEAD` and `DELETE` routes. On `POST`, `PUT`, `PATCH` or `app.Map`, minimal APIs infer the `SortItem[]` from the JSON body, so `?sort=` is silently ignored while `where`, `page` and `pageSize` still bind from the query. Use MVC `[FromQuery] FilterQuery` there, or bind `[FromQuery] SortItem[]? sort` as its own parameter.
 
 MVC, on an `[ApiController]`: `public IActionResult Get([FromQuery] FilterQuery query) => ...query.ToRequest()...`. On a controller without `[ApiController]`, check `ModelState.IsValid` first: a parameter that fails `TryParse` only adds a model-state error there, and the action would run with `query.Where == null` and return the unfiltered set.
 
