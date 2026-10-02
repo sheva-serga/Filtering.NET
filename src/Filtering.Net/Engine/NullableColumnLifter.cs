@@ -68,7 +68,7 @@ internal sealed class NullableColumnLifter : ExpressionVisitor
         }
 
         return _unwrappedTheColumn
-            ? Expression.AndAlso(Expression.Property(_nullableAccessorBody, nameof(Nullable<int>.HasValue)), liftedBody)
+            ? Expression.AndAlso(Expression.Property(_nullableAccessorBody, _nullableSupport.NullableHasValueProperty), liftedBody)
             : liftedBody;
     }
 

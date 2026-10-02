@@ -7,6 +7,7 @@
     <Title>Filtering.Net — Source-Generated IQueryable Filtering</Title>
     <Description>Type-safe filter, sort, and pagination for IQueryable and EF Core. A source-generated schema over a generic engine, with no reflection over your types.</Description>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <IsAotCompatible Condition="$([MSBuild]::IsTargetFrameworkCompatible('$(TargetFramework)', 'net8.0'))">true</IsAotCompatible>
   </PropertyGroup>
   <ItemGroup>
     <!-- Both are netstandard2.0-only: net8.0 and later supply System.Text.Json in the shared framework (a package

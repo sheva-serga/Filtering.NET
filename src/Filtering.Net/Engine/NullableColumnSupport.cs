@@ -15,6 +15,8 @@ internal interface INullableColumnSupport
 
     MethodInfo NullableContainsMethod { get; }
 
+    PropertyInfo NullableHasValueProperty { get; }
+
     Expression CreateNullableArrayExpression(object values);
 }
 
@@ -26,6 +28,9 @@ internal sealed class NullableColumnSupport<TColumn> : INullableColumnSupport
     private static readonly MethodInfo ContainsMethod =
         ((MethodCallExpression)((Expression<Func<TColumn?[], TColumn?, bool>>)((values, column) => values.Contains(column))).Body).Method;
 
+    private static readonly PropertyInfo HasValueProperty =
+        (PropertyInfo)((MemberExpression)((Expression<Func<TColumn?, bool>>)(column => column.HasValue)).Body).Member;
+
     public Type ColumnType => typeof(TColumn);
 
     public Type NullableColumnType => typeof(TColumn?);
@@ -33,6 +38,8 @@ internal sealed class NullableColumnSupport<TColumn> : INullableColumnSupport
     public Type NullableArrayType => typeof(TColumn?[]);
 
     public MethodInfo NullableContainsMethod => ContainsMethod;
+
+    public PropertyInfo NullableHasValueProperty => HasValueProperty;
 
     public Expression CreateNullableArrayExpression(object values)
     {

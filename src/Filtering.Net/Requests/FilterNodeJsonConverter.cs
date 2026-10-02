@@ -101,7 +101,7 @@ internal sealed class FilterNodeJsonConverter : JsonConverter<FilterNode>
                 writer.WritePropertyName(key);
                 writer.WriteStartArray();
                 foreach (var child in group.Children)
-                    JsonSerializer.Serialize(writer, child, options);
+                    Write(writer, child, options);
                 writer.WriteEndArray();
                 writer.WriteEndObject();
                 break;
