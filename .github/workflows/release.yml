@@ -1,0 +1,185 @@
+name: release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g. 0.3.0)'
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  test-dotnet:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
+
+      # Docker is available on ubuntu-latest, so the Testcontainers Postgres/SQL Server suites run here instead of skipping.
+      - name: Test
+        run: dotnet test Filtering.Net.sln
+
+  test-typescript:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: clients/typescript
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: clients/typescript/package-lock.json
+
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+
+  pack:
+    needs: [test-dotnet, test-typescript]
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.ver.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: clients/typescript/package-lock.json
+
+      - name: Resolve version
+        id: ver
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            VERSION="${GITHUB_REF_NAME#v}"
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Resolved version: $VERSION"
+
+      - name: Restore
+        run: dotnet restore Filtering.Net.sln
+
+      - name: Pack Filtering.Net
+        run: >
+          dotnet pack src/Filtering.Net/Filtering.Net.csproj
+          -c Release --no-restore
+          -p:Version=${{ steps.ver.outputs.version }}
+          -p:ContinuousIntegrationBuild=true
+          -o ./artifacts/nuget
+
+      - name: Pack Filtering.Net.Generator
+        run: >
+          dotnet pack src/Filtering.Net.Generator/Filtering.Net.Generator.csproj
+          -c Release --no-restore
+          -p:Version=${{ steps.ver.outputs.version }}
+          -p:ContinuousIntegrationBuild=true
+          -o ./artifacts/nuget
+
+      - name: Pack Filtering.Net.EntityFrameworkCore
+        run: >
+          dotnet pack src/Filtering.Net.EntityFrameworkCore/Filtering.Net.EntityFrameworkCore.csproj
+          -c Release --no-restore
+          -p:Version=${{ steps.ver.outputs.version }}
+          -p:ContinuousIntegrationBuild=true
+          -o ./artifacts/nuget
+
+      - name: Upload NuGet packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: nupkgs-${{ steps.ver.outputs.version }}
+          path: ./artifacts/nuget/*.*nupkg
+          if-no-files-found: error
+
+      - name: Set npm version
+        working-directory: clients/typescript
+        run: npm version "${{ steps.ver.outputs.version }}" --no-git-tag-version
+
+      - name: Build npm client
+        working-directory: clients/typescript
+        run: |
+          npm ci
+          npm run build
+
+      - name: Pack npm client
+        working-directory: clients/typescript
+        run: |
+          mkdir -p ../../artifacts/npm
+          npm pack --pack-destination ../../artifacts/npm
+
+      - name: Upload npm tarball
+        uses: actions/upload-artifact@v4
+        with:
+          name: npm-${{ steps.ver.outputs.version }}
+          path: ./artifacts/npm/*.tgz
+          if-no-files-found: error
+
+  publish-nuget:
+    needs: pack
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: nupkgs-${{ needs.pack.outputs.version }}
+          path: ./artifacts/nuget
+
+      - name: Push to NuGet.org
+        run: >
+          dotnet nuget push "./artifacts/nuget/*.nupkg"
+          --api-key ${{ secrets.NUGET_API_KEY }}
+          --source https://api.nuget.org/v3/index.json
+          --skip-duplicate
+
+  publish-npm:
+    needs: pack
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: npm-${{ needs.pack.outputs.version }}
+          path: ./artifacts/npm
+
+      - name: Publish to npmjs.org
+        run: |
+          case "${{ needs.pack.outputs.version }}" in
+            *-*) DIST_TAG=next ;;
+            *)   DIST_TAG=latest ;;
+          esac
+          echo "Publishing with dist-tag: $DIST_TAG"
+          npm publish ./artifacts/npm/*.tgz --provenance --access public --tag "$DIST_TAG"
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
