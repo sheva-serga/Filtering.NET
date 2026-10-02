@@ -16,5 +16,6 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="..\wire-fixtures\*.json" LinkBase="wire-fixtures" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="..\wire-fixtures\invalid\*.json" LinkBase="wire-fixtures\invalid" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>

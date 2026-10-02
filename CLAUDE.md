@@ -15,7 +15,7 @@ Filter / sort / page library for `IQueryable<T>` and EF Core. Consumers declare 
 | `tests/Filtering.Net.EntityFrameworkCore.Tests/` | EF integration tests against SQLite + Testcontainers Postgres / SQL Server. |
 | `docs/github/docs/diagnostics/index.md` | Single mkdocs catalogue page listing every `FN0xxx` / `FN1xxx` rule. New diagnostics add a row here. |
 | `clients/typescript/` | `filtering-net` npm package: TypeScript combinators and query-string helpers. `npm test` / `npm run typecheck` / `npm run build`. Released in lockstep with the NuGet packages by `.github/workflows/release.yml`, which publishes NuGet and npm together after both test suites pass. |
-| `tests/wire-fixtures/` | Shared JSON fixtures (`name`, `request`, `queryString`) read by both the Vitest suite and `tests/Filtering.Net.Tests/WireFixtures`. Change the format here first. |
+| `tests/wire-fixtures/` | Shared JSON fixtures (`name`, `request`, `queryString`) read by both the Vitest suite and `tests/Filtering.Net.Tests/WireFixtures`. Change the format here first. `invalid/query-strings.json` is the shared list of rejected query strings (`name`, `queryString`, `parameter`; `clientAccepts: true` marks shape-invalid trees the TypeScript client passes through, since it validates nothing beyond the wire shape): every row must get a 400 from the minimal API, and the client must throw `FilterQueryStringError` for the rest. |
 
 ## Build / test commands
 

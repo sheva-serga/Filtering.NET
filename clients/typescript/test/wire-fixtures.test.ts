@@ -9,6 +9,7 @@ import {
   asc,
   desc,
   field,
+  FilterQueryStringError,
   fromQueryString,
   not,
   or,
@@ -24,11 +25,21 @@ interface WireFixture {
   readonly queryString: string;
 }
 
+interface InvalidQueryString {
+  readonly name: string;
+  readonly queryString: string;
+  readonly parameter: FilterQueryStringError['parameter'];
+  readonly clientAccepts?: boolean;
+}
+
 const fixtureDirectory = fileURLToPath(new URL('../../../tests/wire-fixtures/', import.meta.url));
 const fixtures: WireFixture[] = readdirSync(fixtureDirectory)
   .filter((fileName) => fileName.endsWith('.json'))
   .sort()
   .map((fileName) => JSON.parse(readFileSync(join(fixtureDirectory, fileName), 'utf8')) as WireFixture);
+const invalidQueryStrings = JSON.parse(
+  readFileSync(join(fixtureDirectory, 'invalid', 'query-strings.json'), 'utf8'),
+) as InvalidQueryString[];
 
 const builders: Record<string, () => FilterRequest> = {
   'every-builtin-operator': () =>
@@ -91,4 +102,28 @@ describe('wire fixtures', () => {
       expect(fromQueryString(fixture.queryString)).toEqual(fixture.request);
     });
   });
+});
+
+describe('invalid query strings', () => {
+  it('has rows for every parameter', () => {
+    const parameters = new Set(invalidQueryStrings.map((row) => row.parameter));
+
+    expect(parameters).toEqual(new Set(['where', 'sort', 'page', 'pageSize']));
+  });
+
+  it.each(invalidQueryStrings.filter((row) => !row.clientAccepts))(
+    '$name is rejected with parameter $parameter',
+    (row) => {
+      expect(() => fromQueryString(row.queryString)).toThrow(
+        expect.objectContaining({ name: 'FilterQueryStringError', parameter: row.parameter }),
+      );
+    },
+  );
+
+  it.each(invalidQueryStrings.filter((row) => row.clientAccepts))(
+    '$name is accepted because the client validates no tree shape',
+    (row) => {
+      expect(() => fromQueryString(row.queryString)).not.toThrow();
+    },
+  );
 });

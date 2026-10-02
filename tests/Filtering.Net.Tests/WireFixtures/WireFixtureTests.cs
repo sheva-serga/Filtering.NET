@@ -3,6 +3,8 @@ using System.Text.Json;
 
 using AwesomeAssertions;
 
+using Microsoft.AspNetCore.WebUtilities;
+
 using Xunit;
 
 namespace Filtering.Net.Tests.WireFixtures;
@@ -23,6 +25,20 @@ public sealed class WireFixtureTests(EchoServerFixture echoServer) : IClassFixtu
         return fixtureNames;
     }
 
+    public static TheoryData<string> InvalidQueryStrings()
+    {
+        var queryStrings = new TheoryData<string>();
+        foreach (var invalidQueryString in InvalidQueryString.LoadAll(FixtureDirectory))
+        {
+            queryStrings.Add(invalidQueryString.QueryString);
+        }
+        return queryStrings;
+    }
+
+    public static TheoryData<string> InvalidWhereValues() => InvalidParameterValues("where");
+
+    public static TheoryData<string> InvalidSortValues() => InvalidParameterValues("sort");
+
     [Fact]
     public void FixtureNames_SharedFixturesCopiedToTheTestOutput_IsNotEmpty()
     {
@@ -31,6 +47,16 @@ public sealed class WireFixtureTests(EchoServerFixture echoServer) : IClassFixtu
 
         // Assert
         fixtureNames.Should().NotBeEmpty();
+    }
+
+    [Fact]
+    public void InvalidQueryStrings_SharedListCopiedToTheTestOutput_IsNotEmpty()
+    {
+        // Act
+        var queryStrings = InvalidQueryStrings();
+
+        // Assert
+        queryStrings.Should().NotBeEmpty();
     }
 
     [Theory]
@@ -131,21 +157,38 @@ public sealed class WireFixtureTests(EchoServerFixture echoServer) : IClassFixtu
     }
 
     [Theory]
-    [InlineData("where=5")]
-    [InlineData("where=%7B%22field%22%3A%22a%22%7D")]
-    [InlineData("where=%7B%7D")]
-    [InlineData("sort=name%3Aup")]
-    [InlineData("sort=%3Adesc")]
-    [InlineData("sort=")]
-    [InlineData("sort=name&sort=")]
-    [InlineData("page=abc")]
-    public async Task MinimalApiBinding_MalformedParameter_ReturnsBadRequest(string queryString)
+    [MemberData(nameof(InvalidQueryStrings))]
+    public async Task MinimalApiBinding_InvalidQueryString_ReturnsBadRequest(string queryString)
     {
         // Act
         var response = await _echoServer.Client.GetAsync("/minimal?" + queryString, TestContext.Current.CancellationToken);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Theory]
+    [MemberData(nameof(InvalidWhereValues))]
+    public void FilterNodeTryParse_InvalidQueryStringWhere_ReturnsFalse(string value)
+    {
+        // Act
+        var parsed = FilterNode.TryParse(value, null, out var filterNode);
+
+        // Assert
+        parsed.Should().BeFalse();
+        filterNode.Should().BeNull();
+    }
+
+    [Theory]
+    [MemberData(nameof(InvalidSortValues))]
+    public void SortItemTryParse_InvalidQueryStringSort_ReturnsFalse(string value)
+    {
+        // Act
+        var parsed = SortItem.TryParse(value, null, out var sortItem);
+
+        // Assert
+        parsed.Should().BeFalse();
+        sortItem.Should().BeNull();
     }
 
     [Theory]
@@ -183,6 +226,18 @@ public sealed class WireFixtureTests(EchoServerFixture echoServer) : IClassFixtu
                 expectedErrorPath, FilterValidationCode.NotSortable, "A sort item must name a field."));
     }
 
+    // A parameter the binder rejects for being repeated has no single value for TryParse to refuse.
+    private static TheoryData<string> InvalidParameterValues(string parameter)
+    {
+        var values = new TheoryData<string>();
+        foreach (var invalidQueryString in InvalidQueryString.LoadAll(FixtureDirectory).Where(row => row.Parameter == parameter))
+        {
+            var parameterValues = QueryHelpers.ParseQuery(invalidQueryString.QueryString)[parameter];
+            if (parameterValues.Count == 1) values.Add(parameterValues[0]!);
+        }
+        return values;
+    }
+
     private static string Canonical(FilterRequest filterRequest) => JsonSerializer.Serialize(filterRequest, EchoServerFixture.WebOptions);
 
     private static async Task<FilterRequest> ReadRequestAsync(HttpResponseMessage response) =>
@@ -205,5 +260,13 @@ internal sealed record WireFixture(string Name, FilterRequest Request, string Qu
     public static WireFixture Load(string fixtureDirectory, string fixtureName) =>
         JsonSerializer.Deserialize<WireFixture>(
             File.ReadAllText(Path.Combine(fixtureDirectory, fixtureName + ".json")),
+            EchoServerFixture.WebOptions)!;
+}
+
+internal sealed record InvalidQueryString(string Name, string QueryString, string Parameter)
+{
+    public static InvalidQueryString[] LoadAll(string fixtureDirectory) =>
+        JsonSerializer.Deserialize<InvalidQueryString[]>(
+            File.ReadAllText(Path.Combine(fixtureDirectory, "invalid", "query-strings.json")),
             EchoServerFixture.WebOptions)!;
 }

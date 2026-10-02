@@ -73,15 +73,11 @@ describe('fromQueryString', () => {
     ]);
   });
 
-  it.each(['where=%7B', 'where=', 'where=5', 'where=%5B%5D', 'where=%22x%22', 'where=null', 'where=%7B%7D%20x'])(
-    'rejects %s with parameter where',
-    (query) => {
-      expect(captureError(() => fromQueryString(query)).parameter).toBe('where');
-    },
-  );
+  it('names the offending parameter on the error', () => {
+    const error = captureError(() => fromQueryString('where=5'));
 
-  it.each(['sort=name%3Aup', 'sort=a%3Ab', 'sort=%3Adesc', 'sort='])('rejects %s with parameter sort', (query) => {
-    expect(captureError(() => fromQueryString(query)).parameter).toBe('sort');
+    expect(error.name).toBe('FilterQueryStringError');
+    expect(error.parameter).toBe('where');
   });
 
   it.each([
@@ -93,35 +89,5 @@ describe('fromQueryString', () => {
     ['page=-2147483648', -2147483648],
   ] as const)('parses %s like int.TryParse to %i', (query, value) => {
     expect(fromQueryString(query).page).toBe(value);
-  });
-
-  it.each([
-    ['page=1.5', 'page'],
-    ['page=abc', 'page'],
-    ['page=', 'page'],
-    ['page=%20', 'page'],
-    ['page=%2B', 'page'],
-    ['page=%2B-5', 'page'],
-    ['page=5-', 'page'],
-    ['page=1%205', 'page'],
-    ['page=%C2%A05', 'page'],
-    ['page=%D9%A5', 'page'],
-    ['page=2147483648', 'page'],
-    ['page=-2147483649', 'page'],
-    ['page=99999999999999999999', 'page'],
-    ['pageSize=2e3', 'pageSize'],
-    ['pageSize=0x10', 'pageSize'],
-  ] as const)('rejects %s with parameter %s', (query, parameter) => {
-    expect(captureError(() => fromQueryString(query)).parameter).toBe(parameter);
-  });
-
-  it.each([
-    ['page=1&page=2', 'page'],
-    ['pageSize=10&pageSize=20', 'pageSize'],
-    ['page=1&Page=2', 'page'],
-    ['pageSize=10&PAGESIZE=20', 'pageSize'],
-    ['where=%7B%22field%22%3A%22a%22%2C%22op%22%3A%22isNull%22%7D&where=%7B%22field%22%3A%22b%22%2C%22op%22%3A%22isNull%22%7D', 'where'],
-  ] as const)('rejects the repeated scalar parameter in %s', (query, parameter) => {
-    expect(captureError(() => fromQueryString(query)).parameter).toBe(parameter);
   });
 });
