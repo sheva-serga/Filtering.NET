@@ -109,6 +109,8 @@ public sealed class WireFixtureTests : IAsyncLifetime
     [InlineData("where=5")]
     [InlineData("where=%7B%22field%22%3A%22a%22%7D")]
     [InlineData("sort=name%3Aup")]
+    [InlineData("sort=")]
+    [InlineData("sort=name&sort=")]
     [InlineData("page=abc")]
     public async Task MinimalApiBinding_MalformedParameter_ReturnsBadRequest(string queryString)
     {
@@ -137,6 +139,26 @@ public sealed class WireFixtureTests : IAsyncLifetime
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
+    }
+
+    [Theory]
+    [InlineData("sort=", "sort[0].field")]
+    [InlineData("sort=name&sort=", "sort[1].field")]
+    public async Task MvcBinding_EmptySortValue_BindsAnItemThatFailsSortValidation(string queryString, string expectedErrorPath)
+    {
+        // Arrange
+        var client = _echoServer!.GetTestClient();
+        var definition = WireSampleDefinition.Create();
+
+        // Act
+        var response = await client.GetAsync("/mvc?" + queryString, TestContext.Current.CancellationToken);
+        var validationResult = definition.Validate(await ReadRequestAsync(response));
+
+        // Assert
+        response.StatusCode.Should().Be(HttpStatusCode.OK);
+        validationResult.Errors.Should().ContainSingle()
+            .Which.Should().BeEquivalentTo(new FilterValidationError(
+                expectedErrorPath, FilterValidationCode.NotSortable, "A sort item must name a field."));
     }
 
     private static string Canonical(FilterRequest filterRequest) => JsonSerializer.Serialize(filterRequest, WebOptions);

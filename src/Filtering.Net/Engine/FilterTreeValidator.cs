@@ -35,7 +35,7 @@ internal static class FilterTreeValidator
         for (var sortIndex = 0; sortIndex < sortItems.Count; sortIndex++)
         {
             var sortItem = sortItems[sortIndex];
-            if (string.IsNullOrEmpty(sortItem.Field))
+            if (sortItem is null || string.IsNullOrEmpty(sortItem.Field))
             {
                 validationErrors.Add(new FilterValidationError(
                     $"sort[{sortIndex}].field",

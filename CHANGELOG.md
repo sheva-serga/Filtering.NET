@@ -17,6 +17,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 - `FilterNode` and `SortItem` expose `TryParse(string?, IFormatProvider?, out T)`, so ASP.NET Core now treats them as simple (parseable) types. An endpoint parameter that is a bare `FilterNode` or `SortItem` is inferred from the query string instead of the JSON body; add `[FromBody]` to keep binding it from the body. `FilterRequest` is unaffected.
 
+### Fixed
+- A null sort item, whether from a JSON body (`{"sort":[null]}`) or from an empty `sort=` query value that MVC binds as a null element, is reported as a `NotSortable` validation error instead of throwing `NullReferenceException`.
+
 ## [0.2.1] - 2026-09-21
 
 ### Added

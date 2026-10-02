@@ -51,11 +51,13 @@ public class FilterDefinition<TEntity>(FilterSchema<TEntity> schema) : IFilterDe
         if (sortItems is { Count: > 0 })
         {
             if (!Schema.HasSortableProperties)
-                throw new FilterDispatchException($"No sortable fields are configured (got '{sortItems[0].Field}').");
+                throw new FilterDispatchException($"No sortable fields are configured (got '{sortItems[0]?.Field}').");
 
             IOrderedQueryable<TEntity>? orderedQuery = null;
             foreach (var sortItem in sortItems)
             {
+                if (sortItem is null)
+                    throw new FilterDispatchException("A sort item must name a field (validation should have caught this).");
                 if (!Schema.TryGetProperty(sortItem.Field, out var property))
                     throw new FilterDispatchException($"Unknown sort field '{sortItem.Field}' (validation should have caught this).");
                 if (!property.Sortable)

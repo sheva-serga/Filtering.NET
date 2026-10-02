@@ -1,4 +1,5 @@
 using System.Linq.Expressions;
+using System.Text.Json;
 
 using AwesomeAssertions;
 
@@ -233,6 +234,37 @@ public class FilterDefinitionTests
             error.Code.Should().Be(FilterValidationCode.NotSortable);
             error.Message.Should().Be("A sort item must name a field.");
         });
+    }
+
+    [Fact]
+    public void Validate_NullSortItem_ReportsNotSortable()
+    {
+        // Arrange
+        var definition = StandardDefinition();
+
+        // Act
+        var validationResult = definition.Validate([new SortItem("Name"), null!]);
+
+        // Assert
+        validationResult.Errors.Should().ContainSingle()
+            .Which.Should().BeEquivalentTo(new FilterValidationError(
+                "sort[1].field", FilterValidationCode.NotSortable, "A sort item must name a field."));
+    }
+
+    [Fact]
+    public void Validate_RequestBodyWithNullSortItem_ReportsNotSortable()
+    {
+        // Arrange
+        var definition = StandardDefinition();
+        var request = JsonSerializer.Deserialize<FilterRequest>("""{"sort":[null]}""", new JsonSerializerOptions(JsonSerializerDefaults.Web))!;
+
+        // Act
+        var validationResult = definition.Validate(request);
+
+        // Assert
+        validationResult.Errors.Should().ContainSingle()
+            .Which.Should().BeEquivalentTo(new FilterValidationError(
+                "sort[0].field", FilterValidationCode.NotSortable, "A sort item must name a field."));
     }
 
     [Fact]
@@ -586,6 +618,33 @@ public class FilterDefinitionTests
         // Assert
         sortOnNonSortable.Should().Throw<FilterDispatchException>()
             .WithMessage("Field 'Score' is not configured as sortable (validation should have caught this).");
+    }
+
+    [Fact]
+    public void ApplySorting_NoSortablePropertiesAndNullSortItem_ThrowsDispatchException()
+    {
+        // Arrange
+        var definition = Definition(properties: [FilterProperty.Map<Person, int>("Age", person => person.Age, Int32Filter.Profile).Build()]);
+
+        // Act
+        var sortOnNullItem = () => definition.ApplySorting(People(), [null!]);
+
+        // Assert
+        sortOnNullItem.Should().Throw<FilterDispatchException>().WithMessage("No sortable fields are configured*");
+    }
+
+    [Fact]
+    public void ApplySorting_NullSortItem_ThrowsDispatchException()
+    {
+        // Arrange
+        var definition = StandardDefinition();
+
+        // Act
+        var sortOnNullItem = () => definition.ApplySorting(People(), [new SortItem("Name"), null!]);
+
+        // Assert
+        sortOnNullItem.Should().Throw<FilterDispatchException>()
+            .WithMessage("A sort item must name a field (validation should have caught this).");
     }
 
     [Fact]
