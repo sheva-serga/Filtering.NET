@@ -179,11 +179,11 @@ jobs:
           name: npm-${{ needs.pack.outputs.version }}
           path: ./artifacts/npm
 
-      - name: Publish to npmjs.org
+      - name: Stage on npmjs.org for approval
         run: |
           case "${{ needs.pack.outputs.version }}" in
             *-*) DIST_TAG=next ;;
             *)   DIST_TAG=latest ;;
           esac
-          echo "Publishing with dist-tag: $DIST_TAG"
-          npm publish ./artifacts/npm/*.tgz --provenance --access public --tag "$DIST_TAG"
+          echo "Staging with dist-tag: $DIST_TAG"
+          npm stage publish ./artifacts/npm/*.tgz --provenance --access public --tag "$DIST_TAG"
