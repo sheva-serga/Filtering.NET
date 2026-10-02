@@ -133,6 +133,29 @@ public class Fn0009Tests
     }
 
     [Fact]
+    public void MapAliasCollidesWithPropertyMapName_ReportsTheRuleAsAdditionalLocation()
+    {
+        // Arrange — the [Map] alias is the primary site, so the rule's declaration must be the additional one.
+        var source = """
+            using Filtering.Net;
+            namespace TestNs;
+            public class User { public string Nickname { get; set; } = ""; public string First { get; set; } = ""; public string Last { get; set; } = ""; }
+            [GenerateFilter<User>]
+            [Map(nameof(User.Nickname), Alias = "fullName")]
+            public partial class UserFilter
+            {
+                [PropertyMap("FullName")]
+                private static FilterRule<User, string> MapFullName(FilterRuleBuilder<User, string> builder) =>
+                    builder.For(user => user.First + " " + user.Last);
+            }
+            """;
+
+        // Act
+        // Assert
+        DiagnosticTestHelpers.AssertDiagnosticHasAdditionalLocations(source, "FN0009", expectedAdditionalCount: 1);
+    }
+
+    [Fact]
     public void PropertyMapDistinctAlias_DoesNotFireFN0009()
     {
         // Arrange
