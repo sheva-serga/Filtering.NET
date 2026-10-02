@@ -21,7 +21,7 @@ Filter / sort / page library for `IQueryable<T>` and EF Core. Consumers declare 
 
 ```sh
 dotnet build              # whole solution
-dotnet test               # ~770 tests across 3 test projects (768 at 0.3.0)
+dotnet test               # ~790 tests across 3 test projects (788 at 0.3.1)
 dotnet test tests/Filtering.Net.Generator.Tests --filter "FullyQualifiedName~CompositeValidate"
 ```
 
