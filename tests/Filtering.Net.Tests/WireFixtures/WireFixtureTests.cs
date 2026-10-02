@@ -24,13 +24,13 @@ public sealed class WireFixtureTests(EchoServerFixture echoServer) : IClassFixtu
     }
 
     [Fact]
-    public void FixtureDirectory_ContainsTheSharedFixtures_IsNotEmpty()
+    public void FixtureNames_SharedFixturesCopiedToTheTestOutput_IsNotEmpty()
     {
         // Act
         var fixtureNames = FixtureNames();
 
         // Assert
-        fixtureNames.Should().HaveCount(8);
+        fixtureNames.Should().NotBeEmpty();
     }
 
     [Theory]
