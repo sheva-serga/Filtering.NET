@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Text.Json;
 
 using AwesomeAssertions;
 
@@ -118,6 +119,49 @@ public class PropertyMapSortingRuntimeTests
         // Assert
         sortedTeams.Select(team => GeneratedFilterHarness.ReadMember<int>(team, "Id"))
             .Should().Equal(2, 3, 1);
+    }
+
+    [Fact]
+    public void ApplyFilter_AliasLeaf_FiltersByComputedValue()
+    {
+        // Arrange
+        var assembly = RuntimeLoader.LoadGeneratedAssembly(ConsumerSource);
+        var personType = assembly.GetType("Sample.Person")!;
+        var filter = Activator.CreateInstance(assembly.GetType("Sample.PersonFilter")!)!;
+        var people = GeneratedFilterHarness.BuildQueryable(personType,
+        [
+            GeneratedFilterHarness.CreateInstance(personType, ("Id", 1), ("FirstName", "Ann"), ("LastName", "Adams")),
+            GeneratedFilterHarness.CreateInstance(personType, ("Id", 2), ("FirstName", "Cid"), ("LastName", "Clark")),
+        ]);
+        var leaf = new FilterLeaf("name", "eq", JsonDocument.Parse("\"Cid Clark\"").RootElement);
+
+        // Act
+        var matchedPeople = GeneratedFilterHarness.InvokeApplyFilter(filter, people, leaf);
+
+        // Assert
+        matchedPeople.Select(person => GeneratedFilterHarness.ReadMember<int>(person, "Id")).Should().Equal(2);
+    }
+
+    [Fact]
+    public void ApplyFilter_LiftedAliasLeaf_FiltersByComputedValue()
+    {
+        // Arrange
+        var assembly = RuntimeLoader.LoadGeneratedAssembly(ConsumerSource);
+        var personType = assembly.GetType("Sample.Person")!;
+        var teamType = assembly.GetType("Sample.Team")!;
+        var filter = Activator.CreateInstance(assembly.GetType("Sample.TeamFilter")!)!;
+        var teams = GeneratedFilterHarness.BuildQueryable(teamType,
+        [
+            CreateTeam(teamType, 1, GeneratedFilterHarness.CreateInstance(personType, ("Id", 1), ("FirstName", "Ann"), ("LastName", "Adams"))),
+            CreateTeam(teamType, 2, GeneratedFilterHarness.CreateInstance(personType, ("Id", 2), ("FirstName", "Cid"), ("LastName", "Clark"))),
+        ]);
+        var leaf = new FilterLeaf("Leader.name", "eq", JsonDocument.Parse("\"Cid Clark\"").RootElement);
+
+        // Act
+        var matchedTeams = GeneratedFilterHarness.InvokeApplyFilter(filter, teams, leaf);
+
+        // Assert
+        matchedTeams.Select(team => GeneratedFilterHarness.ReadMember<int>(team, "Id")).Should().Equal(2);
     }
 
     private static object CreateTeam(Type teamType, int id, object leader) =>
