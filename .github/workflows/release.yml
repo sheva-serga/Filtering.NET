@@ -129,6 +129,12 @@ jobs:
           mkdir -p ../../artifacts/npm
           npm pack --pack-destination ../../artifacts/npm
 
+      - name: Lint npm tarball
+        working-directory: clients/typescript
+        run: |
+          npx --yes publint@0.3.25 --strict ../../artifacts/npm/*.tgz
+          npx --yes @arethetypeswrong/cli@0.18.5 --profile esm-only ../../artifacts/npm/*.tgz
+
       - name: Upload npm tarball
         uses: actions/upload-artifact@v4
         with:
