@@ -1,8 +1,36 @@
+using AwesomeAssertions;
+
 namespace Filtering.Net.Generator.Tests.Diagnostics;
 
 /// <summary>Tests for FN0002 (MapAndPropertyMapBoth): a property declared on both [Map] and [PropertyMap].</summary>
 public class Fn0002Tests
 {
+    [Fact]
+    public void ShadowedRuleAliasEqualToMapName_ReportsOnlyFN0002()
+    {
+        // Arrange — the shadowed rule never reaches the schema, so its alias cannot collide with anything.
+        var source = """
+            using Filtering.Net;
+            namespace TestNs;
+            public class User { public string Name { get; set; } = ""; public string Nickname { get; set; } = ""; }
+            [GenerateFilter<User>]
+            [Map(nameof(User.Name))]
+            [Map(nameof(User.Nickname))]
+            public partial class UserFilter
+            {
+                [PropertyMap(nameof(User.Name), Alias = "nickname")]
+                private static FilterRule<User, string> OverrideName(FilterRuleBuilder<User, string> builder) =>
+                    builder.For(user => user.Name);
+            }
+            """;
+
+        // Act
+        var observedIds = DiagnosticTestHelpers.GetDiagnostics(source).Select(diagnostic => diagnostic.Id).Distinct().ToList();
+
+        // Assert
+        observedIds.Should().BeEquivalentTo(["FN0002"]);
+    }
+
     [Fact]
     public void MapAndPropertyMapForSameProperty_FiresFN0002()
     {

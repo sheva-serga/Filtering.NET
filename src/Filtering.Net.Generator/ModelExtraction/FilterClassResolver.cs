@@ -69,10 +69,15 @@ internal static class FilterClassResolver
         List<DiagnosticInfo> diagnostics)
     {
         // [Map] properties and [PropertyMap] rules share one wire-key space at runtime, so they are scanned together.
+        // Mirrors emission: an override with an unusable signature (FN0023) or one shadowed by a [Map] (FN0002)
+        // never reaches the schema, so it cannot collide with anything.
+        var mappedPropertyNames = new HashSet<string>(properties.Select(mapping => mapping.PropertyName), StringComparer.Ordinal);
         var wireKeyClaims = properties
             .Select(mapping => (Name: mapping.PropertyName, mapping.Alias, Location: mapping.DeclarationLocation))
-            .Concat(declaration.Overrides.Select(propertyOverride =>
-                (Name: propertyOverride.PropertyName, propertyOverride.Alias, Location: propertyOverride.DeclarationLocation)))
+            .Concat(declaration.Overrides
+                .Where(propertyOverride => propertyOverride.BuilderTypeFqn is not null && !mappedPropertyNames.Contains(propertyOverride.PropertyName))
+                .Select(propertyOverride =>
+                    (Name: propertyOverride.PropertyName, propertyOverride.Alias, Location: propertyOverride.DeclarationLocation)))
             .ToList();
 
         // Tracks every site that has claimed a given case-folded name (property name or alias);

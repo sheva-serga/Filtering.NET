@@ -127,4 +127,54 @@ public class Fn0023Tests
         observedIds.Should().Contain("FN0002");
         observedIds.Should().NotContain("FN0023");
     }
+
+    [Fact]
+    public void UnusableRuleAliasEqualToMapName_ReportsOnlyFN0023()
+    {
+        // Arrange — the rule never reaches the schema, so its alias cannot collide with anything.
+        var source = """
+            using Filtering.Net;
+            namespace TestNs;
+            public class User { public string Name { get; set; } = ""; public string First { get; set; } = ""; public string Last { get; set; } = ""; }
+            [GenerateFilter<User>]
+            [Map(nameof(User.Name))]
+            public partial class UserFilter
+            {
+                [PropertyMap("FullName", Alias = "name")]
+                private FilterRule<User, string> MapFullName(FilterRuleBuilder<User, string> builder) =>
+                    builder.For(user => user.First + " " + user.Last);
+            }
+            """;
+
+        // Act
+        var observedIds = DiagnosticTestHelpers.GetDiagnostics(source).Select(diagnostic => diagnostic.Id).Distinct().ToList();
+
+        // Assert
+        observedIds.Should().BeEquivalentTo(["FN0023"]);
+    }
+
+    [Fact]
+    public void MapAliasEqualToUnusableRuleName_ReportsOnlyFN0023()
+    {
+        // Arrange
+        var source = """
+            using Filtering.Net;
+            namespace TestNs;
+            public class User { public string Nickname { get; set; } = ""; public string First { get; set; } = ""; public string Last { get; set; } = ""; }
+            [GenerateFilter<User>]
+            [Map(nameof(User.Nickname), Alias = "fullName")]
+            public partial class UserFilter
+            {
+                [PropertyMap("FullName")]
+                private FilterRule<User, string> MapFullName(FilterRuleBuilder<User, string> builder) =>
+                    builder.For(user => user.First + " " + user.Last);
+            }
+            """;
+
+        // Act
+        var observedIds = DiagnosticTestHelpers.GetDiagnostics(source).Select(diagnostic => diagnostic.Id).Distinct().ToList();
+
+        // Assert
+        observedIds.Should().BeEquivalentTo(["FN0023"]);
+    }
 }
