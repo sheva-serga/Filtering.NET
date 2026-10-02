@@ -12,7 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Query-string binding: `FilterNode.TryParse` (JSON tree), `SortItem.TryParse` (`field`, `field:asc`, `field:desc`), and the `FilterQuery` record (`Where`, `Sort`, `Page`, `PageSize`, `ToRequest()`). ASP.NET Core minimal APIs (`[AsParameters]`) and MVC (`[FromQuery]`) bind them from `?where=…&sort=…&page=…&pageSize=…`.
 - `filtering-net` on npm: dependency-free TypeScript combinators (`field`, `and`/`or`/`not`, `asc`/`desc`/`sortBy`, `withTiebreakers`, `request`) and `toQueryString` / `fromQueryString`, versioned in lockstep with the NuGet packages.
 - Shared wire fixtures under `tests/wire-fixtures` keep the .NET and TypeScript sides byte-compatible, including real ASP.NET query binding.
-- CI runs the .NET and TypeScript test suites on every push and pull request.
+- CI runs the .NET and TypeScript test suites on pushes to `main` and on pull requests. A release tag publishes the NuGet packages and the npm client from one workflow, only after both suites pass.
+- `Filtering.Net` is annotated `IsAotCompatible` (and therefore `IsTrimmable`) for `net8.0` and later, so the trim and AOT analyzers run over the library itself.
 
 ### Changed
 - `FilterNode` and `SortItem` expose `TryParse(string?, IFormatProvider?, out T)`, so ASP.NET Core now treats them as simple (parseable) types. An endpoint parameter that is a bare `FilterNode` or `SortItem` is inferred from the query string instead of the JSON body; add `[FromBody]` to keep binding it from the body. `FilterRequest` is unaffected.
