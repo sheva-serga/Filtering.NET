@@ -236,11 +236,62 @@ public class PropertyMapOverrideEmissionTests
         }
         """;
 
-    [Fact]
-    public void AliasedSortableRule_EmitsAliasAndSortableBeforeBuild()
+    private const string AliasOnlyRuleSource = """
+        using Filtering.Net;
+        namespace Sample;
+
+        public sealed class Person { public string FirstName { get; set; } = ""; public string LastName { get; set; } = ""; }
+
+        [GenerateFilter<Person>]
+        public partial class PersonFilter
+        {
+            [PropertyMap("FullName", Alias = "name")]
+            private static FilterRule<Person, string> MapFullName(FilterRuleBuilder<Person, string> builder) =>
+                builder.For(person => person.FirstName + " " + person.LastName);
+        }
+        """;
+
+    private const string SortableAscendingRuleSource = """
+        using Filtering.Net;
+        namespace Sample;
+
+        public sealed class Person { public string FirstName { get; set; } = ""; public string LastName { get; set; } = ""; }
+
+        [GenerateFilter<Person>]
+        public partial class PersonFilter
+        {
+            [PropertyMap("FullName", Sortable = true)]
+            private static FilterRule<Person, string> MapFullName(FilterRuleBuilder<Person, string> builder) =>
+                builder.For(person => person.FirstName + " " + person.LastName);
+        }
+        """;
+
+    public static TheoryData<string, string> RuleOptionEntries() => new()
+    {
+        {
+            AliasOnlyRuleSource,
+            """
+                            .Add(global::Filtering.Net.FilterProperty.MapRule("FullName", MapFullName(new global::Filtering.Net.FilterRuleBuilder<global::Sample.Person, string>()))
+                                .Alias("name")
+                                .Build())
+            """
+        },
+        {
+            SortableAscendingRuleSource,
+            """
+                            .Add(global::Filtering.Net.FilterProperty.MapRule("FullName", MapFullName(new global::Filtering.Net.FilterRuleBuilder<global::Sample.Person, string>()))
+                                .Sortable()
+                                .Build())
+            """
+        },
+    };
+
+    [Theory]
+    [MemberData(nameof(RuleOptionEntries))]
+    public void RuleWithOneOption_EmitsThatOptionBeforeBuild(string consumerSource, string expectedRuleEntry)
     {
         // Arrange
-        var driver = GeneratorRunner.RunDriver(AliasedSortableRuleSource);
+        var driver = GeneratorRunner.RunDriver(consumerSource);
 
         // Act
         var generatedFilterSource = driver.GetRunResult().GeneratedTrees
@@ -248,10 +299,7 @@ public class PropertyMapOverrideEmissionTests
             .Single(text => text.Contains("partial class PersonFilter", StringComparison.Ordinal));
 
         // Assert
-        generatedFilterSource.Should().Contain(".Alias(\"name\")");
-        generatedFilterSource.Should().Contain(".Sortable(global::Filtering.Net.SortDir.Desc)");
-        generatedFilterSource.IndexOf(".Sortable(", StringComparison.Ordinal)
-            .Should().BeLessThan(generatedFilterSource.IndexOf(".Build())", StringComparison.Ordinal));
+        generatedFilterSource.Should().Contain(expectedRuleEntry.ReplaceLineEndings("\n"));
     }
 
     [Fact]
