@@ -8,7 +8,7 @@ public sealed class PropertyMapAttribute(string propertyName) : Attribute
     /// <summary>The field key of the rule, accepted as a wire key in requests.</summary>
     public string PropertyName { get; } = propertyName;
 
-    /// <summary>Optional alias used in filter requests instead of the property name.</summary>
+    /// <summary>Optional second wire key, accepted in filter requests alongside <see cref="PropertyName"/>.</summary>
     public string? Alias { get; init; }
 
     /// <summary>When true, the rule's accessor is also sortable.</summary>

@@ -17,7 +17,7 @@ public sealed class MapAttribute(string propertyName) : Attribute
     /// <summary>Optional blacklist of operator names excluded from the resolved profile's operators.</summary>
     public string[]? Except { get; init; }
 
-    /// <summary>Optional alias used in filter requests instead of the property name.</summary>
+    /// <summary>Optional second wire key, accepted in filter requests alongside the property name.</summary>
     public string? Alias { get; init; }
 
     /// <summary>When true, the property is also sortable.</summary>
