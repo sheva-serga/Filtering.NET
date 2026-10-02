@@ -85,10 +85,32 @@ describe('fromQueryString', () => {
   });
 
   it.each([
+    ['page=%2B5', 5],
+    ['page=-7', -7],
+    ['page=007', 7],
+    ['page=%20%095%0D%0A', 5],
+    ['page=2147483647', 2147483647],
+    ['page=-2147483648', -2147483648],
+  ] as const)('parses %s like int.TryParse to %i', (query, value) => {
+    expect(fromQueryString(query).page).toBe(value);
+  });
+
+  it.each([
     ['page=1.5', 'page'],
     ['page=abc', 'page'],
     ['page=', 'page'],
+    ['page=%20', 'page'],
+    ['page=%2B', 'page'],
+    ['page=%2B-5', 'page'],
+    ['page=5-', 'page'],
+    ['page=1%205', 'page'],
+    ['page=%C2%A05', 'page'],
+    ['page=%D9%A5', 'page'],
+    ['page=2147483648', 'page'],
+    ['page=-2147483649', 'page'],
+    ['page=99999999999999999999', 'page'],
     ['pageSize=2e3', 'pageSize'],
+    ['pageSize=0x10', 'pageSize'],
   ] as const)('rejects %s with parameter %s', (query, parameter) => {
     expect(captureError(() => fromQueryString(query)).parameter).toBe(parameter);
   });

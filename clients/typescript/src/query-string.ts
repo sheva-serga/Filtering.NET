@@ -111,9 +111,14 @@ function parseSortItem(text: string): SortItem {
   return { field: fieldName, dir: direction };
 }
 
+// Mirrors int.TryParse with NumberStyles.Integer: ASCII whitespace around an optional sign and digits.
+const int32Pattern = /^[\t\n\v\f\r ]*([+-]?\d+)[\t\n\v\f\r ]*$/;
+
 function parseInteger(parameter: 'page' | 'pageSize', text: string): number {
-  if (!/^-?\d+$/.test(text)) {
-    throw new FilterQueryStringError(parameter, `'${parameter}' must be an integer, got '${text}'.`);
+  const match = int32Pattern.exec(text);
+  const value = match === null ? Number.NaN : Number(match[1]);
+  if (!Number.isInteger(value) || value < -2147483648 || value > 2147483647) {
+    throw new FilterQueryStringError(parameter, `'${parameter}' must be a 32-bit integer, got '${text}'.`);
   }
-  return Number(text);
+  return value;
 }
