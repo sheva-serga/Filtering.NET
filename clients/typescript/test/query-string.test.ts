@@ -56,6 +56,16 @@ describe('fromQueryString', () => {
     expect(fromQueryString('')).toEqual({});
   });
 
+  it('matches parameter names case-insensitively like ASP.NET', () => {
+    const upperCased = encoded.replace('where=', 'WHERE=').replace('sort=', 'Sort=').replace('page=', 'Page=').replace('pageSize=', 'PageSize=');
+
+    expect(fromQueryString(upperCased)).toEqual(expected);
+  });
+
+  it('keeps sort items in query order across casings', () => {
+    expect(fromQueryString('sort=a&SORT=b&Sort=c').sort).toEqual([{ field: 'a' }, { field: 'b' }, { field: 'c' }]);
+  });
+
   it('splits sort items on the last colon and accepts any direction case', () => {
     expect(fromQueryString('sort=meta%3Akey%3Adesc&sort=name%3AASC').sort).toEqual([
       { field: 'meta:key', dir: 'desc' },
@@ -86,6 +96,8 @@ describe('fromQueryString', () => {
   it.each([
     ['page=1&page=2', 'page'],
     ['pageSize=10&pageSize=20', 'pageSize'],
+    ['page=1&Page=2', 'page'],
+    ['pageSize=10&PAGESIZE=20', 'pageSize'],
     ['where=%7B%22field%22%3A%22a%22%2C%22op%22%3A%22isNull%22%7D&where=%7B%22field%22%3A%22b%22%2C%22op%22%3A%22isNull%22%7D', 'where'],
   ] as const)('rejects the repeated scalar parameter in %s', (query, parameter) => {
     expect(captureError(() => fromQueryString(query)).parameter).toBe(parameter);

@@ -33,21 +33,22 @@ export function toQueryString(filterRequest: FilterRequest): string {
 // URLSearchParams already drops one leading "?" from a string.
 export function fromQueryString(query: string | URLSearchParams): FilterRequest {
   const parameters = typeof query === 'string' ? new URLSearchParams(query) : query;
+  const values = collectOwnedValues(parameters);
   const parts: RequestParts = {};
 
-  const whereText = readSingle(parameters, 'where');
+  const whereText = readSingle(values, 'where');
   if (whereText !== undefined) {
     parts.where = parseWhere(whereText);
   }
-  const sortTexts = parameters.getAll('sort');
+  const sortTexts = values.sort;
   if (sortTexts.length > 0) {
     parts.sort = sortTexts.map(parseSortItem);
   }
-  const pageText = readSingle(parameters, 'page');
+  const pageText = readSingle(values, 'page');
   if (pageText !== undefined) {
     parts.page = parseInteger('page', pageText);
   }
-  const pageSizeText = readSingle(parameters, 'pageSize');
+  const pageSizeText = readSingle(values, 'pageSize');
   if (pageSizeText !== undefined) {
     parts.pageSize = parseInteger('pageSize', pageSizeText);
   }
@@ -55,9 +56,26 @@ export function fromQueryString(query: string | URLSearchParams): FilterRequest 
   return request(parts);
 }
 
+type OwnedValues = Record<QueryParameter, string[]>;
+
+// ASP.NET matches query keys case-insensitively, so `Page=2` must bind the same way here.
+function collectOwnedValues(parameters: URLSearchParams): OwnedValues {
+  const owned: OwnedValues = { where: [], sort: [], page: [], pageSize: [] };
+  const parametersByLowerCaseName = new Map<string, QueryParameter>(
+    (Object.keys(owned) as QueryParameter[]).map((parameter) => [parameter.toLowerCase(), parameter]),
+  );
+  for (const [name, value] of parameters) {
+    const parameter = parametersByLowerCaseName.get(name.toLowerCase());
+    if (parameter !== undefined) {
+      owned[parameter].push(value);
+    }
+  }
+  return owned;
+}
+
 // The server cannot bind two values into one scalar either, so taking the first would hide a real mismatch.
-function readSingle(parameters: URLSearchParams, parameter: Exclude<QueryParameter, 'sort'>): string | undefined {
-  const values = parameters.getAll(parameter);
+function readSingle(ownedValues: OwnedValues, parameter: Exclude<QueryParameter, 'sort'>): string | undefined {
+  const values = ownedValues[parameter];
   if (values.length > 1) {
     throw new FilterQueryStringError(parameter, `'${parameter}' must appear at most once, got ${values.length} values.`);
   }
