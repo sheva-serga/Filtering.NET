@@ -149,7 +149,7 @@ internal static class NestedFilterResolver
             mappingSources.Add(new MappingSource(
                 MappingSourceKind.HostRule,
                 propertyOverride.PropertyName,
-                Alias: null,
+                propertyOverride.Alias,
                 $"[PropertyMap] {propertyOverride.PropertyName}",
                 propertyOverride.DeclarationLocation));
         }
@@ -183,9 +183,9 @@ internal static class NestedFilterResolver
         foreach (var claim in wireKeyClaimants)
         {
             if (claim.Value.Count <= 1) continue;
-            // A collision purely between two [Map]s on this class is FN0009's alias rule, which names
-            // the offending alias; reporting FN0001 as well would be two ids for one mistake.
-            if (claim.Value.TrueForAll(source => source.Kind == MappingSourceKind.HostMap)) continue;
+            // A collision purely between this class's own [Map]s and [PropertyMap]s is FN0009's alias rule,
+            // which names the offending alias; reporting FN0001 as well would be two ids for one mistake.
+            if (claim.Value.TrueForAll(source => source.Kind != MappingSourceKind.Spliced)) continue;
             ReportDuplicate(claim.Key, claim.Value);
         }
 

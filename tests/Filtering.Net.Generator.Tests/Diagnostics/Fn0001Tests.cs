@@ -354,6 +354,38 @@ public class Fn0001Tests
     }
 
     [Fact]
+    public void PropertyMapAliasCollidingWithNestedPath_FiresFN0001()
+    {
+        // Arrange — a host [PropertyMap] alias is registered as a wire key exactly like a [Map] alias,
+        // so it collides with a spliced property's path the same way.
+        var source = """
+            using Filtering.Net;
+            namespace TestNs;
+            public class Department { public string Name { get; set; } = ""; }
+            public class User { public Department Department { get; set; } = new(); public string First { get; set; } = ""; public string Last { get; set; } = ""; }
+            [GenerateFilter<Department>]
+            [Map(nameof(Department.Name))]
+            public partial class DepartmentFilter
+            {
+            }
+            [GenerateFilter<User>]
+            [MapNested(nameof(User.Department), Prefix = "Dept")]
+            public partial class UserFilter
+            {
+                [PropertyMap("Label", Alias = "Department.Name")]
+                private static FilterRule<User, string> MapLabel(FilterRuleBuilder<User, string> builder) =>
+                    builder.For(user => user.First + " " + user.Last);
+            }
+            """;
+
+        // Act
+        // (no separate act step — AssertDiagnostic is the verification)
+
+        // Assert
+        DiagnosticTestHelpers.AssertDiagnostic(source, "FN0001");
+    }
+
+    [Fact]
     public void AliasCollisionBetweenTwoMaps_FiresOnlyFN0009()
     {
         // Arrange — one mistake should not produce two error ids; FN0009 names the offending alias.
@@ -366,6 +398,32 @@ public class Fn0001Tests
             [Map(nameof(User.Nickname), Alias = "name")]
             public partial class UserFilter
             {
+            }
+            """;
+
+        // Act
+        var observedIds = DiagnosticTestHelpers.GetDiagnostics(source).Select(diagnostic => diagnostic.Id).ToList();
+
+        // Assert
+        observedIds.Should().Contain("FN0009");
+        observedIds.Should().NotContain("FN0001");
+    }
+
+    [Fact]
+    public void PropertyMapAliasCollidingWithMapName_FiresOnlyFN0009()
+    {
+        // Arrange — the host-only collision is FN0009's, whichever host attribute carries the alias.
+        var source = """
+            using Filtering.Net;
+            namespace TestNs;
+            public class User { public string Name { get; set; } = ""; public string First { get; set; } = ""; public string Last { get; set; } = ""; }
+            [GenerateFilter<User>]
+            [Map(nameof(User.Name))]
+            public partial class UserFilter
+            {
+                [PropertyMap("FullName", Alias = "name")]
+                private static FilterRule<User, string> MapFullName(FilterRuleBuilder<User, string> builder) =>
+                    builder.For(user => user.First + " " + user.Last);
             }
             """;
 
