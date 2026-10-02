@@ -1,6 +1,6 @@
-// This fixture exists solely to verify that the source generator's emitted code
-// does not introduce IL2026 (RequiresUnreferencedCode) or IL3050 (RequiresDynamicCode)
-// warnings when the consuming project is built with PublishAot=true.
+// This fixture exists solely to verify that the source generator's emitted code and the
+// query-string parsing it is fed do not introduce IL2026 (RequiresUnreferencedCode) or
+// IL3050 (RequiresDynamicCode) warnings when the consuming project is built with PublishAot=true.
 
 using System.Linq.Expressions;
 using System.Text.Json.Serialization;
@@ -26,7 +26,7 @@ public sealed class User
 }
 
 [GenerateFilter<User>]
-[Map(nameof(User.Email), Profile = typeof(StringWithPrefixProfile), Only = new[] { "prefixMatch" })]
+[Map(nameof(User.Email), Profile = typeof(StringWithPrefixProfile), Only = new[] { "prefixMatch" }, Sortable = true)]
 public partial class UserFilter
 {
 }
@@ -39,6 +39,12 @@ public static class Program
     public static int Main()
     {
         var filter = new UserFilter(AotJsonContext.Default);
-        return 0;
+        if (!FilterNode.TryParse(
+                """{"and":[{"or":[{"field":"email","op":"prefixMatch","value":{"prefix":"a"}}]},{"field":"email","op":"prefixMatch","value":{"prefix":"b"}}]}""",
+                null,
+                out var where)) return 1;
+        if (!SortItem.TryParse("email:desc", null, out var sortItem)) return 1;
+        var validationResult = filter.Validate(new FilterRequest { Where = where, Sort = [sortItem] });
+        return validationResult.IsValid ? 0 : 1;
     }
 }
