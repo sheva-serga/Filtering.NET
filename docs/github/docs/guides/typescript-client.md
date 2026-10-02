@@ -39,7 +39,7 @@ const body = request({
 | `asc(f)`, `desc(f)`, `sortBy(f, dir?)` | Sort items; `sortBy` without `dir` uses the property's `DefaultSortDirection` |
 | `withTiebreakers(sort, ...tiebreakers)` | Appends each tiebreaker whose field is not already sorted (case-insensitive) |
 | `request({ where, sort, page, pageSize })` | A `FilterRequest` without `undefined` keys or an empty `sort` |
-| `toQueryString(request)` / `fromQueryString(query)` | See [Query-string binding](query-string-binding.md) |
+| `toQueryString(request)` / `fromQueryString(query)` | See [Query-string binding](query-string-binding.md); `fromQueryString` matches the four parameter names case-insensitively and throws `FilterQueryStringError` on a malformed one |
 
 ## Pitfalls
 

@@ -1,6 +1,6 @@
 namespace Filtering.Net;
 
-/// <summary>Query-string binding shape for a <see cref="FilterRequest"/>: <c>where</c> (JSON tree), repeated <c>sort</c> items, <c>page</c>, <c>pageSize</c>. Bind with <c>[AsParameters]</c> or <c>[FromQuery]</c>, then call <see cref="ToRequest"/>.</summary>
+/// <summary>Query-string binding shape for a <see cref="FilterRequest"/>: <c>where</c> (JSON tree), repeated <c>sort</c> items, <c>page</c>, <c>pageSize</c>. Bind with <c>[AsParameters]</c> or <c>[FromQuery]</c>, then call <see cref="ToRequest"/>. <c>[AsParameters]</c> reads <c>sort</c> from the query only on GET and DELETE routes; on routes that accept a body, minimal APIs infer the <see cref="SortItem"/> array from the body, so bind with <c>[FromQuery]</c> there.</summary>
 public sealed record FilterQuery
 {
     /// <summary>The filter tree parsed from the <c>where</c> parameter.</summary>
