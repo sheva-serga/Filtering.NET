@@ -1,3 +1,5 @@
+using AwesomeAssertions;
+
 namespace Filtering.Net.Generator.Tests.Diagnostics;
 
 public class Fn0009Tests
@@ -153,6 +155,32 @@ public class Fn0009Tests
         // Act
         // Assert
         DiagnosticTestHelpers.AssertDiagnosticHasAdditionalLocations(source, "FN0009", expectedAdditionalCount: 1);
+    }
+
+    [Fact]
+    public void AliasCollision_NamesTheWireKeySourcesInTheMessage()
+    {
+        // Arrange
+        var source = """
+            using Filtering.Net;
+            namespace TestNs;
+            public class User { public string Name { get; set; } = ""; public string First { get; set; } = ""; public string Last { get; set; } = ""; }
+            [GenerateFilter<User>]
+            [Map(nameof(User.Name))]
+            public partial class UserFilter
+            {
+                [PropertyMap("FullName", Alias = "name")]
+                private static FilterRule<User, string> MapFullName(FilterRuleBuilder<User, string> builder) =>
+                    builder.For(user => user.First + " " + user.Last);
+            }
+            """;
+
+        // Act
+        var diagnostic = DiagnosticTestHelpers.GetDiagnostics(source).First(item => item.Id == "FN0009");
+
+        // Assert
+        diagnostic.GetMessage().Should().Be(
+            "Alias 'name' collides with another wire key on entity 'TestNs.User': a [Map] property, a [PropertyMap] rule, or another alias (case-insensitive).");
     }
 
     [Fact]

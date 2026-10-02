@@ -86,8 +86,8 @@ internal static class DiagnosticDescriptors
 
     public static readonly DiagnosticDescriptor AliasCollision = new(
         id: "FN0009",
-        title: "Alias collides with existing property or alias",
-        messageFormat: "Alias '{0}' collides with another property or alias on entity '{1}' (case-insensitive).",
+        title: "Alias collides with another wire key",
+        messageFormat: "Alias '{0}' collides with another wire key on entity '{1}': a [Map] property, a [PropertyMap] rule, or another alias (case-insensitive).",
         category: Category,
         defaultSeverity: DiagnosticSeverity.Error,
         isEnabledByDefault: true,

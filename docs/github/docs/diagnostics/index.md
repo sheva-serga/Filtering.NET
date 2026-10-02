@@ -19,7 +19,7 @@ Filtering.Net ships 37 compile-time analyzer rules — 29 errors (`FN0001`–`FN
 | FN0006 | NoInferableProfile | Property's CLR type has no built-in primitive profile; specify `Profile = typeof(...)` explicitly. |
 | FN0007 | DuplicateInterceptor | Property has multiple `[InterceptValue]` declarations. |
 | FN0008 | NonStaticOperator | `[FilterOperator]` member must be `public static`. |
-| FN0009 | AliasCollision | Alias collides with another property name or alias ([Map] or [PropertyMap]) on the filter (case-insensitive). |
+| FN0009 | AliasCollision | Alias collides with another wire key on the filter: a `[Map]` property, a `[PropertyMap]` rule, or another alias (case-insensitive). |
 | FN0010 | InvalidBaseProfile | `[FilterProfile(BasedOn = typeof(X))]` references a type not marked with `[FilterProfile]`. |
 | FN0011 | InterceptorWithoutMap | `[InterceptValue]` declared without a matching `[Map]` for the property. |
 | FN0012 | AmbiguousProfile | Property's CLR type matches multiple profiles; use `[Map(typeof(...))]` to pick one. |
