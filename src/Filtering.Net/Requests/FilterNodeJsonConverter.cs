@@ -11,12 +11,18 @@ internal sealed class FilterNodeJsonConverter : JsonConverter<FilterNode>
             throw new JsonException($"FilterNode expects an object, got {reader.TokenType}.");
 
         using var document = JsonDocument.ParseValue(ref reader);
-        var root = document.RootElement;
+        return ReadNode(document.RootElement);
+    }
 
-        var hasAnd = root.TryGetProperty("and", out var andElement);
-        var hasOr = root.TryGetProperty("or", out var orElement);
-        var hasNot = root.TryGetProperty("not", out var notElement);
-        var hasField = root.TryGetProperty("field", out _);
+    internal static FilterNode ReadNode(JsonElement element)
+    {
+        if (element.ValueKind != JsonValueKind.Object)
+            throw new JsonException($"FilterNode expects an object, got {element.ValueKind}.");
+
+        var hasAnd = element.TryGetProperty("and", out var andElement);
+        var hasOr = element.TryGetProperty("or", out var orElement);
+        var hasNot = element.TryGetProperty("not", out var notElement);
+        var hasField = element.TryGetProperty("field", out _);
 
         var groupKindCount = (hasAnd ? 1 : 0) + (hasOr ? 1 : 0) + (hasNot ? 1 : 0);
 
@@ -25,15 +31,15 @@ internal sealed class FilterNodeJsonConverter : JsonConverter<FilterNode>
         if (groupKindCount == 1 && hasField)
             throw new JsonException("FilterNode is ambiguous: looks like both group and leaf.");
 
-        if (hasAnd) return ReadGroup(LogicalOp.And, andElement, options);
-        if (hasOr) return ReadGroup(LogicalOp.Or, orElement, options);
-        if (hasNot) return ReadNotGroup(notElement, options);
-        if (hasField) return ReadLeaf(root);
+        if (hasAnd) return ReadGroup(LogicalOp.And, andElement);
+        if (hasOr) return ReadGroup(LogicalOp.Or, orElement);
+        if (hasNot) return ReadNotGroup(notElement);
+        if (hasField) return ReadLeaf(element);
 
         throw new JsonException("FilterNode requires either `and`/`or`/`not` (group) or `field`/`op`/`value` (leaf).");
     }
 
-    private static FilterGroup ReadGroup(LogicalOp op, JsonElement childrenElement, JsonSerializerOptions options)
+    private static FilterGroup ReadGroup(LogicalOp op, JsonElement childrenElement)
     {
         if (childrenElement.ValueKind != JsonValueKind.Array)
             throw new JsonException($"`{op.ToString().ToLowerInvariant()}` must be an array of FilterNodes.");
@@ -41,16 +47,16 @@ internal sealed class FilterNodeJsonConverter : JsonConverter<FilterNode>
         var childList = new List<FilterNode>();
         foreach (var childElement in childrenElement.EnumerateArray())
         {
-            var child = childElement.Deserialize<FilterNode>(options)
-                ?? throw new JsonException("Null child in filter group.");
-            childList.Add(child);
+            if (childElement.ValueKind == JsonValueKind.Null)
+                throw new JsonException("Null child in filter group.");
+            childList.Add(ReadNode(childElement));
         }
         return new FilterGroup(op, childList);
     }
 
-    private static FilterGroup ReadNotGroup(JsonElement notElement, JsonSerializerOptions options)
+    private static FilterGroup ReadNotGroup(JsonElement notElement)
     {
-        FilterGroup readAsArray = ReadGroup(LogicalOp.Not, notElement, options);
+        FilterGroup readAsArray = ReadGroup(LogicalOp.Not, notElement);
         if (readAsArray.Children.Count != 1)
             throw new JsonException("`not` requires exactly one child.");
         return readAsArray;
