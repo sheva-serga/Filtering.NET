@@ -36,9 +36,11 @@ const query = toQueryString(body);            // where=<JSON>&sort=createDate:de
 const restored = fromQueryString(location.search);
 ```
 
-`fromQueryString` ignores parameters it does not own. It throws `FilterQueryStringError` (with `.parameter`) on malformed JSON, a sort item whose `:` suffix is not `asc`/`desc`, a non-integer page, or a repeated scalar parameter. On the server, bind with `[AsParameters] FilterQuery` (minimal APIs) or `[FromQuery] FilterQuery` (MVC) and call `ToRequest()`. Minimal APIs and `[ApiController]` controllers reject a parameter that fails to parse with a 400; other MVC controllers must check `ModelState.IsValid`.
+`fromQueryString` matches `where`, `sort`, `page` and `pageSize` case-insensitively, as ASP.NET does, and ignores parameters it does not own. It throws `FilterQueryStringError` (with `.parameter`) on malformed JSON, a sort item whose `:` suffix is not `asc`/`desc`, a page that `int.TryParse` would reject, or a repeated scalar parameter. On the server, bind with `[AsParameters] FilterQuery` (minimal APIs) or `[FromQuery] FilterQuery` (MVC) and call `ToRequest()`. `[AsParameters]` reads `sort` from the query only on GET and DELETE routes; on POST, PUT, PATCH and `Map` minimal APIs infer the `SortItem` array from the body, so use `[FromQuery]` there.
 
-A sort field that itself contains `:` cannot travel through the query string.
+Minimal APIs and `[ApiController]` controllers answer a parameter that fails to parse with a 400; other MVC controllers must check `ModelState.IsValid`. In the Development environment `RouteHandlerOptions.ThrowOnBadRequest` defaults to `true`, so behind `UseExceptionHandler` that 400 becomes a 500 unless the app sets `ThrowOnBadRequest = false` or maps `BadHttpRequestException.StatusCode`. MVC binds an empty `sort=` as an empty item rather than a binding error; `Validate` reports it.
+
+A sort field that itself contains `:` must carry an explicit direction: `meta:key:desc` round-trips, a direction-less `meta:key` does not.
 
 ## Versioning
 
