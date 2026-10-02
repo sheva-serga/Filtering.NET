@@ -73,7 +73,7 @@ function collectOwnedValues(parameters: URLSearchParams): OwnedValues {
   return owned;
 }
 
-// The server cannot bind two values into one scalar either, so taking the first would hide a real mismatch.
+// Minimal APIs answer a repeated scalar with 400 while MVC silently binds the first value; throwing keeps the client from guessing which one the server did.
 function readSingle(ownedValues: OwnedValues, parameter: Exclude<QueryParameter, 'sort'>): string | undefined {
   const values = ownedValues[parameter];
   if (values.length > 1) {
