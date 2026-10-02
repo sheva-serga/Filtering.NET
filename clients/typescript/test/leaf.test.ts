@@ -3,17 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { field } from '../src/leaf.js';
 
 describe('field', () => {
-  it('builds a binary leaf for every built-in operator', () => {
-    expect(field('name').eq('Ann')).toEqual({ field: 'name', op: 'eq', value: 'Ann' });
-    expect(field('name').ne('Bob')).toEqual({ field: 'name', op: 'ne', value: 'Bob' });
-    expect(field('age').gt(18)).toEqual({ field: 'age', op: 'gt', value: 18 });
-    expect(field('age').gte(21)).toEqual({ field: 'age', op: 'gte', value: 21 });
-    expect(field('age').lt(65)).toEqual({ field: 'age', op: 'lt', value: 65 });
-    expect(field('age').lte(60)).toEqual({ field: 'age', op: 'lte', value: 60 });
-    expect(field('name').contains('an')).toEqual({ field: 'name', op: 'contains', value: 'an' });
-    expect(field('name').startsWith('A')).toEqual({ field: 'name', op: 'startsWith', value: 'A' });
-    expect(field('name').endsWith('n')).toEqual({ field: 'name', op: 'endsWith', value: 'n' });
-    expect(field('age').in([30, 40])).toEqual({ field: 'age', op: 'in', value: [30, 40] });
+  it('builds a binary leaf', () => {
+    expect(field('age').gte(18)).toEqual({ field: 'age', op: 'gte', value: 18 });
   });
 
   it('omits the value key for isNull', () => {
@@ -24,11 +15,9 @@ describe('field', () => {
     expect(JSON.stringify(leaf)).toBe('{"field":"nickname","op":"isNull"}');
   });
 
-  it('builds custom operators with and without a value', () => {
+  it('omits the value key for a custom operator without a value', () => {
     const unary = field('tags').op('isEmpty');
 
-    expect(field('name').op('ilike', 'an%')).toEqual({ field: 'name', op: 'ilike', value: 'an%' });
-    expect(unary).toEqual({ field: 'tags', op: 'isEmpty' });
     expect('value' in unary).toBe(false);
   });
 

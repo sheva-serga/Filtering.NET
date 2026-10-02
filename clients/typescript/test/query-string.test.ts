@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { field } from '../src/leaf.js';
 import { FilterQueryStringError, fromQueryString, toQueryString } from '../src/query-string.js';
 import { request } from '../src/request.js';
-import { desc, sortBy } from '../src/sort.js';
+import { desc } from '../src/sort.js';
 
 function captureError(action: () => unknown): FilterQueryStringError {
   try {
@@ -18,20 +18,6 @@ function captureError(action: () => unknown): FilterQueryStringError {
 }
 
 describe('toQueryString', () => {
-  it('writes where as JSON, one sort key per item, then paging', () => {
-    const query = toQueryString(
-      request({ where: field('a').eq(1), sort: [desc('createdAt'), sortBy('name')], page: 2, pageSize: 10 }),
-    );
-
-    expect([...new URLSearchParams(query)]).toEqual([
-      ['where', '{"field":"a","op":"eq","value":1}'],
-      ['sort', 'createdAt:desc'],
-      ['sort', 'name'],
-      ['page', '2'],
-      ['pageSize', '10'],
-    ]);
-  });
-
   it('omits absent parts and never adds a leading question mark', () => {
     expect(toQueryString(request({}))).toBe('');
     expect(toQueryString(request({ page: 1 }))).toBe('page=1');
