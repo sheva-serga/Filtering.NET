@@ -143,20 +143,17 @@ public class EndToEndRuntimeTests
         var userFilterType = assembly.GetType("Sample.UserFilter")!;
         var userType = assembly.GetType("Sample.User")!;
         var instance = Activator.CreateInstance(userFilterType)!;
-        var query = BuildQueryable(userType,
+        var query = GeneratedFilterHarness.BuildQueryable(userType,
         [
             CreateUser(userType, "Bea", 30),
             CreateUser(userType, "Ada", 25),
             CreateUser(userType, "Ada", 40),
         ]);
         var sortItems = new List<SortItem> { new("Name", SortDir.Asc), new("Age", SortDir.Desc) };
-        var applySortingMethod = userFilterType.GetMethods().First(m => m.Name == "ApplySorting" && m.GetParameters().Length == 4);
-        var ageProperty = userType.GetProperty("Age")!;
 
         // Act
-        var sortedQuery = applySortingMethod.Invoke(instance, [query, sortItems, (int?)null, (int?)null])!;
-        var orderedAges = ((System.Collections.IEnumerable)sortedQuery).Cast<object>()
-            .Select(user => (int)ageProperty.GetValue(user)!).ToList();
+        var orderedAges = GeneratedFilterHarness.InvokeApplySorting(instance, query, sortItems)
+            .Select(user => GeneratedFilterHarness.ReadMember<int>(user, "Age")).ToList();
 
         // Assert
         orderedAges.Should().Equal(40, 25, 30);
@@ -170,13 +167,11 @@ public class EndToEndRuntimeTests
         var userFilterType = assembly.GetType("Sample.UserFilter")!;
         var userType = assembly.GetType("Sample.User")!;
         var instance = Activator.CreateInstance(userFilterType)!;
-        var query = BuildQueryable(userType, [.. Enumerable.Range(1, 30).Select(age => CreateUser(userType, $"User{age:00}", age))]);
+        var query = GeneratedFilterHarness.BuildQueryable(userType, [.. Enumerable.Range(1, 30).Select(age => CreateUser(userType, $"User{age:00}", age))]);
         var sortItems = new List<SortItem> { new("Name", SortDir.Asc) };
-        var applySortingMethod = userFilterType.GetMethods().First(m => m.Name == "ApplySorting" && m.GetParameters().Length == 4);
 
         // Act
-        var pagedQuery = applySortingMethod.Invoke(instance, [query, sortItems, (int?)1, (int?)null])!;
-        var pageRowCount = ((System.Collections.IEnumerable)pagedQuery).Cast<object>().Count();
+        var pageRowCount = GeneratedFilterHarness.InvokeApplySorting(instance, query, sortItems, page: 1).Count;
 
         // Assert — [PageSettings(DefaultPageSize = 25)], not the built-in fallback of 50.
         pageRowCount.Should().Be(25);
@@ -209,38 +204,20 @@ public class EndToEndRuntimeTests
         var userType = assembly.GetType("Sample.User")!;
         var instance = Activator.CreateInstance(userFilterType)!;
 
-        // Build an in-memory IQueryable<Sample.User> via reflection.
-        var users = new List<object>
-        {
+        var query = GeneratedFilterHarness.BuildQueryable(userType,
+        [
             CreateUser(userType, "Alice", 30),
             CreateUser(userType, "Bob", 25),
             CreateUser(userType, "Charlie", 40),
-        };
-        var listType = typeof(List<>).MakeGenericType(userType);
-        var typedList = Activator.CreateInstance(listType)!;
-        var addMethod = listType.GetMethod("Add")!;
-        foreach (var user in users) addMethod.Invoke(typedList, [user]);
-        var asQueryable = typeof(Queryable).GetMethods()
-            .First(m => m.Name == "AsQueryable" && m.IsGenericMethod)
-            .MakeGenericMethod(userType)
-            .Invoke(null, [typedList])!;
-        var applyFilterMethod = userFilterType.GetMethod("ApplyFilter")!;
+        ]);
 
         // Act — ApplyFilter(query, FilterLeaf("Age", "gt", 28)).
         var filter = new FilterLeaf("Age", "gt", JsonDocument.Parse("28").RootElement);
-        var filteredQuery = applyFilterMethod.Invoke(instance, [asQueryable, (object?)filter])!;
-
-        // Materialise: iterate the resulting IEnumerable.
-        var materialisedResults = new List<object>();
-        foreach (var resultItem in (System.Collections.IEnumerable)filteredQuery)
-        {
-            materialisedResults.Add(resultItem);
-        }
+        var materialisedResults = GeneratedFilterHarness.InvokeApplyFilter(instance, query, filter);
 
         // Assert
         materialisedResults.Should().HaveCount(2); // Alice (30) and Charlie (40)
-        var nameProperty = userType.GetProperty("Name")!;
-        var resultNames = materialisedResults.Select(u => (string)nameProperty.GetValue(u)!).ToList();
+        var resultNames = materialisedResults.Select(user => GeneratedFilterHarness.ReadMember<string>(user, "Name")).ToList();
         resultNames.Should().BeEquivalentTo(["Alice", "Charlie"]);
     }
 
@@ -290,25 +267,15 @@ public class EndToEndRuntimeTests
         var userFilterType = assembly.GetType("Sample.UserFilter")!;
         var userType = assembly.GetType("Sample.User")!;
         var instance = Activator.CreateInstance(userFilterType)!;
-        var listType = typeof(List<>).MakeGenericType(userType);
-        var typedList = Activator.CreateInstance(listType)!;
-        var addMethod = listType.GetMethod("Add")!;
-        addMethod.Invoke(typedList, [CreateUser(userType, "Alice", 30)]);
-        addMethod.Invoke(typedList, [CreateUser(userType, "Bob", 25)]);
-        var asQueryable = typeof(Queryable).GetMethods()
-            .First(m => m.Name == "AsQueryable" && m.IsGenericMethod)
-            .MakeGenericMethod(userType)
-            .Invoke(null, [typedList])!;
+        var query = GeneratedFilterHarness.BuildQueryable(userType, [CreateUser(userType, "Alice", 30), CreateUser(userType, "Bob", 25)]);
         var leaf = new FilterLeaf(field, operatorName, JsonDocument.Parse(valueJson).RootElement);
 
         // Act
         var validationResult = (FilterValidationResult)userFilterType.GetMethods()
             .First(m => m.Name == "Validate" && m.GetParameters().Length == 1 && m.GetParameters()[0].ParameterType == typeof(FilterNode))
             .Invoke(instance, [leaf])!;
-        var filteredQuery = userFilterType.GetMethod("ApplyFilter")!.Invoke(instance, [asQueryable, (object?)leaf])!;
-        var nameProperty = userType.GetProperty("Name")!;
-        var matchedNames = ((System.Collections.IEnumerable)filteredQuery).Cast<object>()
-            .Select(user => (string)nameProperty.GetValue(user)!).ToList();
+        var matchedNames = GeneratedFilterHarness.InvokeApplyFilter(instance, query, leaf)
+            .Select(user => GeneratedFilterHarness.ReadMember<string>(user, "Name")).ToList();
 
         // Assert
         validationResult.IsValid.Should().BeTrue();
@@ -419,7 +386,11 @@ public class EndToEndRuntimeTests
         var userFilterType = assembly.GetType("Sample.UserFilter")!;
         var userType = assembly.GetType("Sample.User")!;
         var instance = Activator.CreateInstance(userFilterType)!;
-        var query = BuildQueryable(userType, [CreateNamedUser(userType, "Alice"), CreateNamedUser(userType, "Bob")]);
+        var query = GeneratedFilterHarness.BuildQueryable(userType,
+        [
+            GeneratedFilterHarness.CreateInstance(userType, ("Name", "Alice")),
+            GeneratedFilterHarness.CreateInstance(userType, ("Name", "Bob")),
+        ]);
         // The base StringFilter "contains" is case-sensitive, so a match on "ALIC" proves the
         // derived operator replaced it rather than being rejected or ignored.
         var leaf = new FilterLeaf("Name", "contains", JsonDocument.Parse("\"ALIC\"").RootElement);
@@ -429,10 +400,8 @@ public class EndToEndRuntimeTests
             .First(m => m.Name == "Validate" && m.GetParameters().Length == 1
                         && m.GetParameters()[0].ParameterType == typeof(FilterNode))
             .Invoke(instance, [leaf])!;
-        var filteredQuery = userFilterType.GetMethod("ApplyFilter")!.Invoke(instance, [query, (object?)leaf])!;
-        var nameProperty = userType.GetProperty("Name")!;
-        var matchedNames = ((System.Collections.IEnumerable)filteredQuery).Cast<object>()
-            .Select(user => (string)nameProperty.GetValue(user)!).ToList();
+        var matchedNames = GeneratedFilterHarness.InvokeApplyFilter(instance, query, leaf)
+            .Select(user => GeneratedFilterHarness.ReadMember<string>(user, "Name")).ToList();
 
         // Assert
         validationResult.IsValid.Should().BeTrue();
@@ -491,11 +460,9 @@ public class EndToEndRuntimeTests
         var invoiceFilterType = assembly.GetType("Sample.Billing.InvoiceFilter")!;
         var invoiceType = assembly.GetType("Sample.Billing.Invoice")!;
         var invoiceStatusType = assembly.GetType("Sample.Billing.Status")!;
-        var paidInvoice = Activator.CreateInstance(invoiceType)!;
-        invoiceType.GetProperty("Status")!.SetValue(paidInvoice, Enum.Parse(invoiceStatusType, "Paid"));
-        var draftInvoice = Activator.CreateInstance(invoiceType)!;
-        invoiceType.GetProperty("Status")!.SetValue(draftInvoice, Enum.Parse(invoiceStatusType, "Draft"));
-        var query = BuildQueryable(invoiceType, [paidInvoice, draftInvoice]);
+        var paidInvoice = GeneratedFilterHarness.CreateInstance(invoiceType, ("Status", Enum.Parse(invoiceStatusType, "Paid")));
+        var draftInvoice = GeneratedFilterHarness.CreateInstance(invoiceType, ("Status", Enum.Parse(invoiceStatusType, "Draft")));
+        var query = GeneratedFilterHarness.BuildQueryable(invoiceType, [paidInvoice, draftInvoice]);
         var leaf = new FilterLeaf("Status", "eq", JsonDocument.Parse("\"Paid\"").RootElement);
         var instance = Activator.CreateInstance(invoiceFilterType)!;
 
@@ -504,8 +471,7 @@ public class EndToEndRuntimeTests
             .First(m => m.Name == "Validate" && m.GetParameters().Length == 1
                         && m.GetParameters()[0].ParameterType == typeof(FilterNode))
             .Invoke(instance, [leaf])!;
-        var filteredQuery = invoiceFilterType.GetMethod("ApplyFilter")!.Invoke(instance, [query, (object?)leaf])!;
-        var matched = ((System.Collections.IEnumerable)filteredQuery).Cast<object>().ToList();
+        var matched = GeneratedFilterHarness.InvokeApplyFilter(instance, query, leaf);
 
         // Assert
         assembly.GetType("Sample.Shipping.ParcelFilter").Should().NotBeNull(
@@ -568,30 +534,6 @@ public class EndToEndRuntimeTests
         validationResult.Errors.Should().Contain(e => e.Code == FilterValidationCode.InvalidValueType);
     }
 
-    private static object BuildQueryable(Type elementType, IReadOnlyList<object> elements)
-    {
-        var listType = typeof(List<>).MakeGenericType(elementType);
-        var typedList = Activator.CreateInstance(listType)!;
-        var addMethod = listType.GetMethod("Add")!;
-        foreach (var element in elements) addMethod.Invoke(typedList, [element]);
-        return typeof(Queryable).GetMethods()
-            .First(m => m.Name == "AsQueryable" && m.IsGenericMethod)
-            .MakeGenericMethod(elementType)
-            .Invoke(null, [typedList])!;
-    }
-
-    private static object CreateNamedUser(Type userType, string name)
-    {
-        var user = Activator.CreateInstance(userType)!;
-        userType.GetProperty("Name")!.SetValue(user, name);
-        return user;
-    }
-
-    private static object CreateUser(Type userType, string name, int age)
-    {
-        var user = Activator.CreateInstance(userType)!;
-        userType.GetProperty("Name")!.SetValue(user, name);
-        userType.GetProperty("Age")!.SetValue(user, age);
-        return user;
-    }
+    private static object CreateUser(Type userType, string name, int age) =>
+        GeneratedFilterHarness.CreateInstance(userType, ("Name", name), ("Age", age));
 }

@@ -46,14 +46,14 @@ public class PropertyMapSortingRuntimeTests
         var filter = Activator.CreateInstance(assembly.GetType("Sample.PersonFilter")!)!;
 
         // Act
-        var schema = filter.GetType().GetProperty("Schema")!.GetValue(filter)!;
-        var properties = ((IEnumerable)schema.GetType().GetProperty("Properties")!.GetValue(schema)!).Cast<object>();
-        var fullNameProperty = properties.Single(property => (string)ReadMember(property, "Field") == "FullName");
+        var schema = GeneratedFilterHarness.ReadMember<object>(filter, "Schema");
+        var properties = GeneratedFilterHarness.ReadMember<IEnumerable>(schema, "Properties").Cast<object>();
+        var fullNameProperty = properties.Single(property => GeneratedFilterHarness.ReadMember<string>(property, "Field") == "FullName");
 
         // Assert
-        ReadMember(fullNameProperty, "Alias").Should().Be("name");
-        ReadMember(fullNameProperty, "Sortable").Should().Be(true);
-        ReadMember(fullNameProperty, "DefaultSortDirection").Should().Be(SortDir.Desc);
+        GeneratedFilterHarness.ReadMember<string>(fullNameProperty, "Alias").Should().Be("name");
+        GeneratedFilterHarness.ReadMember<bool>(fullNameProperty, "Sortable").Should().BeTrue();
+        GeneratedFilterHarness.ReadMember<SortDir>(fullNameProperty, "DefaultSortDirection").Should().Be(SortDir.Desc);
     }
 
     [Fact]
@@ -62,22 +62,19 @@ public class PropertyMapSortingRuntimeTests
         // Arrange
         var assembly = RuntimeLoader.LoadGeneratedAssembly(ConsumerSource);
         var personType = assembly.GetType("Sample.Person")!;
-        var filterType = assembly.GetType("Sample.PersonFilter")!;
-        var filter = Activator.CreateInstance(filterType)!;
-        var people = (IList)Activator.CreateInstance(typeof(List<>).MakeGenericType(personType))!;
-        people.Add(CreatePerson(personType, 1, "Ann", "Adams"));
-        people.Add(CreatePerson(personType, 2, "Cid", "Clark"));
-        people.Add(CreatePerson(personType, 3, "Bea", "Brown"));
-        var applySorting = filterType.GetMethod(
-            "ApplySorting",
-            [typeof(IQueryable<>).MakeGenericType(personType), typeof(IReadOnlyList<SortItem>), typeof(int?), typeof(int?)])!;
-        IReadOnlyList<SortItem> sortItems = [new SortItem("name")];
+        var filter = Activator.CreateInstance(assembly.GetType("Sample.PersonFilter")!)!;
+        var people = GeneratedFilterHarness.BuildQueryable(personType,
+        [
+            GeneratedFilterHarness.CreateInstance(personType, ("Id", 1), ("FirstName", "Ann"), ("LastName", "Adams")),
+            GeneratedFilterHarness.CreateInstance(personType, ("Id", 2), ("FirstName", "Cid"), ("LastName", "Clark")),
+            GeneratedFilterHarness.CreateInstance(personType, ("Id", 3), ("FirstName", "Bea"), ("LastName", "Brown")),
+        ]);
 
         // Act
-        var sortedPeople = (IEnumerable)applySorting.Invoke(filter, [Queryable.AsQueryable(people), sortItems, null, null])!;
+        var sortedPeople = GeneratedFilterHarness.InvokeApplySorting(filter, people, [new SortItem("name")]);
 
         // Assert
-        sortedPeople.Cast<object>().Select(person => (string)ReadMember(person, "FirstName"))
+        sortedPeople.Select(person => GeneratedFilterHarness.ReadMember<string>(person, "FirstName"))
             .Should().Equal("Cid", "Bea", "Ann");
     }
 
@@ -107,42 +104,22 @@ public class PropertyMapSortingRuntimeTests
         var assembly = RuntimeLoader.LoadGeneratedAssembly(ConsumerSource);
         var personType = assembly.GetType("Sample.Person")!;
         var teamType = assembly.GetType("Sample.Team")!;
-        var filterType = assembly.GetType("Sample.TeamFilter")!;
-        var filter = Activator.CreateInstance(filterType)!;
-        var teams = (IList)Activator.CreateInstance(typeof(List<>).MakeGenericType(teamType))!;
-        teams.Add(CreateTeam(teamType, 1, CreatePerson(personType, 1, "Ann", "Adams")));
-        teams.Add(CreateTeam(teamType, 2, CreatePerson(personType, 2, "Cid", "Clark")));
-        teams.Add(CreateTeam(teamType, 3, CreatePerson(personType, 3, "Bea", "Brown")));
-        var applySorting = filterType.GetMethod(
-            "ApplySorting",
-            [typeof(IQueryable<>).MakeGenericType(teamType), typeof(IReadOnlyList<SortItem>), typeof(int?), typeof(int?)])!;
-        IReadOnlyList<SortItem> sortItems = [new SortItem("Leader.name")];
+        var filter = Activator.CreateInstance(assembly.GetType("Sample.TeamFilter")!)!;
+        var teams = GeneratedFilterHarness.BuildQueryable(teamType,
+        [
+            CreateTeam(teamType, 1, GeneratedFilterHarness.CreateInstance(personType, ("Id", 1), ("FirstName", "Ann"), ("LastName", "Adams"))),
+            CreateTeam(teamType, 2, GeneratedFilterHarness.CreateInstance(personType, ("Id", 2), ("FirstName", "Cid"), ("LastName", "Clark"))),
+            CreateTeam(teamType, 3, GeneratedFilterHarness.CreateInstance(personType, ("Id", 3), ("FirstName", "Bea"), ("LastName", "Brown"))),
+        ]);
 
         // Act
-        var sortedTeams = (IEnumerable)applySorting.Invoke(filter, [Queryable.AsQueryable(teams), sortItems, null, null])!;
+        var sortedTeams = GeneratedFilterHarness.InvokeApplySorting(filter, teams, [new SortItem("Leader.name")]);
 
         // Assert
-        sortedTeams.Cast<object>().Select(team => (int)ReadMember(team, "Id"))
+        sortedTeams.Select(team => GeneratedFilterHarness.ReadMember<int>(team, "Id"))
             .Should().Equal(2, 3, 1);
     }
 
-    private static object CreateTeam(Type teamType, int id, object leader)
-    {
-        var team = Activator.CreateInstance(teamType)!;
-        teamType.GetProperty("Id")!.SetValue(team, id);
-        teamType.GetProperty("Leader")!.SetValue(team, leader);
-        return team;
-    }
-
-    private static object CreatePerson(Type personType, int id, string firstName, string lastName)
-    {
-        var person = Activator.CreateInstance(personType)!;
-        personType.GetProperty("Id")!.SetValue(person, id);
-        personType.GetProperty("FirstName")!.SetValue(person, firstName);
-        personType.GetProperty("LastName")!.SetValue(person, lastName);
-        return person;
-    }
-
-    private static object ReadMember(object instance, string memberName) =>
-        instance.GetType().GetProperty(memberName)!.GetValue(instance)!;
+    private static object CreateTeam(Type teamType, int id, object leader) =>
+        GeneratedFilterHarness.CreateInstance(teamType, ("Id", id), ("Leader", leader));
 }

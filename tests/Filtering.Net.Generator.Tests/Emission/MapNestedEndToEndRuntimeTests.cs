@@ -177,12 +177,11 @@ public class MapNestedEndToEndRuntimeTests
         var instance = Activator.CreateInstance(userFilterType)!;
         var userWithDepartment = CreateUserWithOptionalDepartment(userType, departmentType, "alice", "Sales");
         var userWithoutDepartment = CreateUserWithOptionalDepartment(userType, departmentType, "bob", departmentName: null);
-        var typedQueryable = BuildTypedQueryable(userType, [userWithDepartment, userWithoutDepartment]);
+        var typedQueryable = GeneratedFilterHarness.BuildQueryable(userType, [userWithDepartment, userWithoutDepartment]);
         var leaf = new FilterLeaf("department.name", "eq", JsonDocument.Parse("\"Sales\"").RootElement);
 
         // Act
-        var filteredQuery = userFilterType.GetMethod("ApplyFilter")!.Invoke(instance, [typedQueryable, (object?)leaf])!;
-        var materialiseAllRows = () => MaterializeLogins(filteredQuery, userType);
+        var materialiseAllRows = () => GeneratedFilterHarness.InvokeApplyFilter(instance, typedQueryable, leaf);
 
         // Assert
         materialiseAllRows.Should().Throw<NullReferenceException>();
@@ -197,7 +196,7 @@ public class MapNestedEndToEndRuntimeTests
         var userType = assembly.GetType("Sample.User")!;
         var departmentType = assembly.GetType("Sample.Department")!;
         var instance = Activator.CreateInstance(userFilterType)!;
-        var typedQueryable = BuildTypedQueryable(userType,
+        var typedQueryable = GeneratedFilterHarness.BuildQueryable(userType,
         [
             CreateUserWithOptionalDepartment(userType, departmentType, "alice", "Sales"),
             CreateUserWithOptionalDepartment(userType, departmentType, "bob", "Engineering"),
@@ -205,8 +204,7 @@ public class MapNestedEndToEndRuntimeTests
         var leaf = new FilterLeaf("department.name", "eq", JsonDocument.Parse("\"Sales\"").RootElement);
 
         // Act
-        var filteredQuery = userFilterType.GetMethod("ApplyFilter")!.Invoke(instance, [typedQueryable, (object?)leaf])!;
-        var matchedLogins = MaterializeLogins(filteredQuery, userType);
+        var matchedLogins = ReadLogins(GeneratedFilterHarness.InvokeApplyFilter(instance, typedQueryable, leaf));
 
         // Assert
         matchedLogins.Should().Equal(["alice"]);
@@ -300,22 +298,18 @@ public class MapNestedEndToEndRuntimeTests
         var departmentType = assembly.GetType("Sample.Department")!;
         var resolverConstructor = userFilterType.GetConstructor([typeof(System.Text.Json.Serialization.Metadata.IJsonTypeInfoResolver)])!;
         var instance = resolverConstructor.Invoke([new System.Text.Json.Serialization.Metadata.DefaultJsonTypeInfoResolver()]);
-        var users = new[]
-        {
+        var typedQueryable = GeneratedFilterHarness.BuildQueryable(userType,
+        [
             CreateUserWithDepartmentEmail(userType, departmentType, "alice@corp.com"),
             CreateUserWithDepartmentEmail(userType, departmentType, "bob@example.org"),
-        };
-        var typedQueryable = BuildTypedQueryable(userType, users);
-        var applyFilterMethod = userFilterType.GetMethod("ApplyFilter")!;
+        ]);
         var leaf = new FilterLeaf("department.domain", "eq", JsonDocument.Parse("\"corp.com\"").RootElement);
 
         // Act
-        var filteredQuery = applyFilterMethod.Invoke(instance, [typedQueryable, (object?)leaf])!;
-        var matchCount = 0;
-        foreach (var _ in (System.Collections.IEnumerable)filteredQuery) matchCount++;
+        var matchedUsers = GeneratedFilterHarness.InvokeApplyFilter(instance, typedQueryable, leaf);
 
         // Assert
-        matchCount.Should().Be(1);
+        matchedUsers.Should().ContainSingle();
     }
 
     private const string SelfReferencingSource = """
@@ -338,29 +332,21 @@ public class MapNestedEndToEndRuntimeTests
         var employeeFilterType = assembly.GetType("Sample.EmployeeFilter")!;
         var employeeType = assembly.GetType("Sample.Employee")!;
         var instance = Activator.CreateInstance(employeeFilterType)!;
-        object CreateEmployee(string name, object? manager)
-        {
-            var employee = Activator.CreateInstance(employeeType)!;
-            employeeType.GetProperty("Name")!.SetValue(employee, name);
-            employeeType.GetProperty("Manager")!.SetValue(employee, manager);
-            return employee;
-        }
-        var employees = new[]
-        {
+        object CreateEmployee(string name, object? manager) =>
+            GeneratedFilterHarness.CreateInstance(employeeType, ("Name", name), ("Manager", manager));
+        var typedQueryable = GeneratedFilterHarness.BuildQueryable(employeeType,
+        [
             CreateEmployee("Eli", CreateEmployee("Mia", CreateEmployee("Dana", null))),
             CreateEmployee("Noa", CreateEmployee("Max", CreateEmployee("Zed", null))),
-        };
-        var typedQueryable = BuildTypedQueryable(employeeType, employees);
+        ]);
         var withinDepth = new FilterLeaf("manager.manager.name", "eq", JsonDocument.Parse("\"Dana\"").RootElement);
         var beyondDepth = new FilterLeaf("manager.manager.manager.name", "eq", JsonDocument.Parse("\"x\"").RootElement);
         var validateMethod = employeeFilterType.GetMethods()
             .First(m => m.Name == "Validate" && m.GetParameters().Length == 1 && m.GetParameters()[0].ParameterType == typeof(FilterNode));
 
         // Act
-        var filteredQuery = employeeFilterType.GetMethod("ApplyFilter")!.Invoke(instance, [typedQueryable, (object?)withinDepth])!;
-        var nameProperty = employeeType.GetProperty("Name")!;
-        var matchedNames = ((System.Collections.IEnumerable)filteredQuery).Cast<object>()
-            .Select(employee => (string)nameProperty.GetValue(employee)!).ToList();
+        var matchedNames = GeneratedFilterHarness.InvokeApplyFilter(instance, typedQueryable, withinDepth)
+            .Select(employee => GeneratedFilterHarness.ReadMember<string>(employee, "Name")).ToList();
         var beyondDepthResult = (FilterValidationResult)validateMethod.Invoke(instance, [beyondDepth])!;
 
         // Assert
@@ -378,20 +364,17 @@ public class MapNestedEndToEndRuntimeTests
         var departmentType = assembly.GetType("Sample.Department")!;
         var companyType = assembly.GetType("Sample.Company")!;
         var instance = Activator.CreateInstance(userFilterType)!;
-        var users = new[]
-        {
+        var typedQueryable = GeneratedFilterHarness.BuildQueryable(userType,
+        [
             CreateUser(userType, "alice", departmentType, 1, "Sales", companyType, "DE"),
             CreateUser(userType, "bob", departmentType, 2, "Engineering", companyType, "US"),
             CreateUser(userType, "carol", departmentType, 3, "Sales", companyType, "FR"),
-        };
-        var typedQueryable = BuildTypedQueryable(userType, users);
-        var applyFilterMethod = userFilterType.GetMethod("ApplyFilter")!;
+        ]);
         // Wire path stays lower-case; CLR navigation is PascalCase.
         var leaf = new FilterLeaf("department.name", "eq", JsonDocument.Parse("\"Sales\"").RootElement);
 
         // Act
-        var filteredQuery = applyFilterMethod.Invoke(instance, [typedQueryable, (object?)leaf])!;
-        var matchedLogins = MaterializeLogins(filteredQuery, userType);
+        var matchedLogins = ReadLogins(GeneratedFilterHarness.InvokeApplyFilter(instance, typedQueryable, leaf));
 
         // Assert
         matchedLogins.Should().BeEquivalentTo(["alice", "carol"]);
@@ -407,19 +390,16 @@ public class MapNestedEndToEndRuntimeTests
         var departmentType = assembly.GetType("Sample.Department")!;
         var companyType = assembly.GetType("Sample.Company")!;
         var instance = Activator.CreateInstance(userFilterType)!;
-        var users = new[]
-        {
+        var typedQueryable = GeneratedFilterHarness.BuildQueryable(userType,
+        [
             CreateUser(userType, "alice", departmentType, 1, "Sales", companyType, "DE"),
             CreateUser(userType, "bob", departmentType, 2, "Engineering", companyType, "US"),
             CreateUser(userType, "carol", departmentType, 3, "Sales", companyType, "DE"),
-        };
-        var typedQueryable = BuildTypedQueryable(userType, users);
-        var applyFilterMethod = userFilterType.GetMethod("ApplyFilter")!;
+        ]);
         var leaf = new FilterLeaf("department.company.country", "eq", JsonDocument.Parse("\"DE\"").RootElement);
 
         // Act
-        var filteredQuery = applyFilterMethod.Invoke(instance, [typedQueryable, (object?)leaf])!;
-        var matchedLogins = MaterializeLogins(filteredQuery, userType);
+        var matchedLogins = ReadLogins(GeneratedFilterHarness.InvokeApplyFilter(instance, typedQueryable, leaf));
 
         // Assert
         matchedLogins.Should().BeEquivalentTo(["alice", "carol"]);
@@ -434,19 +414,18 @@ public class MapNestedEndToEndRuntimeTests
         var userType = assembly.GetType("Sample.User")!;
         var departmentType = assembly.GetType("Sample.Department")!;
         var instance = Activator.CreateInstance(userFilterType)!;
-        var users = new[]
-        {
+        var typedQueryable = GeneratedFilterHarness.BuildQueryable(userType,
+        [
             CreateSimpleUser(userType, departmentType, "Sales"),
             CreateSimpleUser(userType, departmentType, "Engineering"),
             CreateSimpleUser(userType, departmentType, "Sales-EU"),
-        };
-        var typedQueryable = BuildTypedQueryable(userType, users);
-        var applyFilterMethod = userFilterType.GetMethod("ApplyFilter")!;
+        ]);
         var leaf = new FilterLeaf("department.name", "fuzzy", JsonDocument.Parse("\"Sal\"").RootElement);
 
         // Act
-        var filteredQuery = applyFilterMethod.Invoke(instance, [typedQueryable, (object?)leaf])!;
-        var matchedDepartmentNames = MaterializeDepartmentNames(filteredQuery, userType, departmentType);
+        var matchedDepartmentNames = GeneratedFilterHarness.InvokeApplyFilter(instance, typedQueryable, leaf)
+            .Select(user => GeneratedFilterHarness.ReadMember<string>(GeneratedFilterHarness.ReadMember<object>(user, "Department"), "Name"))
+            .ToList();
 
         // Assert
         matchedDepartmentNames.Should().BeEquivalentTo(["Sales", "Sales-EU"]);
@@ -463,22 +442,18 @@ public class MapNestedEndToEndRuntimeTests
         var userType = assembly.GetType("Sample.User")!;
         var departmentType = assembly.GetType("Sample.Department")!;
         var instance = Activator.CreateInstance(userFilterType)!;
-        var users = new[]
-        {
+        var typedQueryable = GeneratedFilterHarness.BuildQueryable(userType,
+        [
             CreateUserWithDepartmentEmail(userType, departmentType, "alice@corp.com"),
             CreateUserWithDepartmentEmail(userType, departmentType, "bob@corp.com"),
-        };
-        var typedQueryable = BuildTypedQueryable(userType, users);
-        var applyFilterMethod = userFilterType.GetMethod("ApplyFilter")!;
+        ]);
         var leaf = new FilterLeaf("department.email", "contains", JsonDocument.Parse("\"ALICE\"").RootElement);
 
         // Act
-        var filteredQuery = applyFilterMethod.Invoke(instance, [typedQueryable, (object?)leaf])!;
-        var matchCount = 0;
-        foreach (var _ in (System.Collections.IEnumerable)filteredQuery) matchCount++;
+        var matchedUsers = GeneratedFilterHarness.InvokeApplyFilter(instance, typedQueryable, leaf);
 
         // Assert
-        matchCount.Should().Be(1);
+        matchedUsers.Should().ContainSingle();
     }
 
     [Fact]
@@ -511,24 +486,20 @@ public class MapNestedEndToEndRuntimeTests
         var departmentType = assembly.GetType("Sample.Department")!;
         var companyType = assembly.GetType("Sample.Company")!;
         var instance = Activator.CreateInstance(userFilterType)!;
-        var users = new[]
-        {
+        var typedQueryable = GeneratedFilterHarness.BuildQueryable(userType,
+        [
             CreateUser(userType, "carol", departmentType, 3, "Sales", companyType, "FR"),
             CreateUser(userType, "alice", departmentType, 1, "Engineering", companyType, "DE"),
             CreateUser(userType, "bob", departmentType, 2, "Marketing", companyType, "US"),
-        };
-        var typedQueryable = BuildTypedQueryable(userType, users);
+        ]);
         var sortItems = new List<SortItem> { new("department.name", SortDir.Asc) };
         var validateSortMethod = userFilterType.GetMethods()
             .First(m => m.Name == "Validate" && m.GetParameters().Length == 1
                         && m.GetParameters()[0].ParameterType == typeof(IReadOnlyList<SortItem>));
-        var applySortingMethod = userFilterType.GetMethods()
-            .First(m => m.Name == "ApplySorting" && m.GetParameters().Length == 4);
 
         // Act
         var validationResult = (FilterValidationResult)validateSortMethod.Invoke(instance, [sortItems])!;
-        var sortedQuery = applySortingMethod.Invoke(instance, [typedQueryable, sortItems, (int?)null, (int?)null])!;
-        var orderedLogins = MaterializeLogins(sortedQuery, userType);
+        var orderedLogins = ReadLogins(GeneratedFilterHarness.InvokeApplySorting(instance, typedQueryable, sortItems));
 
         // Assert
         validationResult.IsValid.Should().BeTrue();
@@ -565,15 +536,13 @@ public class MapNestedEndToEndRuntimeTests
         var departmentType = assembly.GetType("Sample.Department")!;
         var companyType = assembly.GetType("Sample.Company")!;
         var instance = Activator.CreateInstance(userFilterType)!;
-        var users = new[]
-        {
+        var typedQueryable = GeneratedFilterHarness.BuildQueryable(userType,
+        [
             CreateUser(userType, "alice", departmentType, 1, "Sales", companyType, "DE"),
             CreateUser(userType, "bob", departmentType, 1, "Sales", companyType, "US"),
             CreateUser(userType, "carol", departmentType, 2, "Sales", companyType, "DE"),
             CreateUser(userType, "dave", departmentType, 1, "Engineering", companyType, "DE"),
-        };
-        var typedQueryable = BuildTypedQueryable(userType, users);
-        var applyFilterMethod = userFilterType.GetMethod("ApplyFilter")!;
+        ]);
         var combinedFilter = new FilterGroup(
             LogicalOp.And,
             [
@@ -583,8 +552,7 @@ public class MapNestedEndToEndRuntimeTests
             ]);
 
         // Act
-        var filteredQuery = applyFilterMethod.Invoke(instance, [typedQueryable, (object?)combinedFilter])!;
-        var matchedLogins = MaterializeLogins(filteredQuery, userType);
+        var matchedLogins = ReadLogins(GeneratedFilterHarness.InvokeApplyFilter(instance, typedQueryable, combinedFilter));
 
         // Assert
         matchedLogins.Should().ContainSingle().Which.Should().Be("alice");
@@ -599,83 +567,26 @@ public class MapNestedEndToEndRuntimeTests
         Type companyType,
         string companyCountry)
     {
-        var company = Activator.CreateInstance(companyType)!;
-        companyType.GetProperty("Country")!.SetValue(company, companyCountry);
-        var department = Activator.CreateInstance(departmentType)!;
-        departmentType.GetProperty("Id")!.SetValue(department, departmentId);
-        departmentType.GetProperty("Name")!.SetValue(department, departmentName);
-        departmentType.GetProperty("Company")!.SetValue(department, company);
-        var user = Activator.CreateInstance(userType)!;
-        userType.GetProperty("Login")!.SetValue(user, login);
-        userType.GetProperty("Department")!.SetValue(user, department);
-        return user;
+        var company = GeneratedFilterHarness.CreateInstance(companyType, ("Country", companyCountry));
+        var department = GeneratedFilterHarness.CreateInstance(departmentType, ("Id", departmentId), ("Name", departmentName), ("Company", company));
+        return GeneratedFilterHarness.CreateInstance(userType, ("Login", login), ("Department", department));
     }
 
-    private static object CreateSimpleUser(Type userType, Type departmentType, string departmentName)
-    {
-        var department = Activator.CreateInstance(departmentType)!;
-        departmentType.GetProperty("Name")!.SetValue(department, departmentName);
-        var user = Activator.CreateInstance(userType)!;
-        userType.GetProperty("Department")!.SetValue(user, department);
-        return user;
-    }
+    private static object CreateSimpleUser(Type userType, Type departmentType, string departmentName) =>
+        GeneratedFilterHarness.CreateInstance(userType,
+            ("Department", GeneratedFilterHarness.CreateInstance(departmentType, ("Name", departmentName))));
 
-    private static object CreateUserWithOptionalDepartment(Type userType, Type departmentType, string login, string? departmentName)
-    {
-        var user = Activator.CreateInstance(userType)!;
-        userType.GetProperty("Login")!.SetValue(user, login);
-        if (departmentName is not null)
-        {
-            var department = Activator.CreateInstance(departmentType)!;
-            departmentType.GetProperty("Name")!.SetValue(department, departmentName);
-            userType.GetProperty("Department")!.SetValue(user, department);
-        }
-        return user;
-    }
+    private static object CreateUserWithOptionalDepartment(Type userType, Type departmentType, string login, string? departmentName) =>
+        departmentName is null
+            ? GeneratedFilterHarness.CreateInstance(userType, ("Login", login))
+            : GeneratedFilterHarness.CreateInstance(userType,
+                ("Login", login),
+                ("Department", GeneratedFilterHarness.CreateInstance(departmentType, ("Name", departmentName))));
 
-    private static object CreateUserWithDepartmentEmail(Type userType, Type departmentType, string email)
-    {
-        var department = Activator.CreateInstance(departmentType)!;
-        departmentType.GetProperty("Email")!.SetValue(department, email);
-        var user = Activator.CreateInstance(userType)!;
-        userType.GetProperty("Department")!.SetValue(user, department);
-        return user;
-    }
+    private static object CreateUserWithDepartmentEmail(Type userType, Type departmentType, string email) =>
+        GeneratedFilterHarness.CreateInstance(userType,
+            ("Department", GeneratedFilterHarness.CreateInstance(departmentType, ("Email", email))));
 
-    private static object BuildTypedQueryable(Type entityType, IEnumerable<object> entities)
-    {
-        var listType = typeof(List<>).MakeGenericType(entityType);
-        var typedList = Activator.CreateInstance(listType)!;
-        var addMethod = listType.GetMethod("Add")!;
-        foreach (var entity in entities) addMethod.Invoke(typedList, [entity]);
-        return typeof(Queryable).GetMethods()
-            .First(m => m.Name == "AsQueryable" && m.IsGenericMethod)
-            .MakeGenericMethod(entityType)
-            .Invoke(null, [typedList])!;
-    }
-
-    private static List<string> MaterializeLogins(object query, Type userType)
-    {
-        var loginProperty = userType.GetProperty("Login")!;
-        var results = new List<string>();
-        foreach (var entity in (System.Collections.IEnumerable)query)
-        {
-            results.Add((string)loginProperty.GetValue(entity)!);
-        }
-        return results;
-    }
-
-    private static List<string> MaterializeDepartmentNames(object query, Type userType, Type departmentType)
-    {
-        var departmentProperty = userType.GetProperty("Department")!;
-        var nameProperty = departmentType.GetProperty("Name")!;
-        var results = new List<string>();
-        foreach (var entity in (System.Collections.IEnumerable)query)
-        {
-            var department = departmentProperty.GetValue(entity)!;
-            results.Add((string)nameProperty.GetValue(department)!);
-        }
-        return results;
-    }
-
+    private static List<string> ReadLogins(IEnumerable<object> users) =>
+        users.Select(user => GeneratedFilterHarness.ReadMember<string>(user, "Login")).ToList();
 }

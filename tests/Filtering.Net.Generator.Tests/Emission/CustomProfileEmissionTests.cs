@@ -114,11 +114,11 @@ public class CustomProfileEmissionTests
         var users = BuildUserQueryable(assembly, ["alice@example.com", "bob@example.com"]);
 
         // Act
-        var results = InvokeApplyFilter(assembly, "Sample.UserFilter", filterInstance, users, request.Where!);
+        var results = GeneratedFilterHarness.InvokeApplyFilter(filterInstance, users, request.Where!);
 
         // Assert
         results.Should().HaveCount(1);
-        GetEmailProperty(assembly, results[0]).Should().Be("alice@example.com");
+        GeneratedFilterHarness.ReadMember<string>(results[0], "Email").Should().Be("alice@example.com");
         trackingResolver.RequestedTypes.Should().Contain(requestedType => requestedType.Name == "RegexFilterValue");
     }
 
@@ -136,7 +136,7 @@ public class CustomProfileEmissionTests
 
         // Act
         var thrownException = Assert.Throws<TargetInvocationException>(
-            () => InvokeApplyFilter(assembly, "Sample.UserFilter", filterInstance, users, request.Where!));
+            () => GeneratedFilterHarness.InvokeApplyFilter(filterInstance, users, request.Where!));
 
         // Assert — unwrap the reflective wrapper to reach the Filtering.Net exception.
         var filterDispatchException = thrownException.InnerException.Should().BeOfType<FilterDispatchException>().Subject;
@@ -154,48 +154,8 @@ public class CustomProfileEmissionTests
     private static object BuildUserQueryable(Assembly assembly, string[] emailAddresses)
     {
         var userType = assembly.GetType("Sample.User")!;
-        var listType = typeof(List<>).MakeGenericType(userType);
-        var typedList = Activator.CreateInstance(listType)!;
-        var addMethod = listType.GetMethod("Add")!;
-        var emailProperty = userType.GetProperty("Email")!;
-
-        foreach (var emailAddress in emailAddresses)
-        {
-            var userInstance = Activator.CreateInstance(userType)!;
-            emailProperty.SetValue(userInstance, emailAddress);
-            addMethod.Invoke(typedList, [userInstance]);
-        }
-
-        return typeof(Queryable)
-            .GetMethods()
-            .First(queryableMethod => queryableMethod.Name == "AsQueryable" && queryableMethod.IsGenericMethod)
-            .MakeGenericMethod(userType)
-            .Invoke(null, [typedList])!;
-    }
-
-    private static List<object> InvokeApplyFilter(
-        Assembly assembly,
-        string filterTypeName,
-        object filterInstance,
-        object queryable,
-        FilterNode whereNode)
-    {
-        var filterType = assembly.GetType(filterTypeName)!;
-        var applyFilterMethod = filterType.GetMethod("ApplyFilter")!;
-        var filteredQuery = applyFilterMethod.Invoke(filterInstance, [queryable, whereNode])!;
-
-        var materializedResults = new List<object>();
-        foreach (var resultItem in (System.Collections.IEnumerable)filteredQuery)
-        {
-            materializedResults.Add(resultItem);
-        }
-        return materializedResults;
-    }
-
-    private static string GetEmailProperty(Assembly assembly, object userInstance)
-    {
-        var userType = assembly.GetType("Sample.User")!;
-        return (string)userType.GetProperty("Email")!.GetValue(userInstance)!;
+        return GeneratedFilterHarness.BuildQueryable(userType,
+            [.. emailAddresses.Select(emailAddress => GeneratedFilterHarness.CreateInstance(userType, ("Email", emailAddress)))]);
     }
 
     private sealed class TrackingResolver(IJsonTypeInfoResolver inner) : IJsonTypeInfoResolver

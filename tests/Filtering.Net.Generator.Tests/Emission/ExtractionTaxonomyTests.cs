@@ -18,7 +18,7 @@ namespace Filtering.Net.Generator.Tests.Emission;
 ///   <item>invoke the generated <c>ApplyFilter</c> with one <see cref="FilterLeaf"/>,</item>
 ///   <item>assert the matched rows (and, for typed-value rows, that the resolver was queried).</item>
 /// </list>
-/// All reflection boilerplate lives in the helpers at the bottom of this file.</summary>
+/// The row-spec and leaf helpers at the bottom of this file sit on top of <see cref="GeneratedFilterHarness"/>.</summary>
 public class ExtractionTaxonomyTests
 {
     // -------------------------------------------------------------------------
@@ -396,32 +396,12 @@ public class ExtractionTaxonomyTests
     private static object BuildQueryable(Assembly assembly, params Dictionary<string, object?>[] rowSpecs)
     {
         var entityType = assembly.GetType("Sample.User")!;
-        var listType = typeof(List<>).MakeGenericType(entityType);
-        var list = Activator.CreateInstance(listType)!;
-        var addMethod = listType.GetMethod("Add")!;
-        foreach (var spec in rowSpecs)
-        {
-            var instance = Activator.CreateInstance(entityType)!;
-            foreach (var (propertyName, propertyValue) in spec)
-                entityType.GetProperty(propertyName)!.SetValue(instance, propertyValue);
-            addMethod.Invoke(list, [instance]);
-        }
-        return typeof(Queryable).GetMethods()
-            .First(m => m.Name == "AsQueryable" && m.IsGenericMethod)
-            .MakeGenericMethod(entityType)
-            .Invoke(null, [list])!;
+        return GeneratedFilterHarness.BuildQueryable(entityType,
+            [.. rowSpecs.Select(rowSpec => GeneratedFilterHarness.CreateInstance(entityType, [.. rowSpec.Select(property => (property.Key, property.Value))]))]);
     }
 
-    /// <summary>Invokes the filter's generated <c>ApplyFilter</c> over the queryable and
-    /// materialises the resulting <see cref="IEnumerable"/> into a list.</summary>
-    private static List<object> ApplyFilter(object filter, object queryable, FilterNode where)
-    {
-        var filtered = filter.GetType().GetMethod("ApplyFilter")!.Invoke(filter, [queryable, where])!;
-        var results = new List<object>();
-        foreach (var item in (System.Collections.IEnumerable)filtered)
-            results.Add(item);
-        return results;
-    }
+    private static List<object> ApplyFilter(object filter, object queryable, FilterNode where) =>
+        GeneratedFilterHarness.InvokeApplyFilter(filter, queryable, where);
 
     /// <summary>Builds a <see cref="FilterLeaf"/> from a field name, an operator, and the JSON
     /// text of the value. <c>Leaf("Age", "in", "[25, 35]")</c> reads more naturally than the
@@ -429,9 +409,8 @@ public class ExtractionTaxonomyTests
     private static FilterLeaf Leaf(string field, string @operator, string jsonValue) =>
         new(field, @operator, JsonDocument.Parse(jsonValue).RootElement);
 
-    /// <summary>Reads the named property off a reflectively-loaded entity instance.</summary>
     private static T GetProp<T>(object instance, string propertyName) =>
-        (T)instance.GetType().GetProperty(propertyName)!.GetValue(instance)!;
+        GeneratedFilterHarness.ReadMember<T>(instance, propertyName);
 
     private sealed class TrackingResolver(IJsonTypeInfoResolver inner) : IJsonTypeInfoResolver
     {

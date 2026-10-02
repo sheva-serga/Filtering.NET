@@ -90,7 +90,7 @@ public class PropertyMapOverrideEmissionTests
         var queryable = BuildUserQueryable(assembly, [("Alice", "Smith"), ("Bob", "Jones")]);
 
         // Act
-        var results = InvokeApplyFilter(assembly, "Sample.UserFilter", filterInstance, queryable, whereNode);
+        var results = GeneratedFilterHarness.InvokeApplyFilter(filterInstance, queryable, whereNode);
 
         // Assert
         results.Should().HaveCount(1);
@@ -143,7 +143,7 @@ public class PropertyMapOverrideEmissionTests
         var queryable = BuildUserQueryable(assembly, [("Alice", "Smith"), ("Bob", "Jones")]);
 
         // Act
-        var results = InvokeApplyFilter(assembly, "Sample.UserFilter", filterInstance, queryable, whereNode);
+        var results = GeneratedFilterHarness.InvokeApplyFilter(filterInstance, queryable, whereNode);
 
         // Assert
         results.Should().HaveCount(1);
@@ -290,44 +290,8 @@ public class PropertyMapOverrideEmissionTests
     private static object BuildUserQueryable(Assembly assembly, (string FirstName, string LastName)[] users)
     {
         var userType = assembly.GetType("Sample.User")!;
-        var listType = typeof(List<>).MakeGenericType(userType);
-        var typedList = Activator.CreateInstance(listType)!;
-        var addMethod = listType.GetMethod("Add")!;
-        var firstNameProperty = userType.GetProperty("FirstName")!;
-        var lastNameProperty = userType.GetProperty("LastName")!;
-
-        foreach (var (firstName, lastName) in users)
-        {
-            var userInstance = Activator.CreateInstance(userType)!;
-            firstNameProperty.SetValue(userInstance, firstName);
-            lastNameProperty.SetValue(userInstance, lastName);
-            addMethod.Invoke(typedList, [userInstance]);
-        }
-
-        return typeof(Queryable)
-            .GetMethods()
-            .First(queryableMethod => queryableMethod.Name == "AsQueryable" && queryableMethod.IsGenericMethod)
-            .MakeGenericMethod(userType)
-            .Invoke(null, [typedList])!;
-    }
-
-    private static List<object> InvokeApplyFilter(
-        Assembly assembly,
-        string filterTypeName,
-        object filterInstance,
-        object queryable,
-        FilterNode whereNode)
-    {
-        var filterType = assembly.GetType(filterTypeName)!;
-        var applyFilterMethod = filterType.GetMethod("ApplyFilter")!;
-        var filteredQuery = applyFilterMethod.Invoke(filterInstance, [queryable, whereNode])!;
-
-        var materializedResults = new List<object>();
-        foreach (var resultItem in (System.Collections.IEnumerable)filteredQuery)
-        {
-            materializedResults.Add(resultItem);
-        }
-        return materializedResults;
+        return GeneratedFilterHarness.BuildQueryable(userType,
+            [.. users.Select(user => GeneratedFilterHarness.CreateInstance(userType, ("FirstName", user.FirstName), ("LastName", user.LastName)))]);
     }
 
     private sealed class TrackingResolver(IJsonTypeInfoResolver inner) : IJsonTypeInfoResolver
