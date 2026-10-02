@@ -123,7 +123,7 @@ public class QueryStringParsingTests
     {
         // Arrange
         _ = FilterNode.TryParse("""{"field":"a","op":"isNull"}""", null, out var where);
-        var filterQuery = new FilterQuery(where, [new SortItem("a", SortDir.Desc)], 2, 25);
+        var filterQuery = new FilterQuery { Where = where, Sort = [new SortItem("a", SortDir.Desc)], Page = 2, PageSize = 25 };
 
         // Act
         var filterRequest = filterQuery.ToRequest();
@@ -139,7 +139,7 @@ public class QueryStringParsingTests
     public void FilterQueryToRequest_NoParts_ReturnsEmptyRequest()
     {
         // Act
-        var filterRequest = new FilterQuery(null, null, null, null).ToRequest();
+        var filterRequest = new FilterQuery().ToRequest();
 
         // Assert
         filterRequest.Should().Be(new FilterRequest());
@@ -149,7 +149,7 @@ public class QueryStringParsingTests
     public void FilterQueryToRequest_EmptySort_ReturnsNullSort()
     {
         // Act
-        var filterRequest = new FilterQuery(null, [], null, null).ToRequest();
+        var filterRequest = new FilterQuery { Sort = [] }.ToRequest();
 
         // Assert
         filterRequest.Sort.Should().BeNull();
