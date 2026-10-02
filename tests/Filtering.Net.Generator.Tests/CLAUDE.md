@@ -6,7 +6,7 @@ Three families of tests for the source generator, mixed in this one project beca
 2. **Emission tests** — `Emission/`. Two flavours per scenario:
    - `*_Compiles` — runs the generator + compiles the emitted output, asserts no diagnostics. Catches regressions where the emitted code wouldn't actually build at consumer side. **These MUST stay green at every step of any refactor.**
    - `*_EmitsXxx` — `Verify.Xunit` snapshot of the full emitted file. Compared against `Snapshots/*.verified.cs`. Re-blessed wholesale when emitter changes are intentional.
-3. **End-to-end runtime tests** — `Emission/EndToEndRuntimeTests.cs`. Compiles the generator output, loads it, runs the resulting `IFilterDefinition<T>` against in-memory data, asserts behaviour. Catches semantic regressions that compile-clean tests miss.
+3. **End-to-end runtime tests** — `Emission/EndToEndRuntimeTests.cs`, `MapNestedEndToEndRuntimeTests.cs`, `PropertyMapSortingRuntimeTests.cs`. Compile the generator output through `RuntimeLoader`, drive the loaded filter class through `GeneratedFilterHarness` against in-memory data, assert behaviour. Catches semantic regressions that compile-clean tests miss.
 
 **Target:** `net9.0`. xUnit v3 + AwesomeAssertions + Verify.XunitV3 + Verify.SourceGenerators + Microsoft.CodeAnalysis.CSharp.
 
@@ -33,7 +33,8 @@ Inspect the diff first — `diff -uw verified.cs received.cs` to ignore whitespa
 - **`GeneratorRunner.cs`** — runs `FilterGenerator` against an in-memory `CSharpCompilation`, returns the resulting `GeneratorDriverRunResult`. The single entry point used by extraction, diagnostic, snapshot, and end-to-end tests.
 - **`Emission/CompileVerifier.cs`** — drives the generator and compiles the result with the test project's references attached, returning compile diagnostics for assertion. Used by every `*_Compiles` test.
 - **`Emission/ModuleInitializer.cs`** — Verify.Xunit global configuration (snapshot path, scrubbers) loaded once per test run.
-- **`Emission/RuntimeLoader.cs`** — small reflection helper that loads the generator's emitted assembly into the test process. Used only by `EndToEndRuntimeTests`.
+- **`Emission/RuntimeLoader.cs`** — compiles the generator output for a consumer source into an in-memory assembly and loads it into the test process; throws on emission errors. Used by the three runtime test classes and by the emission tests that execute what they emit (`CustomProfileEmissionTests`, `DiExtensionEmissionTests`, `ExtractionTaxonomyTests`, `PropertyMapOverrideEmissionTests`).
+- **`Emission/GeneratedFilterHarness.cs`** — reflection helpers shared by those same tests for driving a filter class loaded through `RuntimeLoader`: builds typed in-memory queryables of the consumer's entity types, creates instances and reads their members by name, and invokes the generated `ApplyFilter` / `ApplySorting`, materialising the results.
 
 ## Adding a snapshot test
 
