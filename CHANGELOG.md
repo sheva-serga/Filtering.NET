@@ -5,7 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.3.0] - Unreleased
+## [0.3.0] - 2026-10-02
 
 ### Added
 - `[PropertyMap]` takes `Alias`, `Sortable`, and `DefaultSortDirection`, with the same meaning as on `[Map]`. A computed accessor such as `x => x.Price ?? 0m` can now be sorted and exposed under a different wire key, including when lifted through `[MapNested]`. `FN0009` checks `[PropertyMap]` names and aliases together with `[Map]` ones.
