@@ -171,7 +171,7 @@ jobs:
     steps:
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
         with:
-          node-version: 22
+          node-version: 24
           registry-url: https://registry.npmjs.org
 
       - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
@@ -187,5 +187,3 @@ jobs:
           esac
           echo "Publishing with dist-tag: $DIST_TAG"
           npm publish ./artifacts/npm/*.tgz --provenance --access public --tag "$DIST_TAG"
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
