@@ -3,22 +3,15 @@ using System.Text.Json;
 
 using AwesomeAssertions;
 
-using Microsoft.AspNetCore.Builder;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.TestHost;
-using Microsoft.Extensions.DependencyInjection;
-
 using Xunit;
 
 namespace Filtering.Net.Tests.WireFixtures;
 
-public sealed class WireFixtureTests : IAsyncLifetime
+public sealed class WireFixtureTests(EchoServerFixture echoServer) : IClassFixture<EchoServerFixture>
 {
-    internal static readonly JsonSerializerOptions WebOptions = new(JsonSerializerDefaults.Web);
     private static readonly string FixtureDirectory = Path.Combine(AppContext.BaseDirectory, "wire-fixtures");
 
-    private WebApplication? _echoServer;
+    private readonly EchoServerFixture _echoServer = echoServer;
 
     public static TheoryData<string> FixtureNames()
     {
@@ -28,23 +21,6 @@ public sealed class WireFixtureTests : IAsyncLifetime
             fixtureNames.Add(Path.GetFileNameWithoutExtension(fixturePath));
         }
         return fixtureNames;
-    }
-
-    public async ValueTask InitializeAsync()
-    {
-        var builder = WebApplication.CreateBuilder();
-        builder.WebHost.UseTestServer();
-        builder.Services.AddControllers().AddApplicationPart(typeof(WireFixtureTests).Assembly);
-        var echoServer = builder.Build();
-        echoServer.MapGet("/minimal", ([AsParameters] FilterQuery query) => Results.Json(query.ToRequest(), WebOptions));
-        echoServer.MapControllers();
-        await echoServer.StartAsync(TestContext.Current.CancellationToken);
-        _echoServer = echoServer;
-    }
-
-    public async ValueTask DisposeAsync()
-    {
-        if (_echoServer is not null) await _echoServer.DisposeAsync();
     }
 
     [Fact]
@@ -79,10 +55,9 @@ public sealed class WireFixtureTests : IAsyncLifetime
     {
         // Arrange
         var fixture = WireFixture.Load(FixtureDirectory, fixtureName);
-        var client = _echoServer!.GetTestClient();
 
         // Act
-        var response = await client.GetAsync("/minimal?" + fixture.QueryString, TestContext.Current.CancellationToken);
+        var response = await _echoServer.Client.GetAsync("/minimal?" + fixture.QueryString, TestContext.Current.CancellationToken);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -95,10 +70,9 @@ public sealed class WireFixtureTests : IAsyncLifetime
     {
         // Arrange
         var fixture = WireFixture.Load(FixtureDirectory, fixtureName);
-        var client = _echoServer!.GetTestClient();
 
         // Act
-        var response = await client.GetAsync("/mvc?" + fixture.QueryString, TestContext.Current.CancellationToken);
+        var response = await _echoServer.Client.GetAsync("/mvc?" + fixture.QueryString, TestContext.Current.CancellationToken);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.OK);
@@ -114,11 +88,8 @@ public sealed class WireFixtureTests : IAsyncLifetime
     [InlineData("page=abc")]
     public async Task MinimalApiBinding_MalformedParameter_ReturnsBadRequest(string queryString)
     {
-        // Arrange
-        var client = _echoServer!.GetTestClient();
-
         // Act
-        var response = await client.GetAsync("/minimal?" + queryString, TestContext.Current.CancellationToken);
+        var response = await _echoServer.Client.GetAsync("/minimal?" + queryString, TestContext.Current.CancellationToken);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
@@ -131,11 +102,8 @@ public sealed class WireFixtureTests : IAsyncLifetime
     [InlineData("page=abc")]
     public async Task MvcBinding_MalformedParameter_ReturnsBadRequest(string queryString)
     {
-        // Arrange
-        var client = _echoServer!.GetTestClient();
-
         // Act
-        var response = await client.GetAsync("/mvc?" + queryString, TestContext.Current.CancellationToken);
+        var response = await _echoServer.Client.GetAsync("/mvc?" + queryString, TestContext.Current.CancellationToken);
 
         // Assert
         response.StatusCode.Should().Be(HttpStatusCode.BadRequest);
@@ -147,11 +115,10 @@ public sealed class WireFixtureTests : IAsyncLifetime
     public async Task MvcBinding_EmptySortValue_BindsAnItemThatFailsSortValidation(string queryString, string expectedErrorPath)
     {
         // Arrange
-        var client = _echoServer!.GetTestClient();
         var definition = WireSampleDefinition.Create();
 
         // Act
-        var response = await client.GetAsync("/mvc?" + queryString, TestContext.Current.CancellationToken);
+        var response = await _echoServer.Client.GetAsync("/mvc?" + queryString, TestContext.Current.CancellationToken);
         var validationResult = definition.Validate(await ReadRequestAsync(response));
 
         // Assert
@@ -161,12 +128,12 @@ public sealed class WireFixtureTests : IAsyncLifetime
                 expectedErrorPath, FilterValidationCode.NotSortable, "A sort item must name a field."));
     }
 
-    private static string Canonical(FilterRequest filterRequest) => JsonSerializer.Serialize(filterRequest, WebOptions);
+    private static string Canonical(FilterRequest filterRequest) => JsonSerializer.Serialize(filterRequest, EchoServerFixture.WebOptions);
 
     private static async Task<FilterRequest> ReadRequestAsync(HttpResponseMessage response) =>
         JsonSerializer.Deserialize<FilterRequest>(
             await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken),
-            WebOptions)!;
+            EchoServerFixture.WebOptions)!;
 }
 
 internal sealed record WireFixture(string Name, FilterRequest Request, string QueryString)
@@ -174,13 +141,5 @@ internal sealed record WireFixture(string Name, FilterRequest Request, string Qu
     public static WireFixture Load(string fixtureDirectory, string fixtureName) =>
         JsonSerializer.Deserialize<WireFixture>(
             File.ReadAllText(Path.Combine(fixtureDirectory, fixtureName + ".json")),
-            WireFixtureTests.WebOptions)!;
-}
-
-[ApiController]
-[Route("mvc")]
-public sealed class QueryStringEchoController : ControllerBase
-{
-    [HttpGet]
-    public IActionResult Echo([FromQuery] FilterQuery query) => new JsonResult(query.ToRequest(), WireFixtureTests.WebOptions);
+            EchoServerFixture.WebOptions)!;
 }
