@@ -152,6 +152,20 @@ public class FilterNodeJsonConverterTests
     }
 
     [Fact]
+    public void Write_NullGroupChildIsWrittenAsJsonNull()
+    {
+        // Arrange
+        var leaf = new FilterLeaf("a", "eq", JsonDocument.Parse("1").RootElement);
+        var group = new FilterGroup(LogicalOp.And, [leaf, null!]);
+
+        // Act
+        var json = JsonSerializer.Serialize<FilterNode>(group, Options);
+
+        // Assert
+        json.Should().Be("""{"and":[{"field":"a","op":"eq","value":1},null]}""");
+    }
+
+    [Fact]
     public void RoundTrip_PreservesNestedStructure()
     {
         // Arrange
