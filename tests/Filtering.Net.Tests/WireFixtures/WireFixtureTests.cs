@@ -80,9 +80,62 @@ public sealed class WireFixtureTests(EchoServerFixture echoServer) : IClassFixtu
     }
 
     [Theory]
+    [MemberData(nameof(FixtureNames))]
+    public async Task PlainMvcBinding_FixtureQueryString_ProducesTheFixtureRequestWithValidModelState(string fixtureName)
+    {
+        // Arrange
+        var fixture = WireFixture.Load(FixtureDirectory, fixtureName);
+
+        // Act
+        var echo = await ReadPlainMvcEchoAsync("/plain?" + fixture.QueryString);
+
+        // Assert
+        echo.ModelStateValid.Should().BeTrue();
+        Canonical(echo.Request).Should().Be(Canonical(fixture.Request));
+    }
+
+    [Theory]
+    [InlineData("where=5", "Where")]
+    [InlineData("where=%7B%22field%22%3A%22a%22%7D", "Where")]
+    [InlineData("where=%7B%7D", "Where")]
+    [InlineData("sort=name%3Aup", "Sort")]
+    [InlineData("sort=%3Adesc", "Sort")]
+    [InlineData("page=abc", "Page")]
+    public async Task PlainMvcBinding_MalformedParameter_InvalidatesModelStateAndLeavesThePartUnbound(string queryString, string expectedErrorKey)
+    {
+        // Act
+        var echo = await ReadPlainMvcEchoAsync("/plain?" + queryString);
+
+        // Assert
+        echo.ModelStateValid.Should().BeFalse();
+        echo.ErrorKeys.Should().Equal(expectedErrorKey);
+        Canonical(echo.Request).Should().Be(Canonical(new FilterRequest()));
+    }
+
+    [Fact]
+    public async Task PlainMvcBinding_EmptySortValue_KeepsModelStateValidAndBindsAnItemThatFailsSortValidation()
+    {
+        // Arrange
+        var definition = WireSampleDefinition.Create();
+
+        // Act
+        var echo = await ReadPlainMvcEchoAsync("/plain?sort=");
+        var validationResult = definition.Validate(echo.Request);
+
+        // Assert
+        echo.ModelStateValid.Should().BeTrue();
+        echo.Request.Sort.Should().ContainSingle().Which.Should().BeNull();
+        validationResult.Errors.Should().ContainSingle()
+            .Which.Should().BeEquivalentTo(new FilterValidationError(
+                "sort[0].field", FilterValidationCode.NotSortable, "A sort item must name a field."));
+    }
+
+    [Theory]
     [InlineData("where=5")]
     [InlineData("where=%7B%22field%22%3A%22a%22%7D")]
+    [InlineData("where=%7B%7D")]
     [InlineData("sort=name%3Aup")]
+    [InlineData("sort=%3Adesc")]
     [InlineData("sort=")]
     [InlineData("sort=name&sort=")]
     [InlineData("page=abc")]
@@ -98,7 +151,9 @@ public sealed class WireFixtureTests(EchoServerFixture echoServer) : IClassFixtu
     [Theory]
     [InlineData("where=5")]
     [InlineData("where=%7B%22field%22%3A%22a%22%7D")]
+    [InlineData("where=%7B%7D")]
     [InlineData("sort=name%3Aup")]
+    [InlineData("sort=%3Adesc")]
     [InlineData("page=abc")]
     public async Task MvcBinding_MalformedParameter_ReturnsBadRequest(string queryString)
     {
@@ -134,6 +189,15 @@ public sealed class WireFixtureTests(EchoServerFixture echoServer) : IClassFixtu
         JsonSerializer.Deserialize<FilterRequest>(
             await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken),
             EchoServerFixture.WebOptions)!;
+
+    private async Task<PlainMvcEcho> ReadPlainMvcEchoAsync(string requestUri)
+    {
+        var response = await _echoServer.Client.GetAsync(requestUri, TestContext.Current.CancellationToken);
+        response.EnsureSuccessStatusCode();
+        return JsonSerializer.Deserialize<PlainMvcEcho>(
+            await response.Content.ReadAsStringAsync(TestContext.Current.CancellationToken),
+            EchoServerFixture.WebOptions)!;
+    }
 }
 
 internal sealed record WireFixture(string Name, FilterRequest Request, string QueryString)

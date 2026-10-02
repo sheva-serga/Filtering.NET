@@ -44,6 +44,21 @@ public sealed class EchoServerFixture : IAsyncLifetime
     }
 }
 
+public sealed record PlainMvcEcho(bool ModelStateValid, FilterRequest Request, string[] ErrorKeys);
+
+[Route("plain")]
+public sealed class PlainMvcEchoController : Controller
+{
+    [HttpGet]
+    public IActionResult Echo([FromQuery] FilterQuery query) =>
+        new JsonResult(
+            new PlainMvcEcho(
+                ModelState.IsValid,
+                query.ToRequest(),
+                [.. ModelState.Where(entry => entry.Value?.Errors.Count > 0).Select(entry => entry.Key).Order(StringComparer.Ordinal)]),
+            EchoServerFixture.WebOptions);
+}
+
 [ApiController]
 [Route("mvc")]
 public sealed class QueryStringEchoController : ControllerBase
